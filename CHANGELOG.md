@@ -26,6 +26,8 @@ minor version.
 - `Trajectory.from_anthropic` and `Action.from_anthropic`, which read
   Anthropic's Messages format: a request into a trajectory, a response into
   the action to rate.
+- `Trajectory.from_openai_chat` and `Action.from_openai_chat`, which read the
+  OpenAI chat completions format with OpenRouter's reasoning fields.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
   `image/*` in `MediaPart`.
