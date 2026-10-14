@@ -31,6 +31,7 @@ class Trajectory:
     def __init__(self) -> None:
         self._history: list[Event] = []
         self._action_ids: set[str] = set()
+        self._call_ids: set[str] = set()
         self._subagents: dict[str, Trajectory] = {}
 
     @classmethod
@@ -55,6 +56,7 @@ class Trajectory:
         if action.id in self._action_ids:
             raise ConfigurationError("an action with this id is already in the trajectory")
         self._action_ids.add(action.id)
+        self._call_ids.update(call.id for call in action.tool_calls)
         self._history.append(action)
 
     def observe(self, observation: Observation) -> None:
@@ -64,8 +66,11 @@ class Trajectory:
     def delegate(self, instruction: str, *, call_id: str) -> Trajectory:
         """Start a subagent's trajectory, held under the tool call that delegated it.
 
-        The subagent's task is the instruction, authored by the delegator.
+        The call must be one an action in this trajectory made. The subagent's task
+        is the instruction, authored by the delegator.
         """
+        if call_id not in self._call_ids:
+            raise ConfigurationError("delegate takes the id of a tool call in this trajectory")
         if call_id in self._subagents:
             raise ConfigurationError("a subagent is already delegated by this call")
         child = Trajectory()
@@ -90,7 +95,8 @@ class Trajectory:
         """Rebuild a trajectory from what dump returned.
 
         Raises FormatError, naming the JSONPath of the first problem, on data that
-        dump could not have returned.
+        lacks what dump writes or holds it in another shape. Keys dump does not
+        write are ignored.
         """
         return cls._load(data, path="$")
 
@@ -126,4 +132,8 @@ class Trajectory:
 
     def _load_subagents(self, subagents: dict[str, JSON], *, path: str) -> None:
         for index, (call_id, data) in enumerate(subagents.items()):
+            if call_id not in self._call_ids:
+                raise FormatError(
+                    path=f"{path}[{index}]", expected="a subagent under a tool call in the history"
+                )
             self._subagents[call_id] = Trajectory._load(data, path=f"{path}[{index}]")

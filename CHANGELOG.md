@@ -12,3 +12,14 @@ failing one is a breaking change; before 1.0.0, a breaking change raises the
 minor version.
 
 ## [Unreleased]
+
+### Added
+
+- `Trajectory`, a run's append-only history of actions and observations:
+  `from_run` for a black-box agent, `act`, `observe`, `delegate` to a subagent
+  under the tool call that delegated it, and `dump` and `load` in a
+  JSON-compatible format, version 1.
+- `Action`, `ToolCall`, `Observation`, `ToolObservation`, `TextPart`,
+  `MediaPart`, `Description` and `Author`.
+- `ConfigurationError`, for arguments that cannot work, and `FormatError`,
+  which names the JSONPath of a malformed payload and never quotes it.
