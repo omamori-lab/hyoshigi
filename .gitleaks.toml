@@ -1,0 +1,6 @@
+# gitleaks configuration: the default rules. A fake value a test plants to
+# check that nothing leaks is allowlisted here by its exact value.
+title = "hyoshigi"
+
+[extend]
+useDefault = true

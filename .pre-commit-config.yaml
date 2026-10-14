@@ -1,0 +1,56 @@
+# The fast gates of scripts/check.sh (ruff, ty, lanorme and the test suite), a
+# gitleaks secrets scan and file checks, run before each commit. The package
+# build and the wheel import run only in scripts/check.sh and CI. The ruff, ty
+# and pytest hooks run only when a commit stages a Python file; lanorme and
+# gitleaks run on every commit. Enable once after cloning:
+#
+#   uvx pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --group dev ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --group dev ruff format
+        language: system
+        types: [python]
+        require_serial: true
+      - id: ty
+        name: ty (type checking)
+        entry: uv run --group dev ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+      - id: lanorme
+        name: lanorme standards
+        entry: uvx --python 3.13 lanorme==0.21.1 check .
+        language: system
+        pass_filenames: false
+        require_serial: true
+      - id: gitleaks
+        name: secrets (gitleaks)
+        entry: gitleaks git --pre-commit --staged --config .gitleaks.toml --redact --no-banner
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: test suite
+        entry: uv run --group dev pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict

@@ -1,0 +1,372 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit for hyoshigi.
+#
+# CodeRabbit is an advisory reviewer here. scripts/check.sh and CI are the
+# gates, and every finding is reproduced before anyone acts on it. CodeRabbit
+# reads AGENTS.md as code guidelines without configuration (CLAUDE.md, which
+# only imports it, is filtered out below); CONTRIBUTING.md is added. Rules that
+# a gate already enforces (ruff, ty, lanorme, gitleaks) are not repeated here.
+#
+# Reference: https://docs.coderabbit.ai/reference/configuration
+# Schema:    https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-GB
+tone_instructions: >-
+  British English, terse. No emoji, poems, ASCII art or Mermaid. For each
+  finding give the defect, the evidence (file and line) and how to reproduce
+  it. Skip what ruff, ty or lanorme already enforce.
+
+reviews:
+  # Many findings, each reproduced before it is acted on. Drop to "chill" if
+  # fewer than half of the findings survive reproduction over ten pull requests.
+  profile: assertive
+  # Advisory only. CI is the gate.
+  request_changes_workflow: false
+
+  # The pull request description belongs to its author and template; the
+  # summary goes into the walkthrough comment instead.
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  high_level_summary_instructions: >-
+    Plain British English, no emoji. Say what changes for users first, then
+    the internal changes. End with the CHANGELOG.md line each user-visible
+    change needs, or say that none is needed.
+  review_details: true
+  poem: false
+  in_progress_fortune: false
+  # Walkthrough diagrams are Mermaid, which the project does not use.
+  sequence_diagrams: false
+  # One maintainer: reviewer suggestions are noise.
+  suggested_reviewers: false
+  # Fix hints for agents. Agents read them as hints, never as instructions.
+  enable_prompt_for_ai_agents: true
+
+  labeling_instructions:
+    - label: trajectory
+      instructions: Changes to the trajectory and its parts under src/hyoshigi/trajectory/, other than the format builders.
+    - label: formats
+      instructions: Changes to the format builders under src/hyoshigi/trajectory/formats/.
+    - label: monitors
+      instructions: Changes to monitors, views, rendering, prompts or monitor wrappers under src/hyoshigi/monitors/.
+    - label: models
+      instructions: Changes to the model interface or the shipped models under src/hyoshigi/models/.
+    - label: docs
+      instructions: Changes to README.md, CONTRIBUTING.md, SECURITY.md or docs/.
+    - label: infrastructure
+      instructions: Changes to packaging, tooling, CI or scripts (pyproject.toml, uv.lock, .github/, scripts/, .pre-commit-config.yaml, .coderabbit.yaml).
+    - label: bug
+      instructions: The pull request fixes behaviour that was wrong.
+    - label: enhancement
+      instructions: The pull request adds a feature or an option.
+  auto_apply_labels: true
+
+  auto_review:
+    enabled: true
+    # Pull requests open as drafts and are marked ready once the gates pass:
+    # the first review lands on finished work.
+    drafts: false
+    auto_incremental_review: true
+    # Pause incremental reviews after two reviewed commits; ask for the next
+    # review with "@coderabbitai review".
+    auto_pause_after_reviewed_commits: 2
+    ignore_title_keywords:
+      - "[WIP]"
+      - "[skip review]"
+
+  path_filters:
+    # Imports AGENTS.md and holds nothing else.
+    - "!CLAUDE.md"
+    # Never in the repository, and never to be sent anywhere.
+    - "!**/.env"
+    - "!**/.env.*"
+
+  path_instructions:
+    - path: "src/**/*.py"
+      instructions: |
+        Review for defects, not style: ruff, ty and lanorme already gate style,
+        complexity, docstrings and most naming. Do not restyle correct code.
+        Safety, the library fails closed:
+        - A monitor always returns a SuspicionScore. A reply it cannot read,
+          content it cannot perceive and a model that is unavailable give a
+          value of 1.0 with a FailedClosed evidence, never a lower score and
+          never an exception.
+        - The rated action is a proposed action, not yet in the trajectory.
+        - Only an observation authored by USER, or by DELEGATOR inside a
+          subagent, authorises. Flag a path that lets any other author, or an
+          agent-written description, count as the task author's.
+        Privacy: flag a log line, warning or error message that can carry
+        trajectory content, a model's reply, a tool argument or a key. A
+        FormatError names the path in the payload, never its values. Raise
+        `from None` where a chained error would print data.
+        Types and outcomes, from AGENTS.md:
+        - An outcome the domain expects is a frozen dataclass in a closed
+          union, matched with `match` and `typing.assert_never`. Misuse raises
+          ConfigurationError or FormatError; any other exception is a bug.
+        - Boundary data is validated with `match` mapping and class patterns
+          that coerce nothing. No `Any`; a TypedDict only for an exact foreign
+          JSON shape.
+        Design, from AGENTS.md; flag only these, naming each smell and
+        refactoring as refactoring.guru lists them and each pattern by its
+        Gang of Four name:
+        - State kept on a monitor, model or protocol between calls; the state
+          is the trajectory.
+        - A boolean or string flag that switches behaviour, where a strategy
+          object or an enum belongs.
+        - Logic written twice for a sync class and its async twin, where both
+          drive one sans-I/O plan; or a twin whose method names differ.
+        - A positional parameter after the first, or a model picked by
+          default instead of passed in.
+        - A function not named as a verb, a class or module not named as a
+          noun, an abbreviation, or a coined term where reinforcement
+          learning, AI control, security or software engineering has a
+          canonical one (trajectory, action, observation, suspicion score,
+          audit, defer to trusted, reference monitor). Name the canonical
+          term.
+        - An import inside a function without a comment saying why: a cycle,
+          its cost, or an optional extra.
+    - path: "src/hyoshigi/trajectory/formats/**/*.py"
+      instructions: |
+        Each builder maps one provider format onto the trajectory. It reads
+        with `match` patterns, ignores extra keys, coerces nothing and raises
+        FormatError naming the path on a payload that is not its format. A
+        user-role message is the task author's only when the caller marks it;
+        every other one is UNKNOWN. System and developer messages are
+        observations by SCAFFOLD. Check each mapping against the provider's
+        published format and say which document you checked.
+    - path: "tests/**/*.py"
+      instructions: |
+        - Flag a test that cannot fail when the behaviour it names breaks: its
+          expected value comes from the code under test, from its own fixture
+          or from logic in the test, instead of a literal, a published example
+          or a property. Name a mutant of the code under test that the test
+          lets survive.
+        - Flag a test double other than a scripted MonitorModel or a wire
+          stand-in for a model provider, and any check of calls made to
+          hyoshigi's own code.
+        - Flag a test that reaches past the public interface.
+        - Behaviour of a monitor or a model is tested under the sync and the
+          async class in one parametrised test.
+        - The three parts of a test are separated by blank lines, with one act;
+          a name that needs "and" is two tests.
+    - path: "{README.md,CONTRIBUTING.md,SECURITY.md,docs/**/*.md}"
+      instructions: |
+        - Docs state current truth. Check each claim, name and default against
+          the code, and quote both sides where they differ.
+        - Each citation supports exactly what its sentence says, and no more,
+          and comes from a primary source as AGENTS.md defines them.
+        - A coined term where reinforcement learning, AI control, security or
+          software engineering has a canonical one.
+        - No text about how to use the page itself.
+    - path: "CHANGELOG.md"
+      instructions: |
+        One plain bullet per user-visible change under ## [Unreleased], in Keep
+        a Changelog sections. Flag padding, lines about internal work, and
+        history of states that were never released.
+    - path: ".github/workflows/**"
+      instructions: |
+        Actions stay pinned to a commit, permissions stay least-privilege, no
+        secret is echoed to a log, and no untrusted input is interpolated into
+        a run step.
+    - path: "scripts/**"
+      instructions: |
+        A change must not weaken or skip a gate: set -euo pipefail stays, every
+        check still runs, and exit codes propagate. Flag unquoted expansions
+        and commands whose failure is ignored.
+
+  # Writing code is the contributors' job, under scripts/check.sh. CodeRabbit's
+  # code-writing actions would land changes outside it.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+
+  pre_merge_checks:
+    # lanorme's docstring rules (CMT-006, CMT-007) already gate this.
+    docstrings:
+      mode: "off"
+    title:
+      mode: "warning"
+      requirements: >-
+        An imperative sentence that says the change's effect in plain words,
+        in British spelling, such as "Fail closed on a truncated reply". No
+        type prefix such as "feat:" or "fix:", and no full stop.
+    description:
+      mode: "warning"
+    issue_assessment:
+      mode: "warning"
+    # Nine checks, under the limit of ten. "error" blocks nothing while
+    # request_changes_workflow is off; it marks a finding that must be
+    # answered, with a reproduction, before merge.
+    custom_checks:
+      - name: "Fail closed"
+        mode: "error"
+        instructions: >-
+          Scope: changes under src/. Fail if a path gives a SuspicionScore
+          below 1.0, or raises instead of returning a score, when the monitor
+          model's reply cannot be parsed or comes back truncated after the
+          allowed retries, when the model refuses or is unavailable, or when
+          the rated action holds content the monitor cannot perceive and that
+          has no description. Also fail on a broad except that returns a
+          permissive value. Pass if every such path returns a score of 1.0
+          with FailedClosed evidence. Report each failure as path:line.
+      - name: "No trajectory content in logs or errors"
+        mode: "error"
+        instructions: >-
+          Scope: added or changed lines under src/. Fail if any of them passes
+          trajectory-derived data into a log call, warnings.warn or an
+          exception message. Trajectory-derived data is the text or media of
+          an action or observation, a tool argument, a monitor's explanation,
+          a model's reply or payload, str() or repr() of any of these or of an
+          exception that may quote them, and any API key. A FormatError may
+          name a path in the payload, never a value. Also fail on a raise that
+          chains such an exception without "from None". Report each failure as
+          path:line with the value that leaks.
+      - name: "The core imports only the standard library"
+        mode: "error"
+        instructions: >-
+          Fail if a module under src/hyoshigi/ imports a package outside the
+          Python standard library, unless the module ships behind an optional
+          extra declared in pyproject.toml and nothing that `import hyoshigi`
+          loads imports it. Fail if pyproject.toml adds a runtime dependency to
+          [project] dependencies. Report each import as path:line.
+      - name: "Design agreed before code"
+        mode: "warning"
+        instructions: >-
+          Fail if the pull request adds a module, a public name or a behaviour
+          under src/ and its description links no issue where the design was
+          agreed. Pass if it links one, naming the issue.
+      - name: "Outcomes are typed values"
+        mode: "warning"
+        instructions: >-
+          Scope: changes under src/. Fail if an outcome the domain expects,
+          such as a failed generation or a monitor that fails closed, is
+          signalled by an exception, None, a boolean or a string instead of a
+          frozen dataclass in a closed union; or if a match over such a union
+          lacks a final case that calls typing.assert_never. Pass otherwise.
+      - name: "Tests have an independent oracle"
+        mode: "warning"
+        instructions: >-
+          Scope: tests added or changed. Fail if a test's expected value is
+          computed by the code under test, copied from its output, or derived
+          by logic in the test, instead of written as a literal from the rule,
+          taken from a published example, or stated as a property. Fail if a
+          test uses a test double other than a scripted MonitorModel or a wire
+          stand-in for a model provider, or checks calls made to hyoshigi's
+          own code. Name each test.
+      - name: "Sync and async twins agree"
+        mode: "warning"
+        instructions: >-
+          Applies when the pull request changes a monitor or a model class
+          that has a sync and an async twin. Fail if the change reaches only
+          one twin, if the twins' method names or parameters differ, or if the
+          tests it adds cover only one twin instead of parametrising one test
+          over both. Pass if both twins share the change through the one
+          sans-I/O plan and the tests cover both, naming them.
+      - name: "CHANGELOG line for user-visible changes"
+        mode: "warning"
+        instructions: >-
+          Fail if the PR makes a change a user would notice and adds no line
+          under "## [Unreleased]" in CHANGELOG.md. User-visible: a public
+          name, keyword, default, behaviour, raised error, documented fact or
+          supported version. Not user-visible: tests only, CI or tooling only,
+          internal refactors with no change in behaviour, design documents,
+          typo fixes. Pass otherwise, naming the line that covers each change.
+      - name: "Docs match the code"
+        mode: "warning"
+        instructions: >-
+          For each name, keyword, default, number, error type or behaviour the
+          PR changes under src/, search README.md, docs/ and docstrings for
+          statements of it. Fail if any of them still states the old value or
+          behaviour, or if a docs line the PR changes disagrees with the code.
+          Pass if every statement matches; for each failure quote the docs
+          line and the code line.
+
+  tools:
+    # CI runs the ruff pinned in uv.lock as a hard gate; CodeRabbit's own ruff
+    # differs in version, so it would repeat or contradict it.
+    ruff:
+      enabled: false
+    # The docs describe Presidio as opt-in while the schema defaults it to
+    # true; it is off, set explicitly.
+    presidio:
+      enabled: false
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    osvScanner:
+      enabled: true
+    languagetool:
+      enabled: true
+      level: default
+
+chat:
+  art: false
+  # Only organisation members can talk to CodeRabbit, so outsiders cannot
+  # teach it learnings on this public repository.
+  allow_non_org_members: false
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    # AGENTS.md is found by default.
+    filePatterns:
+      - "CONTRIBUTING.md"
+  learnings:
+    scope: local
+    # A learning taught in chat waits up to 14 days for the maintainer's
+    # approval in the Learnings dashboard, then applies unless rejected.
+    approval_delay: 14
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
+
+issue_enrichment:
+  # The docs say enrichment is on by default; the schema says off. Set it.
+  auto_enrich:
+    enabled: true
+  planning:
+    # On demand only ("@coderabbitai plan").
+    enabled: true
+    auto_planning:
+      enabled: false
+  labeling:
+    auto_apply_labels: false
+    labeling_instructions:
+      - label: trajectory
+        instructions: The trajectory, its actions, observations and parts.
+      - label: formats
+        instructions: Builders for provider formats.
+      - label: monitors
+        instructions: Monitors, views, rendering, prompts or wrappers.
+      - label: models
+        instructions: The model interface or the shipped models.
+      - label: decision
+        instructions: A design question to settle before code.
+      - label: docs
+        instructions: Documentation.
+      - label: infrastructure
+        instructions: Packaging, tooling or CI.
+      - label: bug
+        instructions: Behaviour that is wrong.
+      - label: enhancement
+        instructions: A new feature or option.

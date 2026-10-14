@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using these metadata, and cite the
+  research it builds on.
+type: software
+title: hyoshigi
+abstract: >-
+  AI-control monitors without a framework: each action an agent proposes is
+  rated against its trajectory before it runs.
+authors:
+  - given-names: Antonio
+    family-names: Badilla-Olivas
+repository-code: https://github.com/omamori-lab/hyoshigi
+license: MIT
+keywords:
+  - ai-safety
+  - ai-control
+  - ai-agents
+  - llm-agents
+  - agent-safety
+  - monitoring
+  - guardrails
