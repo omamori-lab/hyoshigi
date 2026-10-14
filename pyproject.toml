@@ -141,6 +141,8 @@ enabled = true
 
 [tool.lanorme.naming_clean_code]
 enabled = true
+# Reinforcement learning's verb: an agent acts and observes.
+verbs = ["act"]
 
 [tool.lanorme.similarity]
 enabled = true
