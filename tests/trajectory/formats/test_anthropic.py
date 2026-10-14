@@ -6,7 +6,6 @@ from hyoshigi import (
     JSON,
     Action,
     Author,
-    ConfigurationError,
     FormatError,
     MediaPart,
     Observation,
@@ -164,7 +163,6 @@ SEARCH_RESULTS = (
 )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_request_becomes_the_system_prompt_then_the_user_s_message() -> None:
     trajectory = Trajectory.from_anthropic(REFERENCE_REQUEST)
 
@@ -178,7 +176,6 @@ def test_the_published_request_becomes_the_system_prompt_then_the_user_s_message
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tool_round_trip_becomes_the_action_then_its_tool_observation() -> None:
     request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, TOOL_RESULT_WITH_IMAGE]}
 
@@ -205,7 +202,6 @@ def test_a_tool_round_trip_becomes_the_action_then_its_tool_observation() -> Non
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_empty_tool_result_becomes_a_tool_observation_without_parts() -> None:
     request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, EMPTY_TOOL_RESULT]}
 
@@ -216,7 +212,6 @@ def test_an_empty_tool_result_becomes_a_tool_observation_without_parts() -> None
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_server_tool_in_the_history_becomes_its_call_its_result_and_the_text_after() -> None:
     request: JSON = {
         "messages": [SHANNON_QUESTION, {"role": "assistant", "content": WEB_SEARCH_CONTENT}]
@@ -246,7 +241,6 @@ def test_a_server_tool_in_the_history_becomes_its_call_its_result_and_the_text_a
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_thinking_becomes_the_action_s_thought() -> None:
     request: JSON = {
         "messages": [
@@ -277,9 +271,7 @@ def test_thinking_becomes_the_action_s_thought() -> None:
 
 
 # https://platform.claude.com/docs/en/build-with-claude/vision: an image by URL, which names
-# no subtype, and a block the builder does not model. Until media ranges are accepted, building
-# the expected image/* part raises ConfigurationError.
-@pytest.mark.xfail(strict=True, raises=ConfigurationError)
+# no subtype, and a block the builder does not model.
 def test_an_image_by_url_and_an_unmodelled_block_keep_their_place() -> None:
     request: JSON = {
         "messages": [
@@ -317,7 +309,6 @@ def test_an_image_by_url_and_an_unmodelled_block_keep_their_place() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_authorship_decides_who_wrote_each_user_role_message() -> None:
     request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, SHANNON_QUESTION]}
 
@@ -328,7 +319,6 @@ def test_authorship_decides_who_wrote_each_user_role_message() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_response_whose_server_tool_already_ran_holds_an_opaque_part_in_its_place() -> None:
     action = Action.from_anthropic(WEB_SEARCH_RESPONSE)
 
@@ -344,7 +334,6 @@ def test_a_response_whose_server_tool_already_ran_holds_an_opaque_part_in_its_pl
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
     action = Action.from_anthropic(TOOL_USE_RESPONSE)
 
@@ -354,7 +343,6 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("request_body", "path"),
     [
@@ -443,7 +431,6 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
     assert raised.value.path == path
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("message", "path"),
     [

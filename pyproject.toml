@@ -117,7 +117,8 @@ exclude = [
     ".claude/worktrees",
     ".claude/worktrees/*",
     "dist/*",
-    # Local design notes, which git ignores and lanorme does not.
+    # mutmut's working copy, and the local design notes: git ignores both, lanorme does not.
+    "mutants/*",
     "docs/plans/*",
 ]
 

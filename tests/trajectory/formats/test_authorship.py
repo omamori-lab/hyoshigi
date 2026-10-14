@@ -7,14 +7,12 @@ from hyoshigi import JSON, Author, by_role, marked
 MESSAGE: dict[str, JSON] = {"role": "user", "content": "also add Q2"}
 
 
-@pytest.mark.xfail(strict=True)
 def test_by_role_says_a_user_role_message_is_the_user_s() -> None:
     author = by_role(3, message=MESSAGE)
 
     assert author is Author.USER
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("index", "expected"),
     [(0, Author.USER), (3, Author.UNKNOWN)],

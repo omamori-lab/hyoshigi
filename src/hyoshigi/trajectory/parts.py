@@ -7,9 +7,10 @@ from enum import StrEnum
 from hyoshigi.errors import ConfigurationError
 
 # RFC 6838, section 4.2: a type and a subtype, each a letter or digit followed by up
-# to 126 letters, digits or any of ! # $ & - ^ _ . +
+# to 126 letters, digits or any of ! # $ & - ^ _ . + ; and RFC 9110, section 12.5.1:
+# a media range, whose subtype is *, when only the top-level type is known.
 _RESTRICTED_NAME = r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}"
-_MEDIA_TYPE = re.compile(f"{_RESTRICTED_NAME}/{_RESTRICTED_NAME}")
+_MEDIA_TYPE = re.compile(f"{_RESTRICTED_NAME}/(?:{_RESTRICTED_NAME}|\\*)")
 
 
 class Author(StrEnum):
@@ -45,7 +46,10 @@ class Description:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MediaPart:
-    """An image, audio, video or file, by URL or as bytes, with its IANA media type."""
+    """An image, audio, video or file, by URL or as bytes, with its IANA media type.
+
+    The media type may be a range such as image/* when only the top-level type is known.
+    """
 
     media_type: str
     url: str | None = None

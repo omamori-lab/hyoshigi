@@ -182,14 +182,12 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
     assert stored == STORED
 
 
-@pytest.mark.xfail(strict=True, raises=FormatError)
 def test_loading_the_stored_format_restores_the_history() -> None:
     loaded = Trajectory.load(STORED)
 

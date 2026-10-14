@@ -1,7 +1,9 @@
 """What a trajectory records: the agent's actions and the observations that reach it."""
 
+# Action.from_anthropic names Action in its own signature.
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Self
 from uuid import uuid4
 
 from hyoshigi.trajectory.json_data import JSON
@@ -34,14 +36,18 @@ class Action:
     parts: tuple[Part, ...] = ()
     tool_calls: tuple[ToolCall, ...] = ()
 
-    @classmethod
-    def from_anthropic(cls, message: JSON) -> Self:
+    @staticmethod
+    def from_anthropic(message: JSON) -> Action:
         """Read the assistant message of an Anthropic Messages response into an action.
 
         Raises FormatError, naming the JSONPath of the first problem, on a message that
         is not in the Messages format.
         """
-        return cls()
+        # Imported here because the format module builds actions: a top-level import
+        # would be a cycle.
+        from hyoshigi.trajectory.formats import anthropic  # lanorme: ignore[IMPORT-001]
+
+        return anthropic.read_response(message)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
