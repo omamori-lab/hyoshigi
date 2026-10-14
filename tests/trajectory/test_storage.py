@@ -178,7 +178,6 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
@@ -191,7 +190,6 @@ def test_loading_the_stored_format_restores_the_history() -> None:
     assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     loaded = Trajectory.load(DELEGATING)
 
@@ -261,7 +259,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         pytest.param(
             {**ENVELOPE, "history": [], "subagents": {"call_7": {**ENVELOPE, "history": []}}},
             "$.subagents[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

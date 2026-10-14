@@ -91,7 +91,6 @@ def test_delegating_twice_from_one_call_raises(delegating: Trajectory) -> None:
         delegating.delegate("Find the q4 revenue", call_id="call_7")
 
 
-@pytest.mark.xfail(strict=True)
 def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Trajectory) -> None:
     with pytest.raises(ConfigurationError):
         trajectory.delegate(INSTRUCTION, call_id="call_7")

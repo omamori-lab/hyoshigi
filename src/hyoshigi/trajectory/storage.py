@@ -32,6 +32,7 @@ def dump_event(event: Event) -> JSON:
                 "kind": "tool_observation",
                 "call_id": event.call_id,
                 "is_error": event.is_error,
+                "source": event.source,
                 "parts": dump_parts(event.parts),
             }
         case Observation():
@@ -102,10 +103,14 @@ def load_event(data: JSON, *, path: str) -> Event:
             "kind": "tool_observation",
             "call_id": str(call_id),
             "is_error": bool(is_error),
+            "source": str() | None as source,
             "parts": list(parts),
         }:
             return ToolObservation(
-                call_id=call_id, is_error=is_error, parts=load_parts(parts, path=f"{path}.parts")
+                call_id=call_id,
+                is_error=is_error,
+                source=source,
+                parts=load_parts(parts, path=f"{path}.parts"),
             )
         case {
             "kind": "observation",
