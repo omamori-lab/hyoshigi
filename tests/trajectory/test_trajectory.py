@@ -18,6 +18,8 @@ ANSWER = "Revenue grew 4% in the third quarter."
 INSTRUCTION = "Find the q3 revenue"
 READ = ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.md"}')
 WRITE = ToolCall(id="call_2", name="write_file", arguments='{"path": "summary.md"}')
+DELETE_UNDER_READS_ID = ToolCall(id="call_1", name="delete_file", arguments='{"path": "q3.md"}')
+DELETE_UNDER_WRITES_ID = ToolCall(id="call_2", name="delete_file", arguments='{"path": "q3.md"}')
 
 
 @pytest.fixture
@@ -71,14 +73,14 @@ def test_acting_an_action_already_in_the_history_raises(trajectory: Trajectory) 
     trajectory.act(Action(id="a1"))
 
     with pytest.raises(ConfigurationError):
-        trajectory.act(Action(id="a1"))
+        trajectory.act(Action(id="a1", parts=(TextPart(text="Done."),)))
 
 
 @pytest.mark.parametrize(
     "action",
     [
-        Action(id="a2", tool_calls=(READ,)),
-        Action(id="a2", tool_calls=(WRITE, WRITE)),
+        Action(id="a2", tool_calls=(DELETE_UNDER_READS_ID,)),
+        Action(id="a2", tool_calls=(WRITE, DELETE_UNDER_WRITES_ID)),
     ],
     ids=["used-by-an-earlier-action", "used-twice-in-one-action"],
 )
@@ -91,7 +93,7 @@ def test_acting_with_a_tool_call_id_already_used_raises(
 
 def test_a_refused_action_leaves_the_history_unchanged(reading: Trajectory) -> None:
     with pytest.raises(ConfigurationError):
-        reading.act(Action(id="a2", tool_calls=(WRITE, WRITE)))
+        reading.act(Action(id="a2", tool_calls=(WRITE, DELETE_UNDER_WRITES_ID)))
 
     assert reading.history == (
         Observation(author=Author.USER, parts=(TextPart(text=TASK),)),
