@@ -797,6 +797,26 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[1]",
         ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "server_tool_use",
+                                "id": "s1",
+                                "name": "web_search",
+                                "input": {"query": "q3 revenue"},
+                            },
+                            {"type": "web_search_tool_result", "tool_use_id": "s1", "content": 123},
+                        ],
+                    }
+                ]
+            },
+            "$.messages[0].content[1]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -830,6 +850,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "text-document-without-data",
         "server-tool-use-without-input",
         "server-result-without-content",
+        "server-result-content-not-a-list-or-object",
     ],
 )
 def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON, path: str) -> None:
