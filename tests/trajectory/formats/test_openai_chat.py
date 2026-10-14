@@ -14,6 +14,7 @@ from hyoshigi import (
     ToolCall,
     ToolObservation,
     Trajectory,
+    marked,
 )
 
 # https://github.com/openai/openai-openapi, openapi.yaml, the chat completions examples
@@ -50,6 +51,8 @@ IMAGE_INPUT_REQUEST: JSON = {
     "max_tokens": 300,
 }
 WEATHER_QUESTION: JSON = {"role": "user", "content": "What is the weather like in Boston today?"}
+FOLLOW_UP: JSON = {"role": "user", "content": "And tomorrow?"}
+SCHEDULER_NUDGE: JSON = {"role": "user", "content": "It's 9am: run the daily report"}
 FUNCTIONS_MESSAGE: JSON = {
     "role": "assistant",
     "content": None,
@@ -215,6 +218,50 @@ def test_openrouter_s_reasoning_becomes_the_thought(message: JSON, thought: tupl
     assert (action.thought, action.parts) == (thought, (TextPart(text="Done."),))
 
 
+def test_marked_authorship_makes_only_the_marked_message_the_user_s() -> None:
+    request: JSON = {"messages": [WEATHER_QUESTION, FOLLOW_UP]}
+
+    trajectory = Trajectory.from_openai_chat(request, authorship=marked({1}))
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.UNKNOWN,
+            parts=(TextPart(text="What is the weather like in Boston today?"),),
+        ),
+        Observation(author=Author.USER, parts=(TextPart(text="And tomorrow?"),)),
+    )
+
+
+def attribute_nudges_to_the_scheduler(index: int, *, message: JSON) -> Author:
+    return Author.SCAFFOLD if message is SCHEDULER_NUDGE else Author.USER
+
+
+def test_a_harness_s_own_authorship_reads_each_user_message() -> None:
+    request: JSON = {"messages": [SCHEDULER_NUDGE]}
+
+    trajectory = Trajectory.from_openai_chat(request, authorship=attribute_nudges_to_the_scheduler)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.SCAFFOLD, parts=(TextPart(text="It's 9am: run the daily report"),)
+        ),
+    )
+
+
+def test_an_assistant_s_text_parts_are_its_parts() -> None:
+    action = Action.from_openai_chat(
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "Sunny,"},
+                {"type": "text", "text": " 22 degrees."},
+            ],
+        }
+    )
+
+    assert action.parts == (TextPart(text="Sunny,"), TextPart(text=" 22 degrees."))
+
+
 def test_a_refusal_and_an_unknown_part_are_what_the_assistant_said() -> None:
     action = Action.from_openai_chat(
         {
@@ -277,6 +324,8 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
             "file": {"filename": "q3.pdf", "file_data": "data:application/pdf;base64,JVBERi0xLjcK"},
         },
         {"type": "file", "file": {"file_id": "file-abc123"}},
+        {"type": "image_url", "image_url": {"url": "data:,15%20degrees"}},
+        {"type": "file", "file": {"file_data": "JVBERi0xLjcK"}},
         {"type": "input_video", "video_url": "https://example.com/a.mp4"},
     )
 
@@ -292,6 +341,8 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
                 MediaPart(media_type="audio/mpeg", data=b"ID3"),
                 MediaPart(media_type="application/pdf", data=b"%PDF-1.7\n"),
                 OpaquePart(kind="file"),
+                MediaPart(media_type="text/plain", data=b"15 degrees"),
+                OpaquePart(kind="file"),
                 OpaquePart(kind="input_video"),
             ),
         ),
@@ -303,6 +354,7 @@ def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> 
         "messages": [
             {"role": "system", "content": [{"type": "text", "text": "Answer in French."}]},
             {"role": "function", "name": "get_current_weather", "content": "22 degrees"},
+            {"role": "function", "name": "get_current_weather", "content": None},
             {"role": "tool", "tool_call_id": "call_1", "content": [{"type": "text", "text": "ok"}]},
         ]
     }
@@ -316,6 +368,7 @@ def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> 
         Observation(
             author=Author.TOOL, source="get_current_weather", parts=(TextPart(text="22 degrees"),)
         ),
+        Observation(author=Author.TOOL, source="get_current_weather", parts=()),
         ToolObservation(call_id="call_1", parts=(TextPart(text="ok"),)),
     )
 
@@ -371,6 +424,75 @@ def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> 
             "$.messages[0].reasoning_details[0]",
         ),
         ({"messages": [FUNCTIONS_MESSAGE, FUNCTIONS_MESSAGE]}, "$.messages[1]"),
+        (build_assistant_request({"role": "assistant", "content": 42}), "$.messages[0].content"),
+        (
+            build_assistant_request({"role": "assistant", "content": [{"type": "refusal"}]}),
+            "$.messages[0].content[0]",
+        ),
+        (
+            build_assistant_request({"role": "assistant", "content": [{"text": "Hi"}]}),
+            "$.messages[0].content[0]",
+        ),
+        (build_assistant_request({"role": "assistant", "refusal": 42}), "$.messages[0].refusal"),
+        (build_assistant_request({"role": "assistant", "audio": "a1"}), "$.messages[0].audio"),
+        (
+            build_assistant_request({"role": "assistant", "reasoning": 42}),
+            "$.messages[0].reasoning",
+        ),
+        (
+            build_assistant_request({"role": "assistant", "reasoning_details": [{"summary": "s"}]}),
+            "$.messages[0].reasoning_details[0]",
+        ),
+        (
+            build_assistant_request(
+                {"role": "assistant", "reasoning_details": [{"type": "reasoning.summary"}]}
+            ),
+            "$.messages[0].reasoning_details[0]",
+        ),
+        (
+            build_assistant_request({"role": "assistant", "tool_calls": [{"id": "c1"}]}),
+            "$.messages[0].tool_calls[0]",
+        ),
+        (
+            build_assistant_request(
+                {
+                    "role": "assistant",
+                    "tool_calls": [{"id": "c1", "type": "custom", "custom": {"name": "grep"}}],
+                }
+            ),
+            "$.messages[0].tool_calls[0]",
+        ),
+        (
+            build_assistant_request({"role": "assistant", "function_call": {"name": "f"}}),
+            "$.messages[0].function_call",
+        ),
+        (build_user_request({"type": "file", "file": "q3.pdf"}), "$.messages[0].content[0]"),
+        (
+            build_user_request(
+                {"type": "input_audio", "input_audio": {"data": "*", "format": "wav"}}
+            ),
+            "$.messages[0].content[0].input_audio.data",
+        ),
+        (
+            build_user_request(
+                {"type": "image_url", "image_url": {"url": "data:png;base64,iVBORw=="}}
+            ),
+            "$.messages[0].content[0].image_url.url",
+        ),
+        (
+            build_user_request(
+                {"type": "file", "file": {"file_data": "data:application/pdf;base64,*"}}
+            ),
+            "$.messages[0].content[0].file.file_data",
+        ),
+        (
+            {
+                "messages": [
+                    {"role": "tool", "tool_call_id": "c1", "content": [{"type": "image_url"}]}
+                ]
+            },
+            "$.messages[0].content[0]",
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -389,6 +511,22 @@ def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> 
         "reasoning-details-not-a-list",
         "reasoning-text-without-text",
         "repeated-tool-call-id",
+        "assistant-content-not-text-or-parts",
+        "refusal-part-without-refusal",
+        "assistant-part-without-type",
+        "refusal-not-text",
+        "audio-not-an-object",
+        "reasoning-not-text",
+        "reasoning-detail-without-type",
+        "reasoning-summary-without-summary",
+        "tool-call-without-type",
+        "custom-tool-call-without-input",
+        "function-call-without-arguments-deprecated",
+        "file-part-not-an-object",
+        "audio-data-not-base64",
+        "data-url-media-type-not-iana",
+        "file-data-url-not-base64",
+        "tool-content-part-not-text",
     ],
 )
 def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON, path: str) -> None:
@@ -398,8 +536,16 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
     assert raised.value.path == path
 
 
-def test_a_message_that_is_not_the_assistant_s_raises_format_error() -> None:
+@pytest.mark.parametrize(
+    ("message", "path"),
+    [
+        (WEATHER_QUESTION, "$"),
+        ({"role": "assistant", "content": [{"type": "text"}]}, "$.content[0]"),
+    ],
+    ids=["not-the-assistant-s", "malformed-part"],
+)
+def test_a_malformed_response_raises_format_error_at_its_path(message: JSON, path: str) -> None:
     with pytest.raises(FormatError) as raised:
-        Action.from_openai_chat(WEATHER_QUESTION)
+        Action.from_openai_chat(message)
 
-    assert raised.value.path == "$"
+    assert raised.value.path == path
