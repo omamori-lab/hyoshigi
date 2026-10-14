@@ -109,7 +109,6 @@ def build_assistant_request(message: JSON) -> JSON:
     return {"messages": [message]}
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_default_request_becomes_the_developer_s_then_the_user_s_message() -> None:
     trajectory = Trajectory.from_openai_chat(DEFAULT_REQUEST)
 
@@ -123,7 +122,6 @@ def test_the_published_default_request_becomes_the_developer_s_then_the_user_s_m
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_image_input_becomes_text_and_an_image_by_url() -> None:
     trajectory = Trajectory.from_openai_chat(IMAGE_INPUT_REQUEST)
 
@@ -138,7 +136,6 @@ def test_the_published_image_input_becomes_text_and_an_image_by_url() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_default_response_becomes_the_action_to_rate() -> None:
     action = Action.from_openai_chat(DEFAULT_MESSAGE)
 
@@ -150,14 +147,12 @@ def test_the_published_default_response_becomes_the_action_to_rate() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_function_call_keeps_its_arguments_as_emitted() -> None:
     action = Action.from_openai_chat(FUNCTIONS_MESSAGE)
 
     assert (action.parts, action.tool_calls) == ((), (GET_CURRENT_WEATHER,))
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_function_round_trip_becomes_the_action_then_the_tool_s_observation() -> None:
     request: JSON = {
         "messages": [
@@ -179,7 +174,6 @@ def test_a_function_round_trip_becomes_the_action_then_the_tool_s_observation() 
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_openrouter_s_reasoning_details_become_the_thought() -> None:
     action = Action.from_openai_chat(OPENROUTER_MESSAGE)
 
@@ -195,7 +189,6 @@ def test_openrouter_s_reasoning_details_become_the_thought() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("message", "thought"),
     [
@@ -222,7 +215,6 @@ def test_openrouter_s_reasoning_becomes_the_thought(message: JSON, thought: tupl
     assert (action.thought, action.parts) == (thought, (TextPart(text="Done."),))
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_refusal_and_an_unknown_part_are_what_the_assistant_said() -> None:
     action = Action.from_openai_chat(
         {
@@ -244,7 +236,6 @@ def test_a_refusal_and_an_unknown_part_are_what_the_assistant_said() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_custom_tool_call_and_a_deprecated_function_call_become_tool_calls() -> None:
     request = build_assistant_request(
         {
@@ -275,7 +266,6 @@ def test_a_custom_tool_call_and_a_deprecated_function_call_become_tool_calls() -
 
 
 # RFC 2397: a data URL carries its media type and its bytes, here in base64 or percent-encoded.
-@pytest.mark.xfail(strict=True)
 def test_media_parts_become_media_or_opaque_parts() -> None:
     request = build_user_request(
         {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw=="}},
@@ -308,7 +298,6 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> None:
     request: JSON = {
         "messages": [
@@ -331,7 +320,6 @@ def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> 
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("request_body", "path"),
     [
@@ -410,7 +398,6 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
     assert raised.value.path == path
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_message_that_is_not_the_assistant_s_raises_format_error() -> None:
     with pytest.raises(FormatError) as raised:
         Action.from_openai_chat(WEATHER_QUESTION)
