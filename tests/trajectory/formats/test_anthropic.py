@@ -543,6 +543,51 @@ def test_documents_become_media_and_files_become_opaque() -> None:
     )
 
 
+# https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool, "Errors": a
+# server tool's failure is an error object in the result's content.
+@pytest.mark.xfail(strict=True)
+def test_a_server_tool_s_error_is_observed_as_an_error() -> None:
+    request: JSON = {
+        "messages": [
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "server_tool_use",
+                        "id": "srvtoolu_a93jad",
+                        "name": "web_search",
+                        "input": {"query": "q3 revenue"},
+                    },
+                    {
+                        "type": "web_search_tool_result",
+                        "tool_use_id": "srvtoolu_a93jad",
+                        "content": {
+                            "type": "web_search_tool_result_error",
+                            "error_code": "max_uses_exceeded",
+                        },
+                    },
+                ],
+            }
+        ]
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history[-1:] == (
+        ToolObservation(
+            call_id="srvtoolu_a93jad",
+            source="server",
+            is_error=True,
+            parts=(
+                TextPart(
+                    text='{"type": "web_search_tool_result_error", '
+                    '"error_code": "max_uses_exceeded"}'
+                ),
+            ),
+        ),
+    )
+
+
 def test_an_assistant_message_without_blocks_adds_no_action() -> None:
     request: JSON = {"messages": [WEATHER_QUESTION, {"role": "assistant", "content": []}]}
 
@@ -734,7 +779,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[0]",
         ),
-        pytest.param(
+        (
             {
                 "messages": [
                     {
