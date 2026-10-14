@@ -23,6 +23,14 @@ def trajectory() -> Trajectory:
     return Trajectory.from_run(TASK, answer=ANSWER).trajectory
 
 
+@pytest.fixture
+def delegating(trajectory: Trajectory) -> Trajectory:
+    trajectory.act(
+        Action(id="a1", tool_calls=(ToolCall(id="call_7", name="task", arguments="{}"),))
+    )
+    return trajectory
+
+
 def test_a_black_box_run_holds_only_the_task_authored_by_the_user() -> None:
     run = Trajectory.from_run(TASK, answer=ANSWER)
 
@@ -59,9 +67,9 @@ def test_acting_an_action_already_in_the_history_raises(trajectory: Trajectory) 
 
 
 def test_a_delegated_trajectory_starts_with_the_instruction_from_the_delegator(
-    trajectory: Trajectory,
+    delegating: Trajectory,
 ) -> None:
-    child = trajectory.delegate(INSTRUCTION, call_id="call_7")
+    child = delegating.delegate(INSTRUCTION, call_id="call_7")
 
     assert child.history == (
         Observation(author=Author.DELEGATOR, parts=(TextPart(text=INSTRUCTION),)),
@@ -69,15 +77,21 @@ def test_a_delegated_trajectory_starts_with_the_instruction_from_the_delegator(
 
 
 def test_a_delegated_trajectory_is_held_under_the_call_that_delegated_it(
-    trajectory: Trajectory,
+    delegating: Trajectory,
 ) -> None:
-    child = trajectory.delegate(INSTRUCTION, call_id="call_7")
+    child = delegating.delegate(INSTRUCTION, call_id="call_7")
 
-    assert trajectory.subagents.get("call_7") is child
+    assert delegating.subagents.get("call_7") is child
 
 
-def test_delegating_twice_from_one_call_raises(trajectory: Trajectory) -> None:
-    trajectory.delegate(INSTRUCTION, call_id="call_7")
+def test_delegating_twice_from_one_call_raises(delegating: Trajectory) -> None:
+    delegating.delegate(INSTRUCTION, call_id="call_7")
 
     with pytest.raises(ConfigurationError):
-        trajectory.delegate("Find the q4 revenue", call_id="call_7")
+        delegating.delegate("Find the q4 revenue", call_id="call_7")
+
+
+@pytest.mark.xfail(strict=True)
+def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Trajectory) -> None:
+    with pytest.raises(ConfigurationError):
+        trajectory.delegate(INSTRUCTION, call_id="call_7")
