@@ -797,7 +797,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[1]",
         ),
-        pytest.param(
+        (
             {
                 "messages": [
                     {
@@ -815,7 +815,6 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 ]
             },
             "$.messages[0].content[1]",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
