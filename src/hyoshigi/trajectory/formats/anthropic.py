@@ -126,18 +126,15 @@ def read_message(message: JSON, *, index: int, authorship: Authorship) -> list[t
             raise FormatError(path=path, expected="a user or assistant message with content")
 
 
-def read_user_content(content: JSON, *, author: Author, path: str) -> list[tuple[str, Event]]:
+def read_user_content(
+    content: str | list[JSON], *, author: Author, path: str
+) -> list[tuple[str, Event]]:
     """Read a user message's content: observations by its author, and tool results."""
-    match content:
-        case str(text):
-            return [(path, Observation(author=author, parts=(TextPart(text=text),)))]
-        case list(blocks):
-            pass
-        case _:
-            raise FormatError(path=path, expected=_CONTENT)
+    if isinstance(content, str):
+        return [(path, Observation(author=author, parts=(TextPart(text=content),)))]
     events: list[tuple[str, Event]] = []
     parts: list[Part] = []
-    for index, block in enumerate(blocks):
+    for index, block in enumerate(content):
         block_path = f"{path}[{index}]"
         match block:
             case {"type": "tool_result"}:
@@ -211,7 +208,7 @@ def read_image_source(source: JSON, *, path: str) -> Part:
         case {"type": "base64", "media_type": str(media_type), "data": str(data)}:
             return build_media(media_type, data=decode_data(data, path=f"{path}.data"), path=path)
         case {"type": "url", "url": str(url)}:
-            return build_media("image/*", url=url, path=path)
+            return MediaPart(media_type="image/*", url=url)
         case {"type": "base64" | "url"}:
             raise FormatError(path=path, expected="a base64 or URL image source")
         case {"type": str()}:
@@ -226,7 +223,7 @@ def read_document_source(source: JSON, *, path: str) -> Part:
         case {"type": "base64", "media_type": str(media_type), "data": str(data)}:
             return build_media(media_type, data=decode_data(data, path=f"{path}.data"), path=path)
         case {"type": "url", "url": str(url)}:
-            return build_media("application/pdf", url=url, path=path)
+            return MediaPart(media_type="application/pdf", url=url)
         case {"type": "text", "data": str(text)}:
             return TextPart(text=text)
         case {"type": "base64" | "url" | "text"}:
@@ -237,28 +234,22 @@ def read_document_source(source: JSON, *, path: str) -> Part:
             raise FormatError(path=path, expected="a document source with a type")
 
 
-def build_media(
-    media_type: str, *, url: str | None = None, data: bytes | None = None, path: str
-) -> MediaPart:
-    """Build a media part, or raise FormatError at the path if it cannot be one."""
+def build_media(media_type: str, *, data: bytes | None, path: str) -> MediaPart:
+    """Build a media part from base64 data, or raise FormatError at the path if it cannot be one."""
     try:
-        return MediaPart(media_type=media_type, url=url, data=data)
+        return MediaPart(media_type=media_type, data=data)
     except ConfigurationError:
         raise FormatError(path=path, expected="an IANA media type") from None
 
 
-def read_assistant_content(content: JSON, *, path: str) -> list[tuple[str, Event]]:
+def read_assistant_content(content: str | list[JSON], *, path: str) -> list[tuple[str, Event]]:
     """Read an assistant message's content into actions, split by server tools' results.
 
     Each action's id is the JSONPath of its first block.
     """
-    match content:
-        case str(text):
-            return [(path, Action(id=path, parts=(TextPart(text=text),)))]
-        case list(blocks):
-            pass
-        case _:
-            raise FormatError(path=path, expected=_CONTENT)
+    if isinstance(content, str):
+        return [(path, Action(id=path, parts=(TextPart(text=content),)))]
+    blocks = content
     events: list[tuple[str, Event]] = []
     draft: _ActionDraft | None = None
     for index, block in enumerate(blocks):
@@ -289,7 +280,7 @@ def read_server_result(block: JSON, *, call_id: str, path: str) -> ToolObservati
         case {"content": content}:
             text = json.dumps(content, ensure_ascii=False)
         case _:
-            text = "null"
+            raise FormatError(path=path, expected="a server tool's result with content")
     return ToolObservation(call_id=call_id, source="server", parts=(TextPart(text=text),))
 
 

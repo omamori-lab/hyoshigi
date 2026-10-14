@@ -214,6 +214,25 @@ SEARCH_RESULTS = (
 )
 
 
+SOURCE = "$.messages[0].content[0].source"
+
+
+def build_user_request(*blocks: JSON) -> JSON:
+    return {"messages": [{"role": "user", "content": list(blocks)}]}
+
+
+def build_tool_result(content: JSON) -> JSON:
+    return {"type": "tool_result", "tool_use_id": WEATHER_CALL_ID, "content": content}
+
+
+def build_image(source: JSON) -> JSON:
+    return {"type": "image", "source": source}
+
+
+def build_document(source: JSON) -> JSON:
+    return {"type": "document", "source": source}
+
+
 def test_the_published_request_becomes_the_system_prompt_then_the_user_s_message() -> None:
     trajectory = Trajectory.from_anthropic(REFERENCE_REQUEST)
 
@@ -280,8 +299,12 @@ def test_a_tool_round_trip_becomes_the_action_then_its_tool_observation() -> Non
             ),
         ),
         (EMPTY_TOOL_RESULT, ToolObservation(call_id=WEATHER_CALL_ID, parts=())),
+        (
+            {"role": "user", "content": [build_tool_result(None)]},
+            ToolObservation(call_id=WEATHER_CALL_ID, parts=()),
+        ),
     ],
-    ids=["successful", "with-a-document", "error", "empty"],
+    ids=["successful", "with-a-document", "error", "empty", "null-content"],
 )
 def test_a_published_tool_result_becomes_the_tool_s_observation(
     tool_result: JSON, expected: ToolObservation
@@ -520,6 +543,18 @@ def test_documents_become_media_and_files_become_opaque() -> None:
     )
 
 
+def test_an_assistant_message_without_blocks_adds_no_action() -> None:
+    request: JSON = {"messages": [WEATHER_QUESTION, {"role": "assistant", "content": []}]}
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.USER, parts=(TextPart(text="What's the weather in San Francisco?"),)
+        ),
+    )
+
+
 def test_text_outside_ascii_stays_as_written_in_arguments_and_results() -> None:
     request: JSON = {
         "messages": [
@@ -575,29 +610,11 @@ def test_a_response_whose_server_tool_already_ran_holds_an_opaque_part_in_its_pl
 def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
     action = Action.from_anthropic(TOOL_USE_RESPONSE)
 
-    assert (action.parts, action.tool_calls) == (
+    assert (action.parts, action.tool_calls, type(action.id)) == (
         (TextPart(text="I'll help you check the current weather and time in San Francisco."),),
         (GET_WEATHER,),
+        str,
     )
-
-
-SOURCE = "$.messages[0].content[0].source"
-
-
-def build_user_request(*blocks: JSON) -> JSON:
-    return {"messages": [{"role": "user", "content": list(blocks)}]}
-
-
-def build_tool_result(content: JSON) -> JSON:
-    return {"type": "tool_result", "tool_use_id": WEATHER_CALL_ID, "content": content}
-
-
-def build_image(source: JSON) -> JSON:
-    return {"type": "image", "source": source}
-
-
-def build_document(source: JSON) -> JSON:
-    return {"type": "document", "source": source}
 
 
 @pytest.mark.parametrize(
@@ -694,6 +711,18 @@ def build_document(source: JSON) -> JSON:
             ),
             f"{SOURCE}.data",
         ),
+        (build_user_request(build_image({"type": "url"})), SOURCE),
+        (
+            build_user_request(
+                build_document({"type": "base64", "media_type": "pdf", "data": "JVBERi0xLjcK"})
+            ),
+            SOURCE,
+        ),
+        (
+            build_user_request(build_document({"type": "base64", "media_type": "application/pdf"})),
+            SOURCE,
+        ),
+        (build_user_request(build_document({"type": "text", "media_type": "text/plain"})), SOURCE),
         (
             {
                 "messages": [
@@ -723,7 +752,6 @@ def build_document(source: JSON) -> JSON:
                 ]
             },
             "$.messages[0].content[1]",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -752,6 +780,10 @@ def build_document(source: JSON) -> JSON:
         "url-document-without-url",
         "document-source-without-type",
         "document-data-not-base64",
+        "url-image-without-url",
+        "base64-document-not-iana",
+        "base64-document-without-data",
+        "text-document-without-data",
         "server-tool-use-without-input",
         "server-result-without-content",
     ],
