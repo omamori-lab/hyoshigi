@@ -49,6 +49,19 @@ class Action:
 
         return anthropic.read_response(message)
 
+    @staticmethod
+    def from_openai_chat(message: JSON) -> Action:
+        """Read a chat completions response's assistant message into an action.
+
+        OpenRouter's reasoning fields are read as the thought. Raises FormatError, naming
+        the JSONPath of the first problem, on a message that is not in the format.
+        """
+        # Imported here because the format module builds actions: a top-level import
+        # would be a cycle.
+        from hyoshigi.trajectory.formats import openai_chat  # lanorme: ignore[IMPORT-001]
+
+        return openai_chat.read_response(message)
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Observation:

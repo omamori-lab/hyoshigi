@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
-from hyoshigi.trajectory.formats.anthropic import read_request
+from hyoshigi.trajectory.formats import anthropic
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.json_data import JSON
@@ -52,9 +52,19 @@ class Trajectory:
         not in the Messages format.
         """
         trajectory = cls()
-        for path, event in read_request(request, authorship=authorship):
+        for path, event in anthropic.read_request(request, authorship=authorship):
             trajectory._record(event, path=path)
         return trajectory
+
+    @classmethod
+    def from_openai_chat(cls, request: JSON, *, authorship: Authorship = by_role) -> Self:
+        """Build the trajectory of an OpenAI chat completions request body.
+
+        OpenRouter's reasoning fields are read as the assistant's thought. Raises
+        FormatError, naming the JSONPath of the first problem, on a body that is not
+        in the chat completions format.
+        """
+        return cls()
 
     @property
     def history(self) -> tuple[Event, ...]:

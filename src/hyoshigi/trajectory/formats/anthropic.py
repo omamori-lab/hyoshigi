@@ -8,8 +8,9 @@ import json
 from dataclasses import dataclass, field, replace
 from typing import assert_never
 
-from hyoshigi.errors import ConfigurationError, FormatError
+from hyoshigi.errors import FormatError
 from hyoshigi.trajectory.formats.authorship import Authorship
+from hyoshigi.trajectory.formats.media import build_media
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, MediaPart, OpaquePart, Part, TextPart
@@ -232,14 +233,6 @@ def read_document_source(source: JSON, *, path: str) -> Part:
             return OpaquePart(kind="document")
         case _:
             raise FormatError(path=path, expected="a document source with a type")
-
-
-def build_media(media_type: str, *, data: bytes | None, path: str) -> MediaPart:
-    """Build a media part from base64 data, or raise FormatError at the path if it cannot be one."""
-    try:
-        return MediaPart(media_type=media_type, data=data)
-    except ConfigurationError:
-        raise FormatError(path=path, expected="an IANA media type") from None
 
 
 def read_assistant_content(content: str | list[JSON], *, path: str) -> list[tuple[str, Event]]:
