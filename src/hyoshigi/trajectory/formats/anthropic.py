@@ -275,7 +275,7 @@ def close(draft: _ActionDraft | None) -> list[tuple[str, Event]]:
 
 
 def read_server_result(block: JSON, *, call_id: str, path: str) -> ToolObservation:
-    """Read a server tool's result: its content, as JSON text, observed from the server.
+    """Read a server tool's result: its content, a list or a typed object, as JSON text.
 
     A server tool reports a failure as an error object in the content, whose type ends in
     _error, such as web_search_tool_result_error.
@@ -283,10 +283,13 @@ def read_server_result(block: JSON, *, call_id: str, path: str) -> ToolObservati
     match block:
         case {"content": {"type": str(kind)} as content}:
             is_error = kind.endswith("_error")
-        case {"content": content}:
+        case {"content": list() as content}:
             is_error = False
         case _:
-            raise FormatError(path=path, expected="a server tool's result with content")
+            raise FormatError(
+                path=path,
+                expected="a server tool's result whose content is a list or a typed object",
+            )
     text = json.dumps(content, ensure_ascii=False)
     return ToolObservation(
         call_id=call_id, source="server", is_error=is_error, parts=(TextPart(text=text),)
