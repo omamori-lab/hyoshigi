@@ -50,7 +50,7 @@ def test_a_media_type_outside_the_iana_grammar_is_refused(media_type: str) -> No
         "image/svg+xml",
         "IMAGE/PNG",
         # RFC 9110, section 12.5.1: a media range names a top-level type whose subtype is unknown.
-        pytest.param("image/*", marks=pytest.mark.xfail(strict=True, raises=ConfigurationError)),
+        "image/*",
     ],
 )
 def test_a_media_type_in_the_iana_grammar_is_accepted(media_type: str) -> None:

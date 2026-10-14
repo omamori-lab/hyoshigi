@@ -69,7 +69,7 @@ def dump_part(part: Part) -> JSON:
                 "description": dump_description(part.description),
             }
         case OpaquePart():
-            return {}
+            return {"kind": "opaque", "opaque_kind": part.kind}
         case unreachable:
             assert_never(unreachable)
 
@@ -149,6 +149,8 @@ def load_part(data: JSON, *, path: str) -> Part:
     match data:
         case {"kind": "text", "text": str(text)}:
             return TextPart(text=text)
+        case {"kind": "opaque", "opaque_kind": str(kind)}:
+            return OpaquePart(kind=kind)
         case {
             "kind": "media",
             "media_type": str(media_type),
@@ -166,7 +168,7 @@ def load_part(data: JSON, *, path: str) -> Part:
             except ConfigurationError:
                 raise FormatError(path=path, expected=_MEDIA_PART) from None
         case _:
-            raise FormatError(path=path, expected="a text or media part")
+            raise FormatError(path=path, expected="a text, media or opaque part")
 
 
 def decode_data(encoded: str | None, *, path: str) -> bytes | None:

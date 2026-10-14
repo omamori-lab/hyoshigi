@@ -8,6 +8,7 @@ from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
+from hyoshigi.trajectory.formats.anthropic import read_request
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.json_data import JSON
@@ -50,7 +51,10 @@ class Trajectory:
         Raises FormatError, naming the JSONPath of the first problem, on a body that is
         not in the Messages format.
         """
-        return cls()
+        trajectory = cls()
+        for path, event in read_request(request, authorship=authorship):
+            trajectory._record(event, path=path)
+        return trajectory
 
     @property
     def history(self) -> tuple[Event, ...]:
@@ -138,19 +142,23 @@ class Trajectory:
 
     def _load_history(self, history: list[JSON], *, path: str) -> None:
         for index, data in enumerate(history):
-            match load_event(data, path=f"{path}[{index}]"):
-                case Action() as action:
-                    try:
-                        self.act(action)
-                    except ConfigurationError:
-                        raise FormatError(
-                            path=f"{path}[{index}]",
-                            expected="an action with ids new to the trajectory",
-                        ) from None
-                case Observation() as observation:
-                    self.observe(observation)
-                case unreachable:
-                    assert_never(unreachable)
+            event_path = f"{path}[{index}]"
+            self._record(load_event(data, path=event_path), path=event_path)
+
+    def _record(self, event: Event, *, path: str) -> None:
+        """Act or observe an event read from a payload, or raise FormatError at its path."""
+        match event:
+            case Action():
+                try:
+                    self.act(event)
+                except ConfigurationError:
+                    raise FormatError(
+                        path=path, expected="an action with ids new to the trajectory"
+                    ) from None
+            case Observation():
+                self.observe(event)
+            case unreachable:
+                assert_never(unreachable)
 
     def _load_subagents(self, subagents: dict[str, JSON], *, path: str) -> None:
         for index, (call_id, data) in enumerate(subagents.items()):
