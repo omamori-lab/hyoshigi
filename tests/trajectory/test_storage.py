@@ -204,7 +204,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         ({**ENVELOPE, "version": True, "history": []}, "$"),
         ({**ENVELOPE, "history": [{"kind": "decision"}]}, "$.history[0]"),
         pytest.param(
-            {**ENVELOPE, "history": [ACTION, ACTION]},
+            {**ENVELOPE, "history": [ACTION, {**ACTION, "parts": [TEXT]}]},
             "$.history[1]",
         ),
         pytest.param(
@@ -212,7 +212,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 **ENVELOPE,
                 "history": [
                     {**ACTION, "tool_calls": [TASK_CALL]},
-                    {**ACTION, "id": "a2", "tool_calls": [TASK_CALL]},
+                    {**ACTION, "id": "a2", "tool_calls": [{**TASK_CALL, "name": "review"}]},
                 ],
             },
             "$.history[1]",
