@@ -8,7 +8,6 @@ CHART_URL = "https://example.com/chart.png"
 PNG_SIGNATURE = b"\x89PNG"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("url", "data"),
     [(None, None), (CHART_URL, PNG_SIGNATURE)],
@@ -23,7 +22,6 @@ def test_a_media_part_takes_exactly_one_of_url_and_data(
 
 # RFC 6838, section 4.2: a type and a subtype, each a letter or digit followed by up
 # to 126 letters, digits or any of ! # $ & - ^ _ . +
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "media_type",
     [

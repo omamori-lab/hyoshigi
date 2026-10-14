@@ -44,6 +44,7 @@ Changelog = "https://github.com/omamori-lab/hyoshigi/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
+    "mutmut>=3.8.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
     "ty>=0.0.87",
@@ -97,6 +98,11 @@ unused-ignore-comment = "error"
 testpaths = ["tests"]
 xfail_strict = true
 
+[tool.mutmut]
+# The domain is mutation-tested: no surviving mutant is left unexplained.
+paths_to_mutate = ["src/hyoshigi/"]
+tests_dir = ["tests/"]
+
 # The limits below are a ratchet: lower them as the code allows, and raise one only in a
 # reviewed change that says why.
 [tool.lanorme]
@@ -139,9 +145,12 @@ enabled = true
 [tool.lanorme.attribute_access]
 enabled = true
 
+# Reinforcement learning's verb: an agent acts and observes.
+[tool.lanorme.naming_canon]
+verbs = ["act"]
+
 [tool.lanorme.naming_clean_code]
 enabled = true
-# Reinforcement learning's verb: an agent acts and observes.
 verbs = ["act"]
 
 [tool.lanorme.similarity]

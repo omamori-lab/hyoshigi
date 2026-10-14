@@ -40,6 +40,10 @@ complexity, docstrings, prose), builds the package and imports the built
 wheel in a fresh environment. CI runs the same script on Python 3.12, 3.13
 and 3.14, and scans the whole history for secrets.
 
+The domain is mutation-tested: run `uv run --group dev mutmut run`, then
+`uv run --group dev mutmut results`, and explain every surviving mutant in
+the pull request.
+
 The pre-commit hooks run the fast gates only: ruff, ty, lanorme, the test
 suite, a gitleaks scan of the staged changes and a few file checks. Run
 `scripts/check.sh` before you push.
