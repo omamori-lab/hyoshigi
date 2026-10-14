@@ -59,4 +59,15 @@ class MediaPart:
             raise ConfigurationError("a media part takes exactly one of url and data")
 
 
-type Part = TextPart | MediaPart
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OpaquePart:
+    """Content recorded but not read, named by its kind in the provider's format.
+
+    A monitor sees a placeholder for it in the history; in the action it rates, the
+    score fails closed.
+    """
+
+    kind: str
+
+
+type Part = TextPart | MediaPart | OpaquePart

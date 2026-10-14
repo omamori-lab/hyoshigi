@@ -32,6 +32,7 @@ def test_a_media_part_takes_exactly_one_of_url_and_data(
         "ima ge/png",
         "image/png; charset=utf-8",
         ".image/png",
+        "*/*",
         "image/" + "x" * 128,
     ],
 )
@@ -42,7 +43,15 @@ def test_a_media_type_outside_the_iana_grammar_is_refused(media_type: str) -> No
 
 @pytest.mark.parametrize(
     "media_type",
-    ["image/png", "audio/wav", "application/vnd.api+json", "image/svg+xml", "IMAGE/PNG"],
+    [
+        "image/png",
+        "audio/wav",
+        "application/vnd.api+json",
+        "image/svg+xml",
+        "IMAGE/PNG",
+        # RFC 9110, section 12.5.1: a media range names a top-level type whose subtype is unknown.
+        pytest.param("image/*", marks=pytest.mark.xfail(strict=True, raises=ConfigurationError)),
+    ],
 )
 def test_a_media_type_in_the_iana_grammar_is_accepted(media_type: str) -> None:
     part = MediaPart(media_type=media_type, url=CHART_URL)

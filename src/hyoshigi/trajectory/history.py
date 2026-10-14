@@ -1,8 +1,10 @@
 """What a trajectory records: the agent's actions and the observations that reach it."""
 
 from dataclasses import dataclass, field
+from typing import Self
 from uuid import uuid4
 
+from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, Part
 
 
@@ -31,6 +33,15 @@ class Action:
     thought: tuple[Part, ...] = ()
     parts: tuple[Part, ...] = ()
     tool_calls: tuple[ToolCall, ...] = ()
+
+    @classmethod
+    def from_anthropic(cls, message: JSON) -> Self:
+        """Read the assistant message of an Anthropic Messages response into an action.
+
+        Raises FormatError, naming the JSONPath of the first problem, on a message that
+        is not in the Messages format.
+        """
+        return cls()
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
