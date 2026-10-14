@@ -9,7 +9,7 @@ from dataclasses import replace
 
 from hyoshigi.errors import FormatError
 from hyoshigi.trajectory.formats.authorship import Authorship
-from hyoshigi.trajectory.formats.media import build_media, read_data_url
+from hyoshigi.trajectory.formats.media import read_data_url
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, MediaPart, OpaquePart, Part, TextPart
@@ -126,7 +126,7 @@ def read_media_part(part: JSON, *, path: str) -> Part:
             "input_audio": {"data": str(data), "format": str(audio_format)},
         } if audio_format in _AUDIO_TYPES:
             audio = decode_data(data, path=f"{path}.input_audio.data")
-            return build_media(_AUDIO_TYPES[audio_format], data=audio, path=path)
+            return MediaPart(media_type=_AUDIO_TYPES[audio_format], data=audio)
         case {"type": "file"}:
             return read_file_part(part, path=path)
         case _:
