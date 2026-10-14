@@ -6,6 +6,7 @@ from hyoshigi import (
     JSON,
     Action,
     Author,
+    Event,
     FormatError,
     MediaPart,
     Observation,
@@ -143,6 +144,56 @@ WEB_SEARCH_RESPONSE: JSON = {
 
 WEATHER_QUESTION: JSON = {"role": "user", "content": "What's the weather in San Francisco?"}
 SHANNON_QUESTION: JSON = {"role": "user", "content": "When was Claude Shannon born?"}
+SCHEDULER_NUDGE: JSON = {"role": "user", "content": "It's 9am: run the daily report"}
+WEATHER_CALL_ID = "toolu_01A09q90qw90lq917835lq9"
+MODEL_CARD = "https://assets.anthropic.com/m/1cd9d098ac3e6467/original/Claude-3-Model-Card-October-Addendum.pdf"
+
+# https://platform.claude.com/docs/en/api/messages, the messages parameter's example with
+# several conversational turns.
+CONVERSATION: JSON = {
+    "messages": [
+        {"role": "user", "content": "Hello there."},
+        {"role": "assistant", "content": "Hi, I'm Claude. How can I help you?"},
+        {"role": "user", "content": "Can you explain LLMs in plain English?"},
+    ]
+}
+
+# https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls: "Example of
+# successful tool result", "Example of tool result with documents", a tool execution error, and
+# the text blocks of its examples on where text goes.
+SUCCESSFUL_TOOL_RESULT: JSON = {
+    "role": "user",
+    "content": [{"type": "tool_result", "tool_use_id": WEATHER_CALL_ID, "content": "15 degrees"}],
+}
+TOOL_RESULT_WITH_DOCUMENT: JSON = {
+    "role": "user",
+    "content": [
+        {
+            "type": "tool_result",
+            "tool_use_id": WEATHER_CALL_ID,
+            "content": [
+                {"type": "text", "text": "The weather is"},
+                {
+                    "type": "document",
+                    "source": {"type": "text", "media_type": "text/plain", "data": "15 degrees"},
+                },
+            ],
+        }
+    ],
+}
+TOOL_ERROR: JSON = {
+    "role": "user",
+    "content": [
+        {
+            "type": "tool_result",
+            "tool_use_id": WEATHER_CALL_ID,
+            "content": "ConnectionError: the weather service API is not available (HTTP 500)",
+            "is_error": True,
+        }
+    ],
+}
+NEXT_QUESTION: JSON = {"type": "text", "text": "What should I do next?"}
+HERE_ARE_THE_RESULTS: JSON = {"type": "text", "text": "Here are the results:"}
 
 GET_WEATHER = ToolCall(
     id="toolu_01A09q90qw90lq917835lq9",
@@ -202,14 +253,76 @@ def test_a_tool_round_trip_becomes_the_action_then_its_tool_observation() -> Non
     )
 
 
-def test_an_empty_tool_result_becomes_a_tool_observation_without_parts() -> None:
-    request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, EMPTY_TOOL_RESULT]}
+@pytest.mark.parametrize(
+    ("tool_result", "expected"),
+    [
+        (
+            SUCCESSFUL_TOOL_RESULT,
+            ToolObservation(call_id=WEATHER_CALL_ID, parts=(TextPart(text="15 degrees"),)),
+        ),
+        (
+            TOOL_RESULT_WITH_DOCUMENT,
+            ToolObservation(
+                call_id=WEATHER_CALL_ID,
+                parts=(TextPart(text="The weather is"), TextPart(text="15 degrees")),
+            ),
+        ),
+        (
+            TOOL_ERROR,
+            ToolObservation(
+                call_id=WEATHER_CALL_ID,
+                is_error=True,
+                parts=(
+                    TextPart(
+                        text="ConnectionError: the weather service API is not available (HTTP 500)"
+                    ),
+                ),
+            ),
+        ),
+        (EMPTY_TOOL_RESULT, ToolObservation(call_id=WEATHER_CALL_ID, parts=())),
+    ],
+    ids=["successful", "with-a-document", "error", "empty"],
+)
+def test_a_published_tool_result_becomes_the_tool_s_observation(
+    tool_result: JSON, expected: ToolObservation
+) -> None:
+    request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, tool_result]}
 
     trajectory = Trajectory.from_anthropic(request)
 
-    assert trajectory.history[-1:] == (
-        ToolObservation(call_id="toolu_01A09q90qw90lq917835lq9", parts=()),
-    )
+    assert trajectory.history[-1:] == (expected,)
+
+
+# The same page: text after the tool results, as the API requires, and text before them, which
+# the API refuses with a 400 error; either way the events keep the blocks' order.
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (
+            [{"type": "tool_result", "tool_use_id": WEATHER_CALL_ID}, NEXT_QUESTION],
+            (
+                ToolObservation(call_id=WEATHER_CALL_ID, parts=()),
+                Observation(author=Author.USER, parts=(TextPart(text="What should I do next?"),)),
+            ),
+        ),
+        (
+            [HERE_ARE_THE_RESULTS, {"type": "tool_result", "tool_use_id": WEATHER_CALL_ID}],
+            (
+                Observation(author=Author.USER, parts=(TextPart(text="Here are the results:"),)),
+                ToolObservation(call_id=WEATHER_CALL_ID, parts=()),
+            ),
+        ),
+    ],
+    ids=["results-then-text", "text-then-results"],
+)
+def test_tool_results_and_text_keep_their_order(content: JSON, expected: tuple[Event, ...]) -> None:
+    request: JSON = {
+        "messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, {"role": "user", "content": content}]
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history[2:] == expected
 
 
 def test_a_server_tool_in_the_history_becomes_its_call_its_result_and_the_text_after() -> None:
@@ -309,13 +422,138 @@ def test_an_image_by_url_and_an_unmodelled_block_keep_their_place() -> None:
     )
 
 
-def test_authorship_decides_who_wrote_each_user_role_message() -> None:
-    request: JSON = {"messages": [WEATHER_QUESTION, TOOL_USE_RESPONSE, SHANNON_QUESTION]}
+def test_marked_authorship_makes_only_the_marked_turns_the_user_s() -> None:
+    trajectory = Trajectory.from_anthropic(CONVERSATION, authorship=marked({2}))
 
-    trajectory = Trajectory.from_anthropic(request, authorship=marked({0}))
+    assert trajectory.history == (
+        Observation(author=Author.UNKNOWN, parts=(TextPart(text="Hello there."),)),
+        Action(
+            id="$.messages[1].content",
+            parts=(TextPart(text="Hi, I'm Claude. How can I help you?"),),
+        ),
+        Observation(
+            author=Author.USER, parts=(TextPart(text="Can you explain LLMs in plain English?"),)
+        ),
+    )
 
-    assert trajectory.history[-1:] == (
-        Observation(author=Author.UNKNOWN, parts=(TextPart(text="When was Claude Shannon born?"),)),
+
+def attribute_nudges_to_the_scheduler(index: int, *, message: JSON) -> Author:
+    return Author.SCAFFOLD if message is SCHEDULER_NUDGE else Author.USER
+
+
+def test_a_harness_s_own_authorship_reads_each_user_role_message() -> None:
+    request: JSON = {"messages": [SCHEDULER_NUDGE]}
+
+    trajectory = Trajectory.from_anthropic(request, authorship=attribute_nudges_to_the_scheduler)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.SCAFFOLD, parts=(TextPart(text="It's 9am: run the daily report"),)
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("system", "expected"),
+    [
+        (
+            "You are a weather assistant.",
+            (
+                Observation(
+                    author=Author.SCAFFOLD,
+                    source="system",
+                    parts=(TextPart(text="You are a weather assistant."),),
+                ),
+            ),
+        ),
+        (None, ()),
+    ],
+    ids=["text", "null"],
+)
+def test_a_system_prompt_given_as_text_or_null(system: JSON, expected: tuple[Event, ...]) -> None:
+    request: JSON = {"system": system, "messages": []}
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history == expected
+
+
+# https://platform.claude.com/docs/en/build-with-claude/pdf-support: a PDF by URL, and one in
+# base64, whose published data is a shell variable, here the bytes "%PDF-1.7" and a newline.
+# Files referred to by id are opaque.
+def test_documents_become_media_and_files_become_opaque() -> None:
+    request: JSON = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "document", "source": {"type": "url", "url": MODEL_CARD}},
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": "JVBERi0xLjcK",
+                        },
+                    },
+                    {"type": "image", "source": {"type": "file", "file_id": "file_011"}},
+                    {"type": "document", "source": {"type": "file", "file_id": "file_012"}},
+                    {"type": "text", "text": "What are the key findings in this document?"},
+                ],
+            }
+        ]
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.USER,
+            parts=(
+                MediaPart(media_type="application/pdf", url=MODEL_CARD),
+                MediaPart(media_type="application/pdf", data=b"%PDF-1.7\n"),
+                OpaquePart(kind="image"),
+                OpaquePart(kind="document"),
+                TextPart(text="What are the key findings in this document?"),
+            ),
+        ),
+    )
+
+
+def test_text_outside_ascii_stays_as_written_in_arguments_and_results() -> None:
+    request: JSON = {
+        "messages": [
+            {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "server_tool_use",
+                        "id": "srvtoolu_1",
+                        "name": "web_search",
+                        "input": {"query": "Zürich"},
+                    },
+                    {
+                        "type": "web_search_tool_result",
+                        "tool_use_id": "srvtoolu_1",
+                        "content": [{"title": "Zürich"}],
+                    },
+                ],
+            }
+        ]
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history == (
+        Action(
+            id="$.messages[0].content[0]",
+            tool_calls=(
+                ToolCall(id="srvtoolu_1", name="web_search", arguments='{"query": "Zürich"}'),
+            ),
+        ),
+        ToolObservation(
+            call_id="srvtoolu_1", source="server", parts=(TextPart(text='[{"title": "Zürich"}]'),)
+        ),
     )
 
 
@@ -341,6 +579,25 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         (TextPart(text="I'll help you check the current weather and time in San Francisco."),),
         (GET_WEATHER,),
     )
+
+
+SOURCE = "$.messages[0].content[0].source"
+
+
+def build_user_request(*blocks: JSON) -> JSON:
+    return {"messages": [{"role": "user", "content": list(blocks)}]}
+
+
+def build_tool_result(content: JSON) -> JSON:
+    return {"type": "tool_result", "tool_use_id": WEATHER_CALL_ID, "content": content}
+
+
+def build_image(source: JSON) -> JSON:
+    return {"type": "image", "source": source}
+
+
+def build_document(source: JSON) -> JSON:
+    return {"type": "document", "source": source}
 
 
 @pytest.mark.parametrize(
@@ -408,6 +665,66 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             {"messages": [TOOL_USE_RESPONSE, TOOL_USE_RESPONSE]},
             "$.messages[1].content[0]",
         ),
+        ({"messages": [{"role": "assistant", "content": 42}]}, "$.messages[0].content"),
+        ({"system": [{"type": "image"}], "messages": []}, "$.system[0]"),
+        (
+            build_user_request({"type": "tool_result", "content": "15 degrees"}),
+            "$.messages[0].content[0]",
+        ),
+        (build_user_request(build_tool_result(42)), "$.messages[0].content[0].content"),
+        (
+            build_user_request(build_tool_result([{"text": "Hi"}])),
+            "$.messages[0].content[0].content[0]",
+        ),
+        (build_user_request({"type": "image"}), "$.messages[0].content[0]"),
+        (build_user_request({"type": "document"}), "$.messages[0].content[0]"),
+        (build_user_request(build_image({"type": "base64", "data": "iVBORw=="})), SOURCE),
+        (
+            build_user_request(
+                build_image({"type": "base64", "media_type": "png", "data": "iVBORw=="})
+            ),
+            SOURCE,
+        ),
+        (build_user_request(build_image({"url": "https://example.com/a.png"})), SOURCE),
+        (build_user_request(build_document({"type": "url"})), SOURCE),
+        (build_user_request(build_document({"data": "15 degrees"})), SOURCE),
+        (
+            build_user_request(
+                build_document({"type": "base64", "media_type": "application/pdf", "data": "*"})
+            ),
+            f"{SOURCE}.data",
+        ),
+        (
+            {
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [{"type": "server_tool_use", "id": "s1", "name": "web_search"}],
+                    }
+                ]
+            },
+            "$.messages[0].content[0]",
+        ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "server_tool_use",
+                                "id": "s1",
+                                "name": "web_search",
+                                "input": {"query": "q3 revenue"},
+                            },
+                            {"type": "web_search_tool_result", "tool_use_id": "s1"},
+                        ],
+                    }
+                ]
+            },
+            "$.messages[0].content[1]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -422,6 +739,21 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "tool-use-without-input",
         "thinking-without-text",
         "repeated-tool-use-id",
+        "assistant-content-not-text-or-blocks",
+        "system-block-not-text",
+        "tool-result-without-tool-use-id",
+        "tool-result-content-not-text-or-blocks",
+        "tool-result-block-without-type",
+        "image-without-source",
+        "document-without-source",
+        "base64-image-without-media-type",
+        "base64-image-not-iana",
+        "image-source-without-type",
+        "url-document-without-url",
+        "document-source-without-type",
+        "document-data-not-base64",
+        "server-tool-use-without-input",
+        "server-result-without-content",
     ],
 )
 def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON, path: str) -> None:
