@@ -63,6 +63,7 @@ STORED: dict[str, JSON] = {
             "kind": "tool_observation",
             "call_id": "call_1",
             "is_error": False,
+            "source": None,
             "parts": [
                 {
                     "kind": "media",
@@ -98,6 +99,7 @@ DELEGATING: dict[str, JSON] = {
             "kind": "tool_observation",
             "call_id": "call_7",
             "is_error": True,
+            "source": "subagent",
             "parts": [{"kind": "text", "text": "The subagent stopped: no access to q3.csv."}],
         },
     ],
@@ -151,6 +153,7 @@ TOOL_OBSERVATION: dict[str, JSON] = {
     "kind": "tool_observation",
     "call_id": "call_1",
     "is_error": False,
+    "source": None,
     "parts": [],
 }
 TEXT: dict[str, JSON] = {"kind": "text", "text": "Plot q3.csv"}
@@ -162,6 +165,7 @@ MEDIA: dict[str, JSON] = {
     "description": None,
 }
 AUDIO: dict[str, JSON] = {"kind": "audio"}
+TASK_CALL: dict[str, JSON] = {"id": "call_7", "name": "task", "arguments": "{}"}
 
 
 @pytest.fixture
@@ -174,6 +178,7 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
@@ -186,6 +191,7 @@ def test_loading_the_stored_format_restores_the_history() -> None:
     assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     loaded = Trajectory.load(DELEGATING)
 
@@ -245,8 +251,17 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
             "$.history[0].parts[0].description.author",
         ),
         (
-            {**ENVELOPE, "history": [], "subagents": {"call_7": {**ENVELOPE, "history": [AUDIO]}}},
+            {
+                **ENVELOPE,
+                "history": [{**ACTION, "tool_calls": [TASK_CALL]}],
+                "subagents": {"call_7": {**ENVELOPE, "history": [AUDIO]}},
+            },
             "$.subagents[0].history[0]",
+        ),
+        pytest.param(
+            {**ENVELOPE, "history": [], "subagents": {"call_7": {**ENVELOPE, "history": []}}},
+            "$.subagents[0]",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -266,6 +281,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "description-without-author",
         "description-with-unknown-author",
         "malformed-subagent",
+        "subagent-without-its-call",
     ],
 )
 def test_loading_a_malformed_payload_raises_format_error_at_its_path(
