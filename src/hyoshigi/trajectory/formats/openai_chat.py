@@ -134,8 +134,8 @@ def read_media_part(part: JSON, *, path: str) -> Part:
 
 
 def read_file_part(part: JSON, *, path: str) -> Part:
-    """Read a file part: data in a data URL becomes media; a file by id, or data without
-    its media type, becomes opaque.
+    """Read a file part: file data in a data URL becomes media of the URL's type, text/plain
+    when it names none; a file by id, or file data that is not a data URL, becomes opaque.
     """
     match part:
         case {"file": {"file_data": str(file_data)}}:
@@ -203,7 +203,10 @@ def read_assistant_parts(message: JSON, *, path: str) -> tuple[Part, ...]:
 
 
 def read_assistant_content(message: JSON, *, path: str) -> tuple[Part, ...]:
-    """Read an assistant message's content: none, a string, or text and refusal parts."""
+    """Read an assistant message's content: none, a string, or parts.
+
+    Text and refusal parts become text; parts of other types become opaque.
+    """
     match message:
         case {"content": str(text)}:
             return (TextPart(text=text),)
