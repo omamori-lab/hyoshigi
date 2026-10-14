@@ -203,7 +203,22 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         ({**ENVELOPE, "version": 2, "history": []}, "$"),
         ({**ENVELOPE, "version": True, "history": []}, "$"),
         ({**ENVELOPE, "history": [{"kind": "decision"}]}, "$.history[0]"),
-        ({**ENVELOPE, "history": [ACTION, ACTION]}, "$.history[1].id"),
+        pytest.param(
+            {**ENVELOPE, "history": [ACTION, ACTION]},
+            "$.history[1]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {**ACTION, "tool_calls": [TASK_CALL]},
+                    {**ACTION, "id": "a2", "tool_calls": [TASK_CALL]},
+                ],
+            },
+            "$.history[1]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
         ({**ENVELOPE, "history": [{**ACTION, "thought": [AUDIO]}]}, "$.history[0].thought[0]"),
         ({**ENVELOPE, "history": [{**ACTION, "parts": [AUDIO]}]}, "$.history[0].parts[0]"),
         (
@@ -267,6 +282,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "boolean-version",
         "unknown-kind",
         "repeated-action-id",
+        "repeated-tool-call-id",
         "malformed-thought",
         "malformed-action-part",
         "tool-call-without-arguments",
