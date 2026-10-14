@@ -16,4 +16,3 @@ class FormatError(ValueError):
     def __init__(self, *, path: str, expected: str) -> None:
         super().__init__(f"{path}: expected {expected}")
         self.path = path
-        self.expected = expected

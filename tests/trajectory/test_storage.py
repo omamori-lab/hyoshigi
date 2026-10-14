@@ -20,6 +20,7 @@ TASK = Observation(author=Author.USER, parts=(TextPart(text="Plot q3.csv"),))
 READ_FILE = Action(
     id="a1",
     thought=(TextPart(text="I should read the file first."),),
+    parts=(TextPart(text="Reading q3.csv."),),
     tool_calls=(ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.csv"}'),),
 )
 CHART = ToolObservation(
@@ -53,7 +54,7 @@ STORED: dict[str, JSON] = {
             "kind": "action",
             "id": "a1",
             "thought": [{"kind": "text", "text": "I should read the file first."}],
-            "parts": [],
+            "parts": [{"kind": "text", "text": "Reading q3.csv."}],
             "tool_calls": [
                 {"id": "call_1", "name": "read_file", "arguments": '{"path": "q3.csv"}'}
             ],
@@ -93,6 +94,12 @@ DELEGATING: dict[str, JSON] = {
             "parts": [],
             "tool_calls": [{"id": "call_7", "name": "task", "arguments": "{}"}],
         },
+        {
+            "kind": "tool_observation",
+            "call_id": "call_7",
+            "is_error": True,
+            "parts": [{"kind": "text", "text": "The subagent stopped: no access to q3.csv."}],
+        },
     ],
     "subagents": {
         "call_7": {
@@ -105,6 +112,21 @@ DELEGATING: dict[str, JSON] = {
                     "source": None,
                     "parts": [{"kind": "text", "text": "Find the q3 revenue"}],
                 },
+                {
+                    "kind": "action",
+                    "id": "b1",
+                    "thought": [],
+                    "parts": [
+                        {
+                            "kind": "media",
+                            "media_type": "image/png",
+                            "url": "https://example.com/q3.png",
+                            "data": None,
+                            "description": None,
+                        }
+                    ],
+                    "tool_calls": [],
+                },
             ],
             "subagents": {},
         },
@@ -112,7 +134,34 @@ DELEGATING: dict[str, JSON] = {
 }
 
 ENVELOPE: dict[str, JSON] = {"format": "hyoshigi.trajectory", "version": 1, "subagents": {}}
+ACTION: dict[str, JSON] = {
+    "kind": "action",
+    "id": "a1",
+    "thought": [],
+    "parts": [],
+    "tool_calls": [],
+}
+OBSERVATION: dict[str, JSON] = {
+    "kind": "observation",
+    "author": "user",
+    "source": None,
+    "parts": [],
+}
+TOOL_OBSERVATION: dict[str, JSON] = {
+    "kind": "tool_observation",
+    "call_id": "call_1",
+    "is_error": False,
+    "parts": [],
+}
 TEXT: dict[str, JSON] = {"kind": "text", "text": "Plot q3.csv"}
+MEDIA: dict[str, JSON] = {
+    "kind": "media",
+    "media_type": "image/png",
+    "url": None,
+    "data": "iVBORw==",
+    "description": None,
+}
+AUDIO: dict[str, JSON] = {"kind": "audio"}
 
 
 @pytest.fixture
@@ -125,28 +174,24 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
     assert stored == STORED
 
 
-@pytest.mark.xfail(strict=True)
 def test_loading_the_stored_format_restores_the_history() -> None:
     loaded = Trajectory.load(STORED)
 
     assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     loaded = Trajectory.load(DELEGATING)
 
     assert loaded.dump() == DELEGATING
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
@@ -154,88 +199,53 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         ({**ENVELOPE, "version": 2, "history": []}, "$"),
         ({**ENVELOPE, "version": True, "history": []}, "$"),
         ({**ENVELOPE, "history": [{"kind": "decision"}]}, "$.history[0]"),
+        ({**ENVELOPE, "history": [ACTION, ACTION]}, "$.history[1].id"),
+        ({**ENVELOPE, "history": [{**ACTION, "thought": [AUDIO]}]}, "$.history[0].thought[0]"),
+        ({**ENVELOPE, "history": [{**ACTION, "parts": [AUDIO]}]}, "$.history[0].parts[0]"),
         (
-            {
-                **ENVELOPE,
-                "history": [
-                    {"kind": "observation", "author": "admin", "source": None, "parts": []}
-                ],
-            },
-            "$.history[0].author",
-        ),
-        (
-            {
-                **ENVELOPE,
-                "history": [
-                    {
-                        "kind": "action",
-                        "id": "a1",
-                        "thought": [],
-                        "parts": [],
-                        "tool_calls": [{"id": "c1"}],
-                    }
-                ],
-            },
+            {**ENVELOPE, "history": [{**ACTION, "tool_calls": [{"id": "c1"}]}]},
             "$.history[0].tool_calls[0]",
         ),
+        ({**ENVELOPE, "history": [{**OBSERVATION, "author": "admin"}]}, "$.history[0].author"),
         (
-            {
-                **ENVELOPE,
-                "history": [
-                    {
-                        "kind": "observation",
-                        "author": "user",
-                        "source": None,
-                        "parts": [
-                            TEXT,
-                            {
-                                "kind": "media",
-                                "media_type": "image/png",
-                                "url": None,
-                                "data": "not base64!",
-                                "description": None,
-                            },
-                        ],
-                    }
-                ],
-            },
-            "$.history[0].parts[1].data",
+            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [TEXT, AUDIO]}]},
+            "$.history[0].parts[1]",
         ),
         (
-            {
-                **ENVELOPE,
-                "history": [
-                    {
-                        "kind": "observation",
-                        "author": "user",
-                        "source": None,
-                        "parts": [
-                            {
-                                "kind": "media",
-                                "media_type": "png",
-                                "url": "https://example.com/a",
-                                "data": None,
-                                "description": None,
-                            }
-                        ],
-                    }
-                ],
-            },
+            {**ENVELOPE, "history": [{**TOOL_OBSERVATION, "parts": [AUDIO]}]},
+            "$.history[0].parts[0]",
+        ),
+        (
+            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [{**MEDIA, "data": "iVBO*Rw=="}]}]},
+            "$.history[0].parts[0].data",
+        ),
+        (
+            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [{**MEDIA, "media_type": "png"}]}]},
             "$.history[0].parts[0]",
         ),
         (
             {
                 **ENVELOPE,
-                "history": [],
-                "subagents": {
-                    "call_7": {
-                        "format": "hyoshigi.trajectory",
-                        "version": 1,
-                        "history": [{"kind": "decision"}],
-                        "subagents": {},
-                    }
-                },
+                "history": [
+                    {**OBSERVATION, "parts": [{**MEDIA, "description": {"text": "A chart"}}]}
+                ],
             },
+            "$.history[0].parts[0].description",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "parts": [{**MEDIA, "description": {"text": "A chart", "author": "admin"}}],
+                    }
+                ],
+            },
+            "$.history[0].parts[0].description.author",
+        ),
+        (
+            {**ENVELOPE, "history": [], "subagents": {"call_7": {**ENVELOPE, "history": [AUDIO]}}},
             "$.subagents[0].history[0]",
         ),
     ],
@@ -244,10 +254,17 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "unknown-version",
         "boolean-version",
         "unknown-kind",
-        "unknown-author",
+        "repeated-action-id",
+        "malformed-thought",
+        "malformed-action-part",
         "tool-call-without-arguments",
+        "unknown-author",
+        "malformed-observation-part",
+        "malformed-tool-observation-part",
         "data-not-base64",
         "media-type-not-iana",
+        "description-without-author",
+        "description-with-unknown-author",
         "malformed-subagent",
     ],
 )
@@ -260,12 +277,15 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
     assert raised.value.path == path
 
 
-@pytest.mark.xfail(strict=True)
+def test_a_format_error_names_its_path_in_its_message() -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load({**ENVELOPE, "history": [AUDIO]})
+
+    assert str(raised.value).startswith("$.history[0]: ")
+
+
 def test_a_format_error_never_quotes_the_payload() -> None:
-    payload = {
-        **ENVELOPE,
-        "history": [{"kind": "observation", "author": "s3cret-0f3c", "source": None, "parts": []}],
-    }
+    payload: JSON = {**ENVELOPE, "history": [{**OBSERVATION, "author": "s3cret-0f3c"}]}
 
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
