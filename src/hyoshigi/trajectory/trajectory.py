@@ -52,11 +52,20 @@ class Trajectory:
         return MappingProxyType(self._subagents)
 
     def act(self, action: Action) -> None:
-        """Record an action the decision allowed."""
+        """Record an action the decision allowed.
+
+        The action's id and each of its tool calls' ids must be new to the
+        trajectory; otherwise nothing is recorded.
+        """
+        call_ids = [call.id for call in action.tool_calls]
         if action.id in self._action_ids:
             raise ConfigurationError("an action with this id is already in the trajectory")
+        if len(set(call_ids)) < len(call_ids) or not self._call_ids.isdisjoint(call_ids):
+            raise ConfigurationError(
+                "each tool call needs an id no other call in the trajectory has"
+            )
         self._action_ids.add(action.id)
-        self._call_ids.update(call.id for call in action.tool_calls)
+        self._call_ids.update(call_ids)
         self._history.append(action)
 
     def observe(self, observation: Observation) -> None:
@@ -119,12 +128,14 @@ class Trajectory:
     def _load_history(self, history: list[JSON], *, path: str) -> None:
         for index, data in enumerate(history):
             match load_event(data, path=f"{path}[{index}]"):
-                case Action() as action if action.id in self._action_ids:
-                    raise FormatError(
-                        path=f"{path}[{index}].id", expected="an id no earlier action has"
-                    )
                 case Action() as action:
-                    self.act(action)
+                    try:
+                        self.act(action)
+                    except ConfigurationError:
+                        raise FormatError(
+                            path=f"{path}[{index}]",
+                            expected="an action with ids new to the trajectory",
+                        ) from None
                 case Observation() as observation:
                     self.observe(observation)
                 case unreachable:

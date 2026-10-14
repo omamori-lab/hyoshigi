@@ -206,7 +206,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         pytest.param(
             {**ENVELOPE, "history": [ACTION, ACTION]},
             "$.history[1]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -217,7 +216,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 ],
             },
             "$.history[1]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         ({**ENVELOPE, "history": [{**ACTION, "thought": [AUDIO]}]}, "$.history[0].thought[0]"),
         ({**ENVELOPE, "history": [{**ACTION, "parts": [AUDIO]}]}, "$.history[0].parts[0]"),

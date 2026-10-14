@@ -74,7 +74,6 @@ def test_acting_an_action_already_in_the_history_raises(trajectory: Trajectory) 
         trajectory.act(Action(id="a1"))
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "action",
     [
@@ -90,7 +89,6 @@ def test_acting_with_a_tool_call_id_already_used_raises(
         reading.act(action)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_refused_action_leaves_the_history_unchanged(reading: Trajectory) -> None:
     with pytest.raises(ConfigurationError):
         reading.act(Action(id="a2", tool_calls=(WRITE, WRITE)))
