@@ -62,9 +62,9 @@ langchain-sync-monitors will be rebuilt on it.
    monitor always returns a `SuspicionScore`, with any failure in its
    evidence. A reply the monitor cannot read, content it cannot perceive and
    a model that is unavailable all fail closed: suspicion 1.0, never "allow".
-   Misuse raises: `ConfigurationError` when an object is built with options
-   that cannot work, `FormatError` when a builder is given a payload that is
-   not its format. Any other exception from hyoshigi's own code is a bug.
+   Misuse raises: `ConfigurationError` when an object is built, or a method
+   called, with arguments that cannot work, `FormatError` when a reader is
+   given a payload that is not its format. Any other exception from hyoshigi's own code is a bug.
 9. **Docstrings and comments say what the code does now, and stay dry.**
    History belongs in git and in the recorded decisions.
 10. **Design patterns we keep.** Monitors and protocols hold configuration
