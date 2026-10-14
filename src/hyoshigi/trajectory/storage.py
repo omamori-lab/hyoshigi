@@ -5,9 +5,8 @@ from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
-from hyoshigi.trajectory.parts import Author, Description, MediaPart, Part, TextPart
-
-type JSON = bool | int | float | str | list[JSON] | dict[str, JSON] | None
+from hyoshigi.trajectory.json_data import JSON
+from hyoshigi.trajectory.parts import Author, Description, MediaPart, OpaquePart, Part, TextPart
 
 FORMAT = "hyoshigi.trajectory"
 VERSION = 1
@@ -69,6 +68,8 @@ def dump_part(part: Part) -> JSON:
                 "data": None if part.data is None else b64encode(part.data).decode("ascii"),
                 "description": dump_description(part.description),
             }
+        case OpaquePart():
+            return {}
         case unreachable:
             assert_never(unreachable)
 

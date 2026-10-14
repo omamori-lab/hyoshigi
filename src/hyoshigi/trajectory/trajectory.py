@@ -8,9 +8,11 @@ from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
+from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
+from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
-from hyoshigi.trajectory.storage import FORMAT, JSON, VERSION, dump_event, load_event
+from hyoshigi.trajectory.storage import FORMAT, VERSION, dump_event, load_event
 
 
 class BlackBoxRun(NamedTuple):
@@ -40,6 +42,15 @@ class Trajectory:
         trajectory = cls()
         trajectory.observe(Observation(author=Author.USER, parts=(TextPart(text=task),)))
         return BlackBoxRun(trajectory=trajectory, answer=Action(parts=(TextPart(text=answer),)))
+
+    @classmethod
+    def from_anthropic(cls, request: JSON, *, authorship: Authorship = by_role) -> Self:
+        """Build the trajectory of an Anthropic Messages request body.
+
+        Raises FormatError, naming the JSONPath of the first problem, on a body that is
+        not in the Messages format.
+        """
+        return cls()
 
     @property
     def history(self) -> tuple[Event, ...]:

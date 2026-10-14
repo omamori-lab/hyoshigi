@@ -152,6 +152,8 @@ verbs = ["act"]
 [tool.lanorme.naming_clean_code]
 enabled = true
 verbs = ["act"]
+# A strategy passed as a value is named for what it decides.
+exempt = ["by_role"]
 
 [tool.lanorme.similarity]
 enabled = true

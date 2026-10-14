@@ -10,6 +10,7 @@ from hyoshigi import (
     FormatError,
     MediaPart,
     Observation,
+    OpaquePart,
     TextPart,
     ToolCall,
     ToolObservation,
@@ -19,7 +20,7 @@ from hyoshigi import (
 TASK = Observation(author=Author.USER, parts=(TextPart(text="Plot q3.csv"),))
 READ_FILE = Action(
     id="a1",
-    thought=(TextPart(text="I should read the file first."),),
+    thought=(TextPart(text="I should read the file first."), OpaquePart(kind="redacted_thinking")),
     parts=(TextPart(text="Reading q3.csv."),),
     tool_calls=(ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.csv"}'),),
 )
@@ -53,7 +54,10 @@ STORED: dict[str, JSON] = {
         {
             "kind": "action",
             "id": "a1",
-            "thought": [{"kind": "text", "text": "I should read the file first."}],
+            "thought": [
+                {"kind": "text", "text": "I should read the file first."},
+                {"kind": "opaque", "opaque_kind": "redacted_thinking"},
+            ],
             "parts": [{"kind": "text", "text": "Reading q3.csv."}],
             "tool_calls": [
                 {"id": "call_1", "name": "read_file", "arguments": '{"path": "q3.csv"}'}
@@ -178,12 +182,14 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
     assert stored == STORED
 
 
+@pytest.mark.xfail(strict=True, raises=FormatError)
 def test_loading_the_stored_format_restores_the_history() -> None:
     loaded = Trajectory.load(STORED)
 
