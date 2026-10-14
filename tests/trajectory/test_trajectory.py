@@ -16,11 +16,19 @@ from hyoshigi import (
 TASK = "Summarise q3.md"
 ANSWER = "Revenue grew 4% in the third quarter."
 INSTRUCTION = "Find the q3 revenue"
+READ = ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.md"}')
+WRITE = ToolCall(id="call_2", name="write_file", arguments='{"path": "summary.md"}')
 
 
 @pytest.fixture
 def trajectory() -> Trajectory:
     return Trajectory.from_run(TASK, answer=ANSWER).trajectory
+
+
+@pytest.fixture
+def reading(trajectory: Trajectory) -> Trajectory:
+    trajectory.act(Action(id="a1", tool_calls=(READ,)))
+    return trajectory
 
 
 @pytest.fixture
@@ -64,6 +72,33 @@ def test_acting_an_action_already_in_the_history_raises(trajectory: Trajectory) 
 
     with pytest.raises(ConfigurationError):
         trajectory.act(Action(id="a1"))
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "action",
+    [
+        Action(id="a2", tool_calls=(READ,)),
+        Action(id="a2", tool_calls=(WRITE, WRITE)),
+    ],
+    ids=["used-by-an-earlier-action", "used-twice-in-one-action"],
+)
+def test_acting_with_a_tool_call_id_already_used_raises(
+    reading: Trajectory, action: Action
+) -> None:
+    with pytest.raises(ConfigurationError):
+        reading.act(action)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_refused_action_leaves_the_history_unchanged(reading: Trajectory) -> None:
+    with pytest.raises(ConfigurationError):
+        reading.act(Action(id="a2", tool_calls=(WRITE, WRITE)))
+
+    assert reading.history == (
+        Observation(author=Author.USER, parts=(TextPart(text=TASK),)),
+        Action(id="a1", tool_calls=(READ,)),
+    )
 
 
 def test_a_delegated_trajectory_starts_with_the_instruction_from_the_delegator(
