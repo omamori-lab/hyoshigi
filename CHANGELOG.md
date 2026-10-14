@@ -23,3 +23,9 @@ minor version.
   `MediaPart`, `Description` and `Author`.
 - `ConfigurationError`, for arguments that cannot work, and `FormatError`,
   which names the JSONPath of a malformed payload and never quotes it.
+- `Trajectory.from_anthropic` and `Action.from_anthropic`, which read
+  Anthropic's Messages format: a request into a trajectory, a response into
+  the action to rate.
+- `Authorship`, `by_role` and `marked`: who wrote each user-role message.
+- `OpaquePart`, for content recorded but not read, and media ranges such as
+  `image/*` in `MediaPart`.
