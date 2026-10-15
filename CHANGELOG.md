@@ -28,6 +28,9 @@ minor version.
   the action to rate.
 - `Trajectory.from_openai_chat` and `Action.from_openai_chat`, which read the
   OpenAI chat completions format with OpenRouter's reasoning fields.
+- `Trajectory.from_open_responses` and `Action.from_open_responses`, which read
+  the Open Responses format of 2026-04-24: a request into a trajectory, a
+  response's output items into the action to rate.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
   `image/*` in `MediaPart`.
