@@ -16,7 +16,6 @@ from hyoshigi import (
     ToolCall,
     ToolObservation,
     Trajectory,
-    by_role,
     marked,
 )
 
@@ -131,7 +130,8 @@ COMPACTED_OUTPUT: JSON = [
 
 WEATHER_QUESTION: JSON = {"type": "message", "role": "user", "content": "Weather in Paris?"}
 FOLLOW_UP: JSON = {"type": "message", "role": "user", "content": "And tomorrow?"}
-SCHEDULER_NUDGE: JSON = {"type": "message", "role": "user", "content": "It's 9am: run the report"}
+NUDGE = "It's 9am: run the report"
+SCHEDULER_NUDGE: JSON = {"type": "message", "role": "user", "content": NUDGE}
 GET_WEATHER: JSON = {
     "type": "function_call",
     "call_id": "call_1",
@@ -146,6 +146,10 @@ def build_user_request(*parts: JSON) -> JSON:
 
 def build_input_request(*items: JSON) -> JSON:
     return {"input": list(items)}
+
+
+def attribute_nudges_to_the_scheduler(index: int, *, message: JSON) -> Author:
+    return Author.SCAFFOLD if message in (SCHEDULER_NUDGE, NUDGE) else Author.USER
 
 
 def test_the_published_websocket_request_becomes_the_user_s_message() -> None:
@@ -357,17 +361,32 @@ def test_an_item_reference_is_an_unknown_author_s_observation(reference: JSON) -
     )
 
 
+def test_a_request_without_input_is_its_instructions() -> None:
+    trajectory = Trajectory.from_open_responses({"instructions": "Answer in French."})
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.SCAFFOLD,
+            source="instructions",
+            parts=(TextPart(text="Answer in French."),),
+        ),
+    )
+
+
 @pytest.mark.parametrize(
-    ("authorship", "author"),
-    [(by_role, Author.USER), (marked({1}), Author.UNKNOWN)],
-    ids=["by-role", "marked-elsewhere"],
+    ("authorship", "text", "author"),
+    [
+        (marked({0}), "Hello!", Author.USER),
+        (attribute_nudges_to_the_scheduler, NUDGE, Author.SCAFFOLD),
+    ],
+    ids=["marked-first", "harness"],
 )
 def test_a_string_input_is_the_first_message_with_the_authorship_s_author(
-    authorship: Authorship, author: Author
+    authorship: Authorship, text: str, author: Author
 ) -> None:
-    trajectory = Trajectory.from_open_responses({"input": "Hello!"}, authorship=authorship)
+    trajectory = Trajectory.from_open_responses({"input": text}, authorship=authorship)
 
-    assert trajectory.history == (Observation(author=author, parts=(TextPart(text="Hello!"),)),)
+    assert trajectory.history == (Observation(author=author, parts=(TextPart(text=text),)),)
 
 
 def test_marked_authorship_makes_only_the_marked_message_the_user_s() -> None:
@@ -379,10 +398,6 @@ def test_marked_authorship_makes_only_the_marked_message_the_user_s() -> None:
         Observation(author=Author.UNKNOWN, parts=(TextPart(text="Weather in Paris?"),)),
         Observation(author=Author.USER, parts=(TextPart(text="And tomorrow?"),)),
     )
-
-
-def attribute_nudges_to_the_scheduler(index: int, *, message: JSON) -> Author:
-    return Author.SCAFFOLD if message is SCHEDULER_NUDGE else Author.USER
 
 
 def test_a_harness_s_own_authorship_reads_each_user_message() -> None:
@@ -466,6 +481,7 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
         {"type": "input_file", "file_url": "https://example.com/q3.pdf"},
         {"type": "input_video", "video_url": "https://example.com/storm.mp4"},
         {"type": "input_video", "video_url": "data:video/mp4;base64,AAAAIGZ0eXA="},
+        {"type": "input_video", "video_url": "AAAAIGZ0eXA="},
         {"type": "input_audio", "input_audio": {"data": "UklGRg==", "format": "wav"}},
     )
 
@@ -484,6 +500,7 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
                 OpaquePart(kind="input_file"),
                 MediaPart(media_type="video/*", url="https://example.com/storm.mp4"),
                 MediaPart(media_type="video/mp4", data=b"\x00\x00\x00 ftyp"),
+                OpaquePart(kind="input_video"),
                 OpaquePart(kind="input_audio"),
             ),
         ),
@@ -498,7 +515,10 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
         ({"previous_response_id": 42}, "$.previous_response_id"),
         ({"input": 42}, "$.input"),
         (build_input_request({"content": "Hi"}), "$.input[0]"),
-        (build_input_request({"type": 42, "role": "user", "content": "Hi"}), "$.input[0]"),
+        (
+            build_input_request({"type": 42, "id": "msg_1", "role": "user", "content": "Hi"}),
+            "$.input[0]",
+        ),
         (build_input_request({"type": "message", "content": "Hi"}), "$.input[0]"),
         (build_input_request({"type": "message", "role": "critic", "content": "Hi"}), "$.input[0]"),
         (build_input_request({"type": "message", "role": "user", "content": 42}), "$.input[0]"),
@@ -553,6 +573,26 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
             ),
             "$.input[0].content[0].file_data",
         ),
+        (
+            build_input_request({"type": "message", "role": "system", "content": [{"text": "Hi"}]}),
+            "$.input[0].content[0]",
+        ),
+        (
+            build_input_request(
+                {"type": "function_call_output", "call_id": "c1", "output": [{"text": "ok"}]}
+            ),
+            "$.input[0].output[0]",
+        ),
+        (
+            build_input_request(
+                {"type": "reasoning", "summary": [], "content": [{"type": "reasoning_text"}]}
+            ),
+            "$.input[0].content[0]",
+        ),
+        (
+            build_user_request({"type": "input_video", "video_url": "data:video/mp4;base64,*"}),
+            "$.input[0].content[0].video_url",
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -582,6 +622,10 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
         "video-url-not-text",
         "file-data-not-text",
         "file-data-url-not-base64",
+        "scaffold-part-without-type",
+        "tool-output-part-without-type",
+        "reasoning-text-without-text",
+        "video-data-url-not-base64",
     ],
 )
 def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON, path: str) -> None:
