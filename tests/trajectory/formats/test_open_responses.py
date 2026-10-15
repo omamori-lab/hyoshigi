@@ -20,8 +20,6 @@ from hyoshigi import (
     marked,
 )
 
-pytestmark = pytest.mark.xfail(strict=True, reason="the Open Responses format is not read yet")
-
 # https://www.openresponses.org/specification/2026-04-24: the examples of a message, a
 # function call, reasoning, a provider's item, a WebSocket request and its continuation,
 # and the user message of the allowed_tools example.
