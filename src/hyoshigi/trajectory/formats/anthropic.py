@@ -5,10 +5,9 @@ https://platform.claude.com/docs/en/api/messages.
 """
 
 import json
-from dataclasses import dataclass, field, replace
-from typing import assert_never
 
 from hyoshigi.errors import FormatError
+from hyoshigi.trajectory.formats.action_draft import ActionDraft, Thought, close
 from hyoshigi.trajectory.formats.authorship import Authorship
 from hyoshigi.trajectory.formats.media import build_media
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
@@ -17,40 +16,6 @@ from hyoshigi.trajectory.parts import Author, MediaPart, OpaquePart, Part, TextP
 from hyoshigi.trajectory.storage import decode_data
 
 _CONTENT = "a string or a list of content blocks"
-
-
-@dataclass(frozen=True, slots=True)
-class _Thought:
-    part: Part
-
-
-@dataclass(slots=True)
-class _ActionDraft:
-    """The parts of an assistant message read so far, until they become an action."""
-
-    id: str | None = None
-    thought: list[Part] = field(default_factory=list)
-    parts: list[Part] = field(default_factory=list)
-    tool_calls: list[ToolCall] = field(default_factory=list)
-
-    def add(self, item: _Thought | Part | ToolCall) -> None:
-        """Add a thought, a part or a tool call."""
-        match item:
-            case _Thought(part=part):
-                self.thought.append(part)
-            case ToolCall():
-                self.tool_calls.append(item)
-            case TextPart() | MediaPart() | OpaquePart():
-                self.parts.append(item)
-            case unreachable:
-                assert_never(unreachable)
-
-    def build(self) -> Action:
-        """Return the action read so far, with its id, or a generated one."""
-        action = Action(
-            thought=tuple(self.thought), parts=tuple(self.parts), tool_calls=tuple(self.tool_calls)
-        )
-        return action if self.id is None else replace(action, id=self.id)
 
 
 def read_request(request: JSON, *, authorship: Authorship) -> list[tuple[str, Event]]:
@@ -73,9 +38,9 @@ def read_response(message: JSON) -> Action:
     """
     match message:
         case {"role": "assistant", "content": list(blocks), "id": str(message_id)}:
-            draft = _ActionDraft(id=message_id)
+            draft = ActionDraft(id=message_id)
         case {"role": "assistant", "content": list(blocks)}:
-            draft = _ActionDraft()
+            draft = ActionDraft()
         case _:
             raise FormatError(
                 path="$", expected="an assistant message with a list of content blocks"
@@ -244,7 +209,7 @@ def read_assistant_content(content: str | list[JSON], *, path: str) -> list[tupl
         return [(path, Action(id=path, parts=(TextPart(text=content),)))]
     blocks = content
     events: list[tuple[str, Event]] = []
-    draft: _ActionDraft | None = None
+    draft: ActionDraft | None = None
     for index, block in enumerate(blocks):
         block_path = f"{path}[{index}]"
         match block:
@@ -255,16 +220,9 @@ def read_assistant_content(content: str | list[JSON], *, path: str) -> list[tupl
                     (block_path, read_server_result(block, call_id=call_id, path=block_path))
                 )
             case _:
-                draft = draft or _ActionDraft(id=block_path)
+                draft = draft or ActionDraft(id=block_path)
                 draft.add(read_assistant_block(block, path=block_path))
     return events + close(draft)
-
-
-def close(draft: _ActionDraft | None) -> list[tuple[str, Event]]:
-    """Return a draft's action with the path it started at, if a draft was started."""
-    if draft is None or draft.id is None:
-        return []
-    return [(draft.id, draft.build())]
 
 
 def read_server_result(block: JSON, *, call_id: str, path: str) -> ToolObservation:
@@ -289,13 +247,13 @@ def read_server_result(block: JSON, *, call_id: str, path: str) -> ToolObservati
     )
 
 
-def read_assistant_block(block: JSON, *, path: str) -> _Thought | Part | ToolCall:
+def read_assistant_block(block: JSON, *, path: str) -> Thought | Part | ToolCall:
     """Read an assistant's block: a thought, a tool call, or a content block."""
     match block:
         case {"type": "thinking", "thinking": str(text)}:
-            return _Thought(TextPart(text=text))
+            return Thought(TextPart(text=text))
         case {"type": "redacted_thinking"}:
-            return _Thought(OpaquePart(kind="redacted_thinking"))
+            return Thought(OpaquePart(kind="redacted_thinking"))
         case {
             "type": "tool_use" | "server_tool_use",
             "id": str(call_id),
