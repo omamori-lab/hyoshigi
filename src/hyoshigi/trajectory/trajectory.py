@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
-from hyoshigi.trajectory.formats import anthropic, openai_chat
+from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.json_data import JSON
@@ -66,6 +66,18 @@ class Trajectory:
         """
         trajectory = cls()
         for path, event in openai_chat.read_request(request, authorship=authorship):
+            trajectory._record(event, path=path)
+        return trajectory
+
+    @classmethod
+    def from_open_responses(cls, request: JSON, *, authorship: Authorship = by_role) -> Self:
+        """Build the trajectory of an Open Responses request body.
+
+        The model's consecutive items become one action. Raises FormatError, naming the
+        JSONPath of the first problem, on a body that is not in the Open Responses format.
+        """
+        trajectory = cls()
+        for path, event in open_responses.read_request(request, authorship=authorship):
             trajectory._record(event, path=path)
         return trajectory
 

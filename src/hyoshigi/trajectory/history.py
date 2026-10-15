@@ -62,6 +62,20 @@ class Action:
 
         return openai_chat.read_response(message)
 
+    @staticmethod
+    def from_open_responses(output: JSON) -> Action:
+        """Read an Open Responses response's output items into one action.
+
+        An item the model did not write, such as a tool the provider ran, becomes an opaque
+        part. Raises FormatError, naming the JSONPath of the first problem, on output that
+        is not in the format.
+        """
+        # Imported here because the format module builds actions: a top-level import
+        # would be a cycle.
+        from hyoshigi.trajectory.formats import open_responses  # lanorme: ignore[IMPORT-001]
+
+        return open_responses.read_response(output)
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Observation:
