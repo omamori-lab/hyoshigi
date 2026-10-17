@@ -408,10 +408,35 @@ def test_a_model_is_named_for_the_provider_and_its_model_id(ask: Ask) -> None:
     assert exchange.model.name == "openai:gpt-6-astra"
 
 
-def test_a_model_perceives_the_media_it_was_given(ask: Ask) -> None:
-    exchange = ask(respond(IMAGE_INPUT_RESPONSE), perceives=MediaTypes("image/*"))
+@pytest.mark.parametrize(
+    "perceives",
+    [
+        MediaTypes("image/*", "application/*", "text/*"),
+        MediaTypes("image/png", "application/pdf", "text/plain"),
+    ],
+    ids=["ranges", "types-within-the-ranges"],
+)
+def test_a_model_perceives_the_media_it_was_given(ask: Ask, perceives: MediaTypes) -> None:
+    exchange = ask(respond(IMAGE_INPUT_RESPONSE), perceives=perceives)
 
-    assert exchange.model.perceives == MediaTypes("image/*")
+    assert exchange.model.perceives == perceives
+
+
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("audio/*",), "audio/*"),
+        (("video/mp4",), "video/mp4"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=["range-of-another-type", "another-type", "the-first-of-those-it-cannot-carry"],
+)
+@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
+def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
+    ask: Ask, patterns: tuple[str, ...], named: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        ask(respond(IMAGE_INPUT_RESPONSE), perceives=MediaTypes(*patterns))
 
 
 def test_a_prompt_is_sent_as_instructions_and_one_user_message(ask: Ask) -> None:
