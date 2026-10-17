@@ -64,9 +64,11 @@ RED_RECTANGLE_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHElEQVR4nGP4TyJgoKcGBgbs"
     "aFQDfTUQB4aDBgDAen2fpitsVAAAAABJRU5ErkJggg=="
 )
-# RFC 2046 / JFIF SOI marker recognized by typesafe_sdk._core.assets.CONTENT_TYPES.
+# Constructed: a JPEG's SOI and JFIF APP0 marker, recognized by
+# typesafe_sdk._core.assets.CONTENT_TYPES.
 JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF"
 IMAGE_REFERENCE = re.compile(rb"<image:[0-9a-f]{32}>")
+ASSET_PART = re.compile(rb"asset-\d+")
 
 
 def build_sync_model(
@@ -109,12 +111,15 @@ def return_noul_response(request: httpx2.Request) -> httpx2.Response:
     return httpx2.Response(200, json=NOUL_RESPONSE)
 
 
-def parse_multipart(request: httpx2.Request) -> tuple[JSON, str, bytes]:
+def parse_multipart(request: httpx2.Request) -> tuple[str | None, JSON, str, bytes]:
     header = f"Content-Type: {request.headers['content-type']}\r\n\r\n".encode()
     message = BytesParser(policy=default).parsebytes(header + request.content)
     request_part, asset_part = list(message.iter_parts())
-    normalized_json = IMAGE_REFERENCE.sub(b"<image>", request_part.get_content())
+    normalized_json = ASSET_PART.sub(
+        b"<part>", IMAGE_REFERENCE.sub(b"<image>", request_part.get_content())
+    )
     return (
+        request.headers.get("TypeSafe-Danger-Zone-Images"),
         json.loads(normalized_json),
         asset_part.get_content_type(),
         asset_part.get_content(),
@@ -147,10 +152,17 @@ def test_an_empty_model_name_raises_configuration_error(build_model: ModelBuilde
 def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
     build_model: ModelBuilder,
 ) -> None:
-    captured: list[tuple[str, str, JSON]] = []
+    captured: list[tuple[str, str, str | None, JSON]] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        captured.append((request.method, str(request.url), json.loads(request.content)))
+        captured.append(
+            (
+                request.method,
+                str(request.url),
+                request.headers.get("TypeSafe-Danger-Zone-Images"),
+                json.loads(request.content),
+            )
+        )
         return httpx2.Response(200, json=NOUL_RESPONSE)
 
     model = build_model(handler, model="jev-1.14.0")
@@ -162,6 +174,7 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
             (
                 "POST",
                 "https://api.typesafe.ai/v1/systemone",
+                None,
                 {
                     "model": "jev-1.14.0",
                     "state": [BILLING_STATE],
@@ -178,8 +191,10 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
     )
 
 
-# https://docs.typesafe.ai/sdk/python/usage/basic.md, "Assets in structured objects":
-# an Image in the state list is uploaded as a multipart asset part referenced from state.
+# https://docs.typesafe.ai/sdk/python/usage/basic.md, "Assets in structured objects", and
+# https://docs.typesafe.ai/images.md, "Turning on images": an Image in the state list is
+# uploaded as a multipart asset part referenced from state, with TypeSafe-Danger-Zone-Images.
+@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     ("media_type", "image_bytes", "part_content_type"),
@@ -197,7 +212,7 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
     image_bytes: bytes,
     part_content_type: str,
 ) -> None:
-    captured: list[tuple[JSON, str, bytes]] = []
+    captured: list[tuple[str | None, JSON, str, bytes]] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         captured.append(parse_multipart(request))
@@ -217,6 +232,7 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
     assert (captured, outcome) == (
         [
             (
+                "true",
                 {
                     "model": "jev-latest",
                     "state": ["The customer returned this item:", "<image>"],
@@ -226,7 +242,7 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
                             "instructions": "Is the item damaged?",
                         }
                     },
-                    "assets": {"<image>": {"type": "image", "part": "asset-0"}},
+                    "assets": {"<image>": {"type": "image", "part": "<part>"}},
                 },
                 part_content_type,
                 image_bytes,
@@ -260,6 +276,24 @@ def test_a_media_type_typesafe_cannot_carry_raises_configuration_error(
         run_decision(model, question=question)
 
 
+@pytest.mark.xfail(strict=True)
+@BUILDERS
+def test_an_unsupported_media_type_after_an_unusable_image_still_raises_configuration_error(
+    build_model: ModelBuilder,
+) -> None:
+    question = Question(
+        statement=BILLING_STATEMENT,
+        state=(
+            MediaPart(media_type="image/png", url="https://example.com/photo.png"),
+            MediaPart(media_type="audio/wav", data=b"RIFF"),
+        ),
+    )
+    model = build_model(return_noul_response, perceives=MediaTypes("image/*", "audio/*"))
+
+    with pytest.raises(ConfigurationError, match="audio/wav"):
+        run_decision(model, question=question)
+
+
 @BUILDERS
 @pytest.mark.parametrize(
     "part",
@@ -289,10 +323,44 @@ def test_an_image_without_usable_bytes_returns_unavailable(
     assert outcome == Unavailable(status=None)
 
 
-# https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 415 Unsupported Media Type,
-# 429 Too Many Requests, 529 Overloaded, plus HTTP 408, 409 and 5xx.
+@pytest.mark.xfail(strict=True)
 @BUILDERS
-@pytest.mark.parametrize("status", [408, 409, 413, 415, 429, 500, 502, 503, 529])
+@pytest.mark.parametrize(
+    "question",
+    [
+        Question(statement=BILLING_STATEMENT, state=(TextPart(text="a\ud800b"),)),
+        Question(statement="a\ud800b", state=(TextPart(text=BILLING_STATE),)),
+    ],
+    ids=["surrogate-in-state", "surrogate-in-statement"],
+)
+def test_a_lone_surrogate_in_the_question_returns_unavailable(
+    build_model: ModelBuilder, question: Question
+) -> None:
+    model = build_model(return_noul_response)
+
+    outcome = run_decision(model, question=question)
+
+    assert outcome == Unavailable(status=None)
+
+
+# https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 429 Too Many Requests,
+# 529 Overloaded, plus HTTP 1xx, 3xx, 408, 409 and 5xx.
+@BUILDERS
+@pytest.mark.parametrize(
+    "status",
+    [
+        pytest.param(103, marks=pytest.mark.xfail(strict=True)),
+        pytest.param(302, marks=pytest.mark.xfail(strict=True)),
+        408,
+        409,
+        413,
+        429,
+        500,
+        502,
+        503,
+        529,
+    ],
+)
 def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -304,6 +372,51 @@ def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_stat
     outcome = run_decision(model, question=BILLING_QUESTION)
 
     assert outcome == Unavailable(status=status)
+
+
+# https://docs.typesafe.ai/api.md, "Errors": HTTP 400 with "max_tokens_exceeded" means the
+# request exceeds the model's context length. The body's shape was observed from the live API,
+# relayed by OpenRouter, on 2026-10-17.
+@pytest.mark.xfail(strict=True)
+@BUILDERS
+def test_a_context_length_http_error_returns_unavailable_with_status_400(
+    build_model: ModelBuilder,
+) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(400, json={"detail": {"error_type": "max_tokens_exceeded"}})
+
+    model = build_model(handler)
+
+    outcome = run_decision(model, question=BILLING_QUESTION)
+
+    assert outcome == Unavailable(status=400)
+
+
+# Through OpenRouter the code is inside message text, which the adapter does not read.
+@BUILDERS
+def test_a_context_length_code_inside_message_text_raises_configuration_error(
+    build_model: ModelBuilder,
+) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            400,
+            json={
+                "error": {
+                    "message": 'HTTP 400: {"detail":{"error_type":"max_tokens_exceeded"}}',
+                    "code": 400,
+                }
+            },
+        )
+
+    model = build_model(handler)
+
+    with pytest.raises(ConfigurationError) as raised:
+        run_decision(model, question=BILLING_QUESTION)
+
+    assert ("400" in str(raised.value), "max_tokens_exceeded" in str(raised.value)) == (
+        True,
+        False,
+    )
 
 
 @BUILDERS
@@ -328,8 +441,20 @@ def test_a_connection_or_timeout_failure_returns_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
+# https://docs.typesafe.ai/api.md, "Compression" and "Errors": 415 Unsupported Media Type
+# means an unsupported Content-Encoding or more than one compression layer.
 @BUILDERS
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+@pytest.mark.parametrize(
+    "status",
+    [
+        400,
+        401,
+        403,
+        404,
+        pytest.param(415, marks=pytest.mark.xfail(strict=True)),
+        422,
+    ],
+)
 def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -355,6 +480,7 @@ def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
 
 
 # The provider's error, whose text can echo the prompt, stays out of the raised error's chain.
+@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_client_http_error_leaves_the_provider_error_out_of_its_chain(
     build_model: ModelBuilder,
@@ -367,7 +493,7 @@ def test_a_client_http_error_leaves_the_provider_error_out_of_its_chain(
     with pytest.raises(ConfigurationError) as raised:
         run_decision(model, question=BILLING_QUESTION)
 
-    assert (raised.value.__cause__, raised.value.__suppress_context__) == (None, True)
+    assert (raised.value.__cause__, raised.value.__context__) == (None, None)
 
 
 @BUILDERS
