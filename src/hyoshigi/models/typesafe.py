@@ -12,10 +12,10 @@ try:
         Noul,
         NoulAnswer,
         SystemOneResponse,
-        TypeSafeAPIConnectionError,
         TypeSafeAPIError,
         TypeSafeAPIResponseValidationError,
         TypeSafeClient,
+        TypeSafeError,
         TypeSafeInternalServerError,
     )
 except ModuleNotFoundError as error:
@@ -42,7 +42,12 @@ type StateItem = str | Image
 QUESTION_KEY = "statement"
 IMAGE_MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/*"})
 IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
-UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 415, 429})
+# https://docs.typesafe.ai/images.md, "Turning on images".
+IMAGE_HEADERS = {"TypeSafe-Danger-Zone-Images": "true"}
+# https://docs.typesafe.ai/api.md, "Errors": 415 is an unsupported Content-Encoding or
+# multiple compression layers (client configuration), so only transient or oversized 4xx
+# statuses map to Unavailable.
+UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
 
 
 def format_model_name(model: str) -> str:
@@ -73,13 +78,16 @@ def translate_part(part: PromptPart) -> StateItem | None:
 
 def translate_state(parts: tuple[PromptPart, ...]) -> list[StateItem] | None:
     """Translate state parts to a TypeSafe state list, or None when an image is unusable."""
-    state: list[StateItem] = []
-    for part in parts:
-        item = translate_part(part)
-        if item is None:
-            return None
-        state.append(item)
-    return state
+    items = [translate_part(part) for part in parts]
+    state = [item for item in items if item is not None]
+    return state if len(state) == len(items) else None
+
+
+def build_headers(state: list[StateItem]) -> dict[str, str] | None:
+    """Return the opt-in header required by TypeSafe when the state contains an image."""
+    if any(isinstance(item, Image) for item in state):
+        return IMAGE_HEADERS
+    return None
 
 
 def build_questions(question: Question) -> dict[str, Noul]:
@@ -99,21 +107,38 @@ def read_decision(response: SystemOneResponse) -> DecisionOutcome:
             return Unavailable()
 
 
-def translate_error(
-    error: TypeSafeAPIConnectionError | TypeSafeAPIError,
-) -> Unavailable:
+def is_unavailable_error(error: TypeSafeAPIError) -> bool:
+    """Whether an HTTP failure from TypeSafe is a transient or content-length outcome."""
+    match error.body:
+        case {"detail": {"error_type": "max_tokens_exceeded"}}:
+            return True
+        case _:
+            return (
+                isinstance(error, TypeSafeInternalServerError)
+                or error.status < 400
+                or error.status in UNAVAILABLE_STATUSES
+            )
+
+
+def translate_error(error: TypeSafeError) -> Unavailable:
     """Translate a TypeSafe SDK error to Unavailable, or raise ConfigurationError on 4xx."""
-    if isinstance(error, TypeSafeAPIConnectionError | TypeSafeAPIResponseValidationError):
+    if not isinstance(error, TypeSafeAPIError) or isinstance(
+        error, TypeSafeAPIResponseValidationError
+    ):
         return Unavailable()
-    if isinstance(error, TypeSafeInternalServerError) or error.status in UNAVAILABLE_STATUSES:
+    if is_unavailable_error(error):
         return Unavailable(status=error.status)
-    raise ConfigurationError(f"TypeSafe request failed with HTTP {error.status}") from None
+    raise ConfigurationError(f"TypeSafe request failed with HTTP {error.status}")
 
 
 def build_decision_model(
     client: TypeSafeClient, *, model: str, perceives: MediaTypes
 ) -> DecisionModel:
-    """A decision model on TypeSafe's API, through the caller's client."""
+    """A decision model on TypeSafe's API, through the caller's client.
+
+    Declaring image media types in ``perceives`` opts in to sending
+    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image.
+    """
     name = format_model_name(model)
 
     def decide(question: Question) -> DecisionOutcome:
@@ -125,10 +150,13 @@ def build_decision_model(
                 state=state,
                 questions=build_questions(question),
                 model=model,
+                extra_headers=build_headers(state),
             )
-        except (TypeSafeAPIConnectionError, TypeSafeAPIError) as error:
-            return translate_error(error)
-        return read_decision(response)
+        except TypeSafeError as caught:
+            error = caught
+        else:
+            return read_decision(response)
+        return translate_error(error)
 
     return DecisionModel(name=name, decide=decide, perceives=perceives)
 
@@ -136,7 +164,11 @@ def build_decision_model(
 def build_async_decision_model(
     client: AsyncTypeSafeClient, *, model: str, perceives: MediaTypes
 ) -> AsyncDecisionModel:
-    """A decision model on TypeSafe's API, through the caller's async client."""
+    """A decision model on TypeSafe's API, through the caller's async client.
+
+    Declaring image media types in ``perceives`` opts in to sending
+    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image.
+    """
     name = format_model_name(model)
 
     async def decide(question: Question) -> DecisionOutcome:
@@ -148,9 +180,12 @@ def build_async_decision_model(
                 state=state,
                 questions=build_questions(question),
                 model=model,
+                extra_headers=build_headers(state),
             )
-        except (TypeSafeAPIConnectionError, TypeSafeAPIError) as error:
-            return translate_error(error)
-        return read_decision(response)
+        except TypeSafeError as caught:
+            error = caught
+        else:
+            return read_decision(response)
+        return translate_error(error)
 
     return AsyncDecisionModel(name=name, decide=decide, perceives=perceives)
