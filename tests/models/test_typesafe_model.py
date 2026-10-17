@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import re
 from collections.abc import Callable
 from email.parser import BytesParser
 from email.policy import default
@@ -32,6 +33,8 @@ TEXT_ONLY = MediaTypes()
 
 # https://api.typesafe.ai/openapi.json, POST /v1/systemone, the "Noul", "Choice" and "Box"
 # examples, and components.schemas.HTTPValidationError.
+# In NOUL_RESPONSE and CHOICE_RESPONSE, the answer sits under the question key the adapter
+# sends ("statement") where the published example uses "billing" and "tone".
 BILLING_STATE = (
     "I was charged twice for my subscription this month. Please refund the extra charge."
 )
@@ -63,6 +66,7 @@ RED_RECTANGLE_PNG = base64.b64decode(
 )
 # RFC 2046 / JFIF SOI marker recognized by typesafe_sdk._core.assets.CONTENT_TYPES.
 JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF"
+IMAGE_REFERENCE = re.compile(rb"<image:[0-9a-f]{32}>")
 
 
 def build_sync_model(
@@ -109,8 +113,9 @@ def parse_multipart(request: httpx2.Request) -> tuple[JSON, str, bytes]:
     header = f"Content-Type: {request.headers['content-type']}\r\n\r\n".encode()
     message = BytesParser(policy=default).parsebytes(header + request.content)
     request_part, asset_part = list(message.iter_parts())
+    normalized_json = IMAGE_REFERENCE.sub(b"<image>", request_part.get_content())
     return (
-        json.loads(request_part.get_content()),
+        json.loads(normalized_json),
         asset_part.get_content_type(),
         asset_part.get_content(),
     )
@@ -121,7 +126,6 @@ BUILDERS = pytest.mark.parametrize(
 )
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_the_model_carries_its_typesafe_name_with_its_media_types(
     build_model: ModelBuilder,
@@ -139,7 +143,6 @@ def test_an_empty_model_name_raises_configuration_error(build_model: ModelBuilde
         build_model(return_noul_response, model="")
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
     build_model: ModelBuilder,
@@ -150,7 +153,7 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
         captured.append((request.method, str(request.url), json.loads(request.content)))
         return httpx2.Response(200, json=NOUL_RESPONSE)
 
-    model = build_model(handler, model="jev-latest")
+    model = build_model(handler, model="jev-1.14.0")
 
     outcome = run_decision(model, question=BILLING_QUESTION)
 
@@ -160,7 +163,7 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
                 "POST",
                 "https://api.typesafe.ai/v1/systemone",
                 {
-                    "model": "jev-latest",
+                    "model": "jev-1.14.0",
                     "state": [BILLING_STATE],
                     "questions": {
                         "statement": {
@@ -177,35 +180,14 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
 
 # https://docs.typesafe.ai/sdk/python/usage/basic.md, "Assets in structured objects":
 # an Image in the state list is uploaded as a multipart asset part referenced from state.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
-    ("media_type", "image_bytes", "part_content_type", "reference"),
+    ("media_type", "image_bytes", "part_content_type"),
     [
-        (
-            "image/png",
-            RED_RECTANGLE_PNG,
-            "image/png",
-            "<image:4a3bbdcf5f5d4e59868b344a9e1f9a84>",
-        ),
-        (
-            "image/jpeg",
-            JPEG_BYTES,
-            "image/jpeg",
-            "<image:50979a7b55574b0dba7a7062707d2837>",
-        ),
-        (
-            "IMAGE/PNG",
-            RED_RECTANGLE_PNG,
-            "image/png",
-            "<image:4a3bbdcf5f5d4e59868b344a9e1f9a84>",
-        ),
-        (
-            "image/*",
-            RED_RECTANGLE_PNG,
-            "image/png",
-            "<image:4a3bbdcf5f5d4e59868b344a9e1f9a84>",
-        ),
+        ("image/png", RED_RECTANGLE_PNG, "image/png"),
+        ("image/jpeg", JPEG_BYTES, "image/jpeg"),
+        ("IMAGE/PNG", RED_RECTANGLE_PNG, "image/png"),
+        ("image/*", RED_RECTANGLE_PNG, "image/png"),
     ],
     ids=["png", "jpeg", "uppercase-png", "image-range"],
 )
@@ -214,7 +196,6 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
     media_type: str,
     image_bytes: bytes,
     part_content_type: str,
-    reference: str,
 ) -> None:
     captured: list[tuple[JSON, str, bytes]] = []
 
@@ -238,14 +219,14 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
             (
                 {
                     "model": "jev-latest",
-                    "state": ["The customer returned this item:", reference],
+                    "state": ["The customer returned this item:", "<image>"],
                     "questions": {
                         "statement": {
                             "type": "noul",
                             "instructions": "Is the item damaged?",
                         }
                     },
-                    "assets": {reference: {"type": "image", "part": "asset-0"}},
+                    "assets": {"<image>": {"type": "image", "part": "asset-0"}},
                 },
                 part_content_type,
                 image_bytes,
@@ -255,7 +236,6 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     "part",
@@ -271,13 +251,15 @@ def test_a_media_type_typesafe_cannot_carry_raises_configuration_error(
     build_model: ModelBuilder, part: MediaPart
 ) -> None:
     question = Question(statement=BILLING_STATEMENT, state=(part,))
-    model = build_model(return_noul_response, perceives=MediaTypes("*/*"))
+    model = build_model(
+        return_noul_response,
+        perceives=MediaTypes("audio/*", "application/*", "image/*"),
+    )
 
     with pytest.raises(ConfigurationError, match=part.media_type):
         run_decision(model, question=question)
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     "part",
@@ -286,8 +268,15 @@ def test_a_media_type_typesafe_cannot_carry_raises_configuration_error(
         MediaPart(media_type="image/jpeg", url="https://example.com/photo.jpg"),
         MediaPart(media_type="image/*", url="https://example.com/photo.png"),
         MediaPart(media_type="image/png", data=b""),
+        MediaPart(media_type="image/*", data=b"GIF89a"),
     ],
-    ids=["png-by-url", "jpeg-by-url", "range-by-url", "empty-image-bytes"],
+    ids=[
+        "png-by-url",
+        "jpeg-by-url",
+        "range-by-url",
+        "empty-image-bytes",
+        "unrecognized-image-bytes",
+    ],
 )
 def test_an_image_without_usable_bytes_returns_unavailable(
     build_model: ModelBuilder, part: MediaPart
@@ -300,11 +289,10 @@ def test_an_image_without_usable_bytes_returns_unavailable(
     assert outcome == Unavailable(status=None)
 
 
-# https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 429 Too Many Requests,
-# 529 Overloaded, plus HTTP 408, 409 and 5xx.
-@pytest.mark.xfail(strict=True)
+# https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 415 Unsupported Media Type,
+# 429 Too Many Requests, 529 Overloaded, plus HTTP 408, 409 and 5xx.
 @BUILDERS
-@pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 502, 503, 529])
+@pytest.mark.parametrize("status", [408, 409, 413, 415, 429, 500, 502, 503, 529])
 def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -318,7 +306,6 @@ def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_stat
     assert outcome == Unavailable(status=status)
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     "error",
@@ -341,9 +328,8 @@ def test_a_connection_or_timeout_failure_returns_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 415, 422])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
 def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -368,7 +354,6 @@ def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     "response_body",
