@@ -193,6 +193,7 @@ def build_reply(status: int, body: JSON) -> Respond:
     return lambda request: httpx.Response(status, json=body)
 
 
+# Constructed replies, not published ones: a gateway page, and a JSON body cut off mid-array.
 def build_page(status: int) -> Respond:
     return lambda request: httpx.Response(status, text="<html>Gateway page</html>")
 
@@ -326,7 +327,8 @@ def test_the_prompt_becomes_instructions_and_one_user_message(
 
     generate(wire.build_client())
 
-    # The Responses API is stateless: store is always false.
+    # The user message is the structured input of https://openrouter.ai/docs/api_reference/responses/basic-usage
+    # and the endpoint is its /api/v1/responses; the API is stateless, so store is always false.
     assert (wire.read_paths(), wire.read_bodies("model", "instructions", "input", "store")) == (
         ["/api/v1/responses"],
         [
@@ -359,6 +361,11 @@ def test_the_output_limit_is_sent_only_when_given(
     assert wire.read_bodies("max_output_tokens") == sent
 
 
+# The wire parts are the schemas InputImage (its example, https://example.com/image.jpg, detail
+# auto) and InputFile (file_url, file_data, filename) of
+# https://openrouter.ai/docs/api/api-reference/responses/create-a-response; the PDF URL is
+# the one of https://openrouter.ai/docs/guides/overview/multimodal/pdfs. The base64 and the
+# filename extensions follow RFC 4648 and the standard library's table of media types.
 @pytest.mark.parametrize(
     ("part", "content"),
     [
@@ -527,6 +534,9 @@ def test_a_response_becomes_the_outcome_its_status_gives(
     assert generate(client) == outcome
 
 
+# content_filter is the other reason of the schema IncompleteDetails; the error codes are those
+# of OpenResponsesErrorField, and the error types those of
+# https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes
 @pytest.mark.parametrize(
     "response",
     [
@@ -585,6 +595,8 @@ def test_the_question_becomes_one_noul_question_about_the_state(
 
     decide(wire.build_client())
 
+    # A noul question is {"type", "instructions"} and the state an array of strings, in the
+    # Decisions reference's request example and the multimodal guide; the path is the reference's.
     assert (wire.read_paths(), wire.read_bodies("model", "state", "questions")) == (
         ["/api/alpha/decisions"],
         [
@@ -652,6 +664,8 @@ def test_media_the_decisions_api_cannot_carry_raises_naming_its_type(
         decide(client, question)
 
 
+# The published answers of another question and of another type (TEAM, a choice answer), and
+# answers constructed to be outside the schema: an unlisted type and probabilities outside [0, 1].
 @pytest.mark.parametrize(
     "answers",
     [
@@ -698,6 +712,9 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
     assert outcome == Unavailable(status=502)
 
 
+# The envelopes are the published error examples; invalid_request and permission_denied are error
+# types of https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes, put
+# in the envelope's error_type field, where that page puts the Responses API's error type.
 @pytest.mark.parametrize(
     ("status", "fields"),
     [
@@ -736,6 +753,11 @@ def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask)
         ask(client)
 
 
+# https://openrouter.ai/docs/api_reference/responses/error-handling: an error body is
+# {"error": {"code", "message"}, "metadata"}, and image_content_policy_violation is the code of
+# a 403. content_policy_violation and refusal are error types of the 403 rows of
+# https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes, put in the
+# published 403 envelope's error_type field.
 @pytest.mark.parametrize(
     "body",
     [
@@ -758,6 +780,10 @@ def test_a_request_the_provider_blocks_is_refused_without_an_explanation(
     assert outcome == Refused()
 
 
+# Each error type with the HTTP status the typed-error-codes tables of
+# https://openrouter.ai/docs/api_reference/errors-and-debugging give it, in the published
+# error envelope of that status. No page shows an error_type on a non-200 reply of the
+# Responses or Decisions API; the Decisions reference documents only integer codes.
 @pytest.mark.parametrize(
     ("status", "error_type"),
     [
@@ -798,6 +824,7 @@ def test_a_connection_failure_is_unavailable_without_a_status(ask: Ask, error: E
     assert outcome == Unavailable()
 
 
+# Constructed, not published: an empty object, a gateway page and a body cut off mid-array.
 @pytest.mark.parametrize(
     "respond",
     [build_reply(200, {}), build_page(200), build_truncation()],
