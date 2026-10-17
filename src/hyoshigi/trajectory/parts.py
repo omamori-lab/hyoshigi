@@ -10,7 +10,7 @@ from hyoshigi.errors import ConfigurationError
 # to 126 letters, digits or any of ! # $ & - ^ _ . + ; and RFC 9110, section 12.5.1:
 # a media range, whose subtype is *, when only the top-level type is known.
 _RESTRICTED_NAME = r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]{0,126}"
-_MEDIA_TYPE = re.compile(f"{_RESTRICTED_NAME}/(?:{_RESTRICTED_NAME}|\\*)")
+MEDIA_TYPE = re.compile(f"{_RESTRICTED_NAME}/(?:{_RESTRICTED_NAME}|\\*)")
 
 
 class Author(StrEnum):
@@ -57,7 +57,7 @@ class MediaPart:
     description: Description | None = None
 
     def __post_init__(self) -> None:
-        if _MEDIA_TYPE.fullmatch(self.media_type) is None:
+        if MEDIA_TYPE.fullmatch(self.media_type) is None:
             raise ConfigurationError("media_type must be an IANA media type, such as image/png")
         if (self.url is None) == (self.data is None):
             raise ConfigurationError("a media part takes exactly one of url and data")
