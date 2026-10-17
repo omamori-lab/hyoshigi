@@ -196,9 +196,9 @@ def read_model_item(item: JSON, *, path: str) -> list[Thought | Part | ToolCall]
             "arguments": str(arguments),
         }:
             return [ToolCall(id=call_id, name=name, arguments=arguments)]
-        case {"content": str(text)}:
+        case {"role": "assistant", "content": str(text)}:
             return [TextPart(text=text)]
-        case {"content": list(parts)}:
+        case {"role": "assistant", "content": list(parts)}:
             return [
                 read_model_part(part, path=f"{path}.content[{i}]") for i, part in enumerate(parts)
             ]
