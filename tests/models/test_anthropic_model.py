@@ -14,7 +14,6 @@ from hyoshigi import (
     JSON,
     AsyncGenerativeModel,
     ConfigurationError,
-    FormatError,
     Generation,
     GenerationOutcome,
     GenerativeModel,
@@ -26,6 +25,8 @@ from hyoshigi import (
     Truncated,
     Unavailable,
 )
+
+NOT_YET = pytest.mark.xfail(strict=True, reason="the Anthropic model has not been changed yet")
 
 type Respond = Callable[[httpx2.Request], httpx2.Response]
 
@@ -284,6 +285,20 @@ def time_out(request: httpx2.Request) -> httpx2.Response:
     raise httpx2.ReadTimeout("timed out", request=request)
 
 
+# What a proxy in front of the API can answer with status 200: an HTML page, or a JSON reply
+# cut off.
+def send_html(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(
+        200, text="<html>Bad gateway</html>", headers={"content-type": "text/html"}
+    )
+
+
+def send_cut_off_json(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(
+        200, text='{"id": "msg_01234", "ty', headers={"content-type": "application/json"}
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class Driver:
     """A model built by one of the two families, driven to a result either way."""
@@ -391,45 +406,6 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
             ],
         ),
         (
-            (MediaPart(media_type="image/png", data=FOOBAR),),
-            [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/png",
-                        "data": FOOBAR_BASE64,
-                    },
-                }
-            ],
-        ),
-        (
-            (MediaPart(media_type="image/gif", data=FOOBAR),),
-            [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/gif",
-                        "data": FOOBAR_BASE64,
-                    },
-                }
-            ],
-        ),
-        (
-            (MediaPart(media_type="image/webp", data=FOOBAR),),
-            [
-                {
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/webp",
-                        "data": FOOBAR_BASE64,
-                    },
-                }
-            ],
-        ),
-        (
             (MediaPart(media_type="image/jpeg", url=VISION_URL),),
             [{"type": "image", "source": {"type": "url", "url": VISION_URL}}],
         ),
@@ -455,6 +431,10 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
             [{"type": "document", "source": {"type": "url", "url": MODEL_CARD}}],
         ),
         (
+            (MediaPart(media_type="APPLICATION/PDF", url=MODEL_CARD),),
+            [{"type": "document", "source": {"type": "url", "url": MODEL_CARD}}],
+        ),
+        (
             (MediaPart(media_type="text/plain", data=GRASS_AND_SKY),),
             [
                 {
@@ -470,14 +450,12 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     ],
     ids=[
         "image-bytes-then-text-in-order",
-        "media-type-case-is-ignored",
-        "png-bytes",
-        "gif-bytes",
-        "webp-bytes",
+        "media-type-case-is-ignored-for-bytes",
         "image-url",
         "image-range-url",
         "pdf-bytes",
         "pdf-url",
+        "media-type-case-is-ignored-for-a-url",
         "plain-text-bytes",
     ],
 )
@@ -490,6 +468,36 @@ def test_media_is_sent_in_the_content_block_the_api_documents_for_it(
     model.generate(Prompt(system=SYSTEM, content=parts))
 
     assert wire.requests == [build_request(content)]
+
+
+# https://platform.claude.com/docs/en/build-with-claude/vision, "Supported formats": JPEG, PNG,
+# GIF and WebP.
+@pytest.mark.parametrize("media_type", ["image/jpeg", "image/png", "image/gif", "image/webp"])
+def test_each_image_type_the_api_supports_is_sent_as_base64_with_its_type(
+    build_driver: BuildDriver, media_type: str
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+
+    model.generate(Prompt(system=SYSTEM, content=(MediaPart(media_type=media_type, data=FOOBAR),)))
+
+    source: JSON = {"type": "base64", "media_type": media_type, "data": FOOBAR_BASE64}
+    assert wire.requests == [build_request([{"type": "image", "source": source}])]
+
+
+@pytest.mark.parametrize("media_type", ["image/jpeg", "image/png", "image/gif", "image/webp"])
+def test_each_image_type_the_api_supports_is_sent_by_url(
+    build_driver: BuildDriver, media_type: str
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+
+    model.generate(
+        Prompt(system=SYSTEM, content=(MediaPart(media_type=media_type, url=VISION_URL),))
+    )
+
+    source: JSON = {"type": "url", "url": VISION_URL}
+    assert wire.requests == [build_request([{"type": "image", "source": source}])]
 
 
 @pytest.mark.parametrize(
@@ -514,6 +522,19 @@ def test_a_media_type_the_api_cannot_carry_raises_naming_the_type_before_any_req
         model.generate(Prompt(system=SYSTEM, content=(TextPart(text="Rate this."), part)))
 
     assert wire.requests == []
+
+
+@NOT_YET
+def test_a_media_type_the_api_cannot_carry_raises_after_media_it_cannot_take_in_its_form(
+    build_driver: BuildDriver,
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+    notes = MediaPart(media_type="text/plain", url="https://example.com/notes.txt")
+    prompt = Prompt(system=SYSTEM, content=(notes, MediaPart(media_type="audio/wav", data=FOOBAR)))
+
+    with pytest.raises(ConfigurationError, match=re.escape("audio/wav")):
+        model.generate(prompt)
 
 
 @pytest.mark.parametrize(
@@ -645,35 +666,32 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
     assert outcome == Refused(explanation=None)
 
 
+@NOT_YET
 @pytest.mark.parametrize(
-    ("body", "path"),
+    "body",
     [
-        ({**STOP_REASONS_RESPONSE, "content": "Here is a string"}, "$"),
-        ({"id": "msg_01234", "type": "message", "role": "assistant"}, "$"),
-        ("a string", "$"),
-        ({**STOP_REASONS_RESPONSE, "content": [{"type": "text"}]}, "$.content[0]"),
-        (
-            {**STOP_REASONS_RESPONSE, "content": [{"type": "text", "text": "a"}, {"type": "text"}]},
-            "$.content[1]",
-        ),
+        {**STOP_REASONS_RESPONSE, "content": "Here is a string"},
+        {"id": "msg_01234", "type": "message", "role": "assistant"},
+        "a string",
+        {**STOP_REASONS_RESPONSE, "content": [{"type": "text"}]},
     ],
-    ids=["content-is-a-string", "no-content", "not-a-message", "text-block-without-text", "second"],
+    ids=["content-is-a-string", "no-content", "not-a-message", "text-block-without-text"],
 )
-def test_a_reply_that_is_not_a_message_raises_format_error_at_its_path(
-    build_driver: BuildDriver, body: JSON, path: str
+def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
+    build_driver: BuildDriver, body: JSON
 ) -> None:
     model = build_driver(Wire(body).respond)
 
-    with pytest.raises(FormatError) as raised:
-        model.generate(HELLO)
+    outcome = model.generate(HELLO)
 
-    assert raised.value.path == path
+    assert outcome == Unavailable(status=None)
 
 
 # https://platform.claude.com/docs/en/api/errors, "HTTP errors": 409, 413, 429, 500, 504 and
-# 529 are documented; 408 and 503 are the statuses the SDK retries and names.
+# 529 are documented; 408 and 503 are the statuses the SDK retries and names. 413, a request
+# too large, is a status the prompt's content can cause.
 @pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 503, 504, 529])
-def test_an_error_status_the_client_gave_up_retrying_is_unavailable_with_its_status(
+def test_an_error_status_a_retry_or_a_smaller_prompt_clears_is_unavailable_with_its_status(
     build_driver: BuildDriver, status: int
 ) -> None:
     wire = Wire(OVERLOADED_ERROR, status=status)
@@ -684,8 +702,17 @@ def test_an_error_status_the_client_gave_up_retrying_is_unavailable_with_its_sta
     assert (outcome, len(wire.requests)) == (Unavailable(status=status), 1)
 
 
-@pytest.mark.parametrize("respond", [fail_to_connect, time_out], ids=["connection", "timeout"])
-def test_a_connection_that_failed_is_unavailable_without_a_status(
+@pytest.mark.parametrize(
+    "respond",
+    [
+        fail_to_connect,
+        time_out,
+        pytest.param(send_html, marks=NOT_YET),
+        pytest.param(send_cut_off_json, marks=NOT_YET),
+    ],
+    ids=["connection", "timeout", "html", "cut-off-json"],
+)
+def test_a_connection_that_failed_or_a_reply_that_is_not_json_is_unavailable_without_a_status(
     build_driver: BuildDriver, respond: Respond
 ) -> None:
     model = build_driver(respond)
