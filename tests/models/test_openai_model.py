@@ -693,7 +693,6 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
     [b'{"id": ', b"", b'{"id": "\xff"}'],
     ids=["truncated", "empty", "not-utf-8"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_reply_labelled_json_that_cannot_be_decoded_is_unavailable_without_a_status(
     ask: Ask, content: bytes
 ) -> None:

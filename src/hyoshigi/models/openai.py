@@ -5,6 +5,7 @@ The API is OpenAI's Responses API reference, https://platform.openai.com/docs/ap
 
 import mimetypes
 from base64 import b64encode
+from json import JSONDecodeError
 from typing import TypedDict, assert_never
 
 try:
@@ -43,7 +44,11 @@ from hyoshigi.models.model import (
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Content = ResponseOutputText | ResponseOutputRefusal
+type Failure = APIConnectionError | APIStatusError | JSONDecodeError | UnicodeDecodeError
 
+# What a call to the client raises when it gets no usable reply. The SDK decodes a body
+# labelled JSON itself, and lets the decoding errors through.
+_FAILURES = (APIConnectionError, APIStatusError, JSONDecodeError, UnicodeDecodeError)
 # The built-in table only: the platform's mime.types files differ between machines.
 _EXTENSIONS = mimetypes.MimeTypes()
 # Statuses that are no answer rather than a mistake: request timeout, conflict, payload too
@@ -229,16 +234,16 @@ def is_readable(part: Content) -> bool:
     return False
 
 
-def read_failure(error: APIConnectionError | APIStatusError) -> Refused | Unavailable:
+def read_failure(error: Failure) -> Refused | Unavailable:
     """The outcome of a request that failed after the client's retries.
 
-    A connection error or a timeout, a status that may pass, and a prompt the API cannot
-    take are unavailable; an error code that names a policy is a refusal. Any other status
-    raises ConfigurationError naming it, without the provider's text, which can echo the
-    prompt.
+    A connection error or a timeout, a body that cannot be decoded, a status that may pass,
+    and a prompt the API cannot take are unavailable; an error code that names a policy is
+    a refusal. Any other status raises ConfigurationError naming it, without the provider's
+    text, which can echo the prompt.
     """
     match error:
-        case APIConnectionError():
+        case APIConnectionError() | JSONDecodeError() | UnicodeDecodeError():
             return Unavailable()
         case APIStatusError(code=str(code)) if "policy" in code:
             return Refused()
@@ -264,7 +269,7 @@ def build_model(
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
         try:
             response = client.responses.create(**arguments)
-        except (APIConnectionError, APIStatusError) as error:
+        except _FAILURES as error:
             return read_failure(error)
         return read_response(response)
 
@@ -283,7 +288,7 @@ def build_async_model(
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
         try:
             response = await client.responses.create(**arguments)
-        except (APIConnectionError, APIStatusError) as error:
+        except _FAILURES as error:
             return read_failure(error)
         return read_response(response)
 
