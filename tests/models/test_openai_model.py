@@ -394,7 +394,6 @@ SERVER_OVERLOADED = {
 }
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_model_is_named_for_the_provider_and_its_model_id(ask: Ask) -> None:
     exchange = ask(respond(IMAGE_INPUT_RESPONSE))
 
@@ -407,7 +406,6 @@ def test_a_model_perceives_the_media_it_was_given(ask: Ask) -> None:
     assert exchange.model.perceives == MediaTypes("image/*")
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_prompt_is_sent_as_instructions_and_one_user_message(ask: Ask) -> None:
     exchange = ask(respond(IMAGE_INPUT_RESPONSE), IMAGE_PROMPT)
 
@@ -420,7 +418,6 @@ def test_a_prompt_is_sent_as_instructions_and_one_user_message(ask: Ask) -> None
     [(None, IMAGE_REQUEST), (300, replace(IMAGE_REQUEST, max_output_tokens=300))],
     ids=["no-limit-sends-no-field", "limit-is-sent"],
 )
-@pytest.mark.xfail(strict=True)
 def test_the_output_limit_is_sent_only_when_given(
     ask: Ask, max_output_tokens: int | None, expected: dict[str, object]
 ) -> None:
@@ -482,7 +479,6 @@ def test_the_output_limit_is_sent_only_when_given(
         "file-of-unknown-extension-with-a-bare-filename",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_media_is_sent_as_the_content_part_of_its_kind(
     ask: Ask, media: MediaPart, expected: dict[str, object]
 ) -> None:
@@ -504,7 +500,6 @@ def test_media_is_sent_as_the_content_part_of_its_kind(
     ],
     ids=["audio", "video", "bytes-of-a-media-range"],
 )
-@pytest.mark.xfail(strict=True)
 def test_media_the_api_cannot_carry_raises_naming_its_media_type(
     ask: Ask, media: MediaPart
 ) -> None:
@@ -514,14 +509,12 @@ def test_media_the_api_cannot_carry_raises_naming_its_media_type(
         ask(respond(IMAGE_INPUT_RESPONSE), prompt)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_is_a_generation_of_its_text(ask: Ask) -> None:
     exchange = ask(respond(IMAGE_INPUT_RESPONSE))
 
     assert exchange.outcome == Generation(text=BOARDWALK_DESCRIPTION)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_reply_after_a_tool_call_is_a_generation_of_the_message_text(ask: Ask) -> None:
     exchange = ask(respond(WEB_SEARCH_RESPONSE))
 
@@ -531,7 +524,6 @@ def test_a_reply_after_a_tool_call_is_a_generation_of_the_message_text(ask: Ask)
 
 
 # openai's Response.output_text joins the text parts in order with no separator.
-@pytest.mark.xfail(strict=True)
 def test_the_text_parts_of_a_reply_are_joined_in_order(ask: Ask) -> None:
     parts = [replace(OUTPUT_TEXT, text="foo"), replace(OUTPUT_TEXT, text="bar")]
     body = replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=parts)])
@@ -551,7 +543,6 @@ REFUSAL = {"type": "refusal", "refusal": "final refusal text"}
     [[REFUSAL], [OUTPUT_TEXT, REFUSAL]],
     ids=["refusal-alone", "refusal-after-text"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
     ask: Ask, content: list[dict[str, object]]
 ) -> None:
@@ -572,7 +563,6 @@ def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
     ],
     ids=["nothing-written", "text-written"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_reply_cut_off_at_the_output_limit_is_truncated_with_its_text(
     ask: Ask, body: dict[str, object], text: str
 ) -> None:
@@ -605,7 +595,6 @@ def test_a_reply_cut_off_at_the_output_limit_is_truncated_with_its_text(
         "without-status",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_reply_that_is_not_complete_for_another_reason_is_truncated(
     ask: Ask, status: str | None, details: dict[str, str] | None
 ) -> None:
@@ -635,7 +624,6 @@ def test_a_reply_stopped_by_the_content_filter_is_a_refusal_without_an_explanati
     [SERVER_ERROR, {"code": "rate_limit_exceeded", "message": "Slow down."}, None],
     ids=["server-error", "rate-limit", "no-error-object"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_failed_reply_is_unavailable_without_a_status(
     ask: Ask, error: dict[str, str] | None
 ) -> None:
@@ -684,7 +672,6 @@ def test_a_failed_reply_whose_code_names_a_policy_is_a_refusal_without_an_explan
         "refusal-is-not-a-string",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_reply_with_fields_of_the_wrong_type_is_unavailable_without_a_status(
     ask: Ask, body: object
 ) -> None:
@@ -693,7 +680,6 @@ def test_a_reply_with_fields_of_the_wrong_type_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> None:
     reply = httpx2.Response(200, text="<html>502 Bad Gateway</html>")
 
@@ -707,7 +693,6 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
     [httpx2.ConnectError("connection refused"), httpx2.ReadTimeout("read timed out")],
     ids=["connection-error", "timeout"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_connection_that_fails_is_unavailable_without_a_status(
     ask: Ask, failure: Exception
 ) -> None:
@@ -730,7 +715,6 @@ def test_a_connection_that_fails_is_unavailable_without_a_status(
         (502, SERVER_OVERLOADED),
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
     ask: Ask, status: int, body: dict[str, object]
 ) -> None:
@@ -741,7 +725,6 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
 
 # openapi.yaml, schema SessionTurnErrorCodeResource: context_length_exceeded, "The request
 # exceeds the model's context window." The Responses API's own error codes list none.
-@pytest.mark.xfail(strict=True)
 def test_an_input_that_exceeds_the_context_window_is_unavailable_with_its_status(
     ask: Ask,
 ) -> None:
@@ -771,7 +754,6 @@ def test_an_input_that_exceeds_the_context_window_is_unavailable_with_its_status
         "failed_to_download_image",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(ask: Ask, code: str) -> None:
     body = reject("The image cannot be used.", code=code)
 
@@ -800,7 +782,6 @@ def test_an_http_error_whose_code_names_a_policy_is_a_refusal_without_an_explana
         (403, "Country, region, or territory not supported"),
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_rejected_request_raises_naming_only_its_status(
     ask: Ask, status: int, message: str
 ) -> None:
@@ -811,7 +792,6 @@ def test_a_rejected_request_raises_naming_only_its_status(
     assert message not in str(raised.value)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_rejected_request_does_not_carry_the_providers_error(ask: Ask) -> None:
     with pytest.raises(ConfigurationError) as raised:
         ask(respond(reject("Incorrect API key provided"), status=401))
