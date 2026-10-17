@@ -37,7 +37,7 @@ langchain-sync-monitors will be rebuilt on it.
    and source; never trust memory for a version, an option or a URL. A new
    dependency starts at its latest release with no known vulnerability. The
    core has no runtime dependencies, only the standard library of Python 3.12
-   or newer; the shipped model's httpx and stamina sit behind an extra.
+   or newer; each provider adapter's SDK sits behind its own extra.
 4. **Types by use.**
    - Data checked at a boundary (provider payloads in the format builders, a
      stored trajectory, a model's HTTP response) is validated with `match`
@@ -86,10 +86,10 @@ langchain-sync-monitors will be rebuilt on it.
 3. **Few test doubles.** The domain (trajectory, formats, views, rendering,
    reply parsing, wrappers, protocols) always runs for real. Doubles are
    allowed only for:
-   - a scripted `MonitorModel` returning fixed generations, since the model is
-     the outside service;
-   - stand-ins on the wire for model providers (an httpx mock transport for
-     OpenRouter and OpenAI-style APIs).
+   - a scripted `GenerativeModel` or `DecisionModel` whose function returns
+     fixed outcomes, since the model is the outside service;
+   - stand-ins on the wire for model providers (an httpx mock transport given
+     to the provider's SDK client).
 
    Tests never check calls made to hyoshigi's own code.
 4. **Every expected value has a source independent of the code:**
