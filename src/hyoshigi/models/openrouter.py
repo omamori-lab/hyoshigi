@@ -4,9 +4,7 @@ The generative model is the Responses API, https://openrouter.ai/docs/api_refere
 The decision model is the Decisions API, https://openrouter.ai/docs/guides/community/jev.
 """
 
-import base64
 import json
-import mimetypes
 from dataclasses import dataclass
 from typing import Literal, TypedDict, assert_never
 
@@ -20,13 +18,13 @@ except ModuleNotFoundError as error:
     ) from error
 
 from hyoshigi.errors import ConfigurationError
+from hyoshigi.models import responses
 from hyoshigi.models.model import (
     AsyncDecisionModel,
     AsyncGenerativeModel,
     Decision,
     DecisionModel,
     DecisionOutcome,
-    Generation,
     GenerationOutcome,
     GenerativeModel,
     MediaTypes,
@@ -34,9 +32,9 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Refused,
-    Truncated,
     Unavailable,
     check_name,
+    collect,
 )
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import MediaPart, TextPart
@@ -47,10 +45,6 @@ QUESTION_NAME = "statement"
 # https://openrouter.ai/docs/guides/community/multimodal-decisions: the Decisions API reads an
 # image only as a base64 data URL of one of these types.
 DECISION_IMAGES = MediaTypes("image/png", "image/jpeg", "image/webp")
-
-# A fresh table of the standard library's own media types, so a filename's extension does not
-# depend on the files of the platform.
-MIME_TYPES = mimetypes.MimeTypes()
 
 # https://openrouter.ai/docs/api_reference/errors-and-debugging: a timeout, a conflict, a
 # request body too large and a rate limit mean no answer now.
@@ -108,73 +102,11 @@ class Rejection:
     status: int
 
 
-def collect[Item](items: list[Item | None]) -> list[Item] | None:
-    """The items, or None if any is None; every item is built before this decides."""
-    kept = [item for item in items if item is not None]
-    return kept if len(kept) == len(items) else None
-
-
-def encode(part: MediaPart) -> str | None:
-    """The part's bytes as a base64 data URL; None if it has none or its type is a range."""
-    if part.data is None or "*" in part.media_type:
-        return None
-    return f"data:{part.media_type};base64,{base64.b64encode(part.data).decode()}"
-
-
-def locate(part: MediaPart) -> str | None:
-    """The part's URL, or its bytes as a data URL; None for the bytes of a media range."""
-    return part.url if part.url is not None else encode(part)
-
-
-def build_file(part: MediaPart) -> components.InputFileTypedDict | None:
-    """A file by URL, or as a data URL with the filename the providers behind OpenRouter require."""
-    if part.url is not None:
-        return {"type": "input_file", "file_url": part.url}
-    data_url = encode(part)
-    if data_url is None:
-        return None
-    extension = MIME_TYPES.guess_extension(part.media_type) or ""
-    return {"type": "input_file", "file_data": data_url, "filename": f"attachment{extension}"}
-
-
-def build_media_content(
-    part: MediaPart,
-) -> components.InputMessageItemContentUnionTypedDict | None:
-    """An image as an input image, a document or text as an input file; None if the part is
-    in a form the API cannot take.
-    """
-    match part.media_type.partition("/")[0].lower():
-        case "image":
-            image_url = locate(part)
-            return (
-                None
-                if image_url is None
-                else {"type": "input_image", "detail": "auto", "image_url": image_url}
-            )
-        case "application" | "text":
-            return build_file(part)
-        case _:
-            raise ConfigurationError(
-                f"OpenRouter's Responses API carries images and files, not {part.media_type}"
-            )
-
-
-def build_content(part: PromptPart) -> components.InputMessageItemContentUnionTypedDict | None:
-    """A prompt part as a Responses API input part, or None if the API cannot take its form."""
-    match part:
-        case TextPart(text=text):
-            return {"type": "input_text", "text": text}
-        case MediaPart():
-            return build_media_content(part)
-        case _:
-            assert_never(part)
-
-
 def build_input(prompt: Prompt) -> components.InputsUnionTypedDict | None:
     """The prompt's content as the one user message of a Responses API request; None if a part
-    is in a form the API cannot take, after every part has been checked for a type it cannot.
+    is in a form the API cannot take.
     """
-    content = collect([build_content(part) for part in prompt.content])
+    content = responses.build_content(prompt)
     return None if content is None else [{"type": "message", "role": "user", "content": content}]
 
 
@@ -182,7 +114,7 @@ def build_image(part: MediaPart) -> ImageObject | None:
     """An image as an image object; None unless it is bytes of a concrete type, since the
     Decisions API reads data URLs and does not fetch a URL, even one that is a data URL.
     """
-    data_url = encode(part)
+    data_url = responses.encode(part)
     return None if data_url is None else {"type": "image_url", "image_url": {"url": data_url}}
 
 
@@ -237,11 +169,6 @@ def read_body_codes(body: str) -> tuple[str, ...]:
     return read_codes(payload)
 
 
-def names_refusal(codes: tuple[str, ...]) -> bool:
-    """Whether an error code says a policy or the model's refusal declined the request."""
-    return any("policy" in code or code == "refusal" for code in codes)
-
-
 def is_temporary_failure(status: int) -> bool:
     """Whether a status says no answer now: below 400 (no error), above 499, or to ask later."""
     return status < 400 or status >= 500 or status in UNAVAILABLE_STATUSES
@@ -253,7 +180,7 @@ def read_failure(status: int, *, codes: tuple[str, ...]) -> Refused | Unavailabl
     A refusal is refused. No answer now, or input the provider rejects, is unavailable. Any
     other rejection is misuse, to be raised by the caller outside the handling of the failure.
     """
-    if names_refusal(codes):
+    if any(map(responses.names_refusal, codes)):
         return Refused()
     if is_temporary_failure(status) or not REJECTED_INPUT.isdisjoint(codes):
         return Unavailable(status=status)
@@ -287,100 +214,34 @@ def settle[Outcome](outcome: Outcome | Rejection) -> Outcome:
     return outcome
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Written:
-    """What a reply's messages hold: the text, the model's refusal if it gave one, whether there
-    was a message, and whether every part was one the SDK could classify.
-    """
-
-    text: str
-    refusal: str | None
-    has_message: bool
-    classified: bool
-
-
-def list_parts(result: components.OpenResponsesResult) -> list[components.OutputMessageItemContent]:
-    """The content parts of the result's messages, in order; its other items are skipped."""
-    return [
-        part
-        for item in result.output
-        if isinstance(item, components.OutputMessageItem)
-        for part in item.content
-    ]
-
-
-def is_cracked(unknown: object) -> bool:
-    """Whether something the SDK built as unknown names a type this module reads: a message, a
-    text or a refusal. It is a documented type whose fields do not match, not an unlisted type.
-    """
-    match unknown:
-        case components.UnknownOutputItems(raw={"type": "message"}):
-            return True
-        case components.UnknownOutputMessageItemContent(raw={"type": "output_text" | "refusal"}):
-            return True
-    return False
-
-
-def read_written(result: components.OpenResponsesResult) -> Written | None:
-    """What the result's messages hold; None if an item or a part is cracked."""
-    parts = list_parts(result)
-    if any(map(is_cracked, [*result.output, *parts])):
-        return None
-    texts = [part.text for part in parts if isinstance(part, components.ResponseOutputText)]
-    refusals = [
-        part.refusal for part in parts if isinstance(part, components.OpenAIResponsesRefusalContent)
-    ]
-    unknown = [
-        part for part in parts if isinstance(part, components.UnknownOutputMessageItemContent)
-    ]
-    return Written(
-        text="".join(texts),
-        refusal=refusals[0] if refusals else None,
-        has_message=any(isinstance(item, components.OutputMessageItem) for item in result.output),
-        classified=not unknown,
-    )
-
-
-def read_completed(written: Written) -> GenerationOutcome:
-    """A completed reply is the refusal or the text; Truncated if a part was unclassified, and
-    unavailable if it holds no message.
-    """
-    if not written.has_message:
-        return Unavailable()
-    if written.refusal is not None:
-        return Refused(explanation=written.refusal)
-    if written.classified:
-        return Generation(text=written.text)
-    return Truncated(text=written.text)
-
-
-def read_result(result: components.OpenResponsesResult) -> GenerationOutcome:
-    """The outcome of a Responses API result, by its status.
-
-    A failed reply is read by its error codes; any status other than completed, incomplete
-    or failed is Truncated, as is an incomplete reply that was not cut by a content filter.
-    """
-    written = read_written(result)
-    if written is None:
-        return Unavailable()
-    match result.status, result.incomplete_details:
-        case "completed", _:
-            return read_completed(written)
-        case "incomplete", components.IncompleteDetails(reason="content_filter"):
-            return Refused()
-        case "failed", _:
-            return Refused() if names_refusal(read_codes(result.model_dump())) else Unavailable()
-        case _:
-            return Truncated(text=written.text)
-
-
 def read_reply(reply: object) -> GenerationOutcome:
-    """The outcome of what the SDK returned: a result, or an event stream, which is not one."""
+    """The outcome of what the SDK returned: a result, or an event stream, which is not one.
+
+    The SDK gives no raw body for a result, so the result is read from its JSON dump, which
+    does not warn of a value the SDK kept unrecognized, such as a status it does not list.
+    """
     match reply:
         case components.OpenResponsesResult():
-            return read_result(reply)
+            return responses.read_reply(
+                restore(reply.model_dump(mode="json", by_alias=True, warnings=False))
+            )
         case _:
             return Unavailable()
+
+
+def restore(value: JSON) -> JSON:
+    """The SDK's dump of a reply with each variant the SDK did not recognize, or could not
+    validate, put back as the payload it kept.
+    """
+    match value:
+        case {"is_unknown": True, "raw": dict() as raw}:
+            return raw
+        case dict():
+            return {key: restore(item) for key, item in value.items()}
+        case list():
+            return [restore(item) for item in value]
+        case _:
+            return value
 
 
 def read_decision(reply: components.DecisionsResponse) -> DecisionOutcome:
