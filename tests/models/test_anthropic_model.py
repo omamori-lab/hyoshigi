@@ -26,8 +26,6 @@ from hyoshigi import (
     Unavailable,
 )
 
-NOT_YET = pytest.mark.xfail(strict=True, reason="the Anthropic model has not been changed yet")
-
 type Respond = Callable[[httpx2.Request], httpx2.Response]
 
 MODEL_ID = "claude-opus-5-5"
@@ -524,7 +522,6 @@ def test_a_media_type_the_api_cannot_carry_raises_naming_the_type_before_any_req
     assert wire.requests == []
 
 
-@NOT_YET
 def test_a_media_type_the_api_cannot_carry_raises_after_media_it_cannot_take_in_its_form(
     build_driver: BuildDriver,
 ) -> None:
@@ -666,7 +663,6 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
     assert outcome == Refused(explanation=None)
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     "body",
     [
@@ -704,12 +700,7 @@ def test_an_error_status_a_retry_or_a_smaller_prompt_clears_is_unavailable_with_
 
 @pytest.mark.parametrize(
     "respond",
-    [
-        fail_to_connect,
-        time_out,
-        pytest.param(send_html, marks=NOT_YET),
-        pytest.param(send_cut_off_json, marks=NOT_YET),
-    ],
+    [fail_to_connect, time_out, send_html, send_cut_off_json],
     ids=["connection", "timeout", "html", "cut-off-json"],
 )
 def test_a_connection_that_failed_or_a_reply_that_is_not_json_is_unavailable_without_a_status(
