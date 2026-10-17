@@ -526,7 +526,6 @@ def test_media_the_api_cannot_carry_raises_naming_its_media_type(
     ],
     ids=["image-range", "application-range", "text-range"],
 )
-@pytest.mark.xfail(strict=True)
 def test_media_in_a_form_the_api_cannot_take_is_unavailable_without_a_status(
     ask: Ask, media: MediaPart
 ) -> None:
@@ -544,9 +543,7 @@ AUDIO = MediaPart(media_type="audio/wav", data=b"foob")
 @pytest.mark.parametrize(
     "content",
     [
-        pytest.param(
-            (RANGE_BYTES, AUDIO), id="unusable-form-first", marks=pytest.mark.xfail(strict=True)
-        ),
+        pytest.param((RANGE_BYTES, AUDIO), id="unusable-form-first"),
         pytest.param((AUDIO, RANGE_BYTES), id="never-carried-first"),
     ],
 )
@@ -568,7 +565,6 @@ def test_media_the_api_can_never_carry_raises_whatever_the_order_of_the_parts(
     ],
     ids=["instructions", "text-part"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_prompt_that_cannot_be_encoded_is_unavailable_without_a_status(
     ask: Ask, prompt: Prompt
 ) -> None:
@@ -577,7 +573,6 @@ def test_a_prompt_that_cannot_be_encoded_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_model_without_a_model_id_raises_when_it_is_built(ask: Ask) -> None:
     with pytest.raises(ConfigurationError):
         ask(respond(IMAGE_INPUT_RESPONSE), model="")
@@ -648,7 +643,6 @@ REASONING_TEXT = {"type": "reasoning_text", "text": "internal thought"}
         "known-part-after-another-type",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_with_a_part_of_an_unknown_type_is_truncated_with_the_known_text(
     ask: Ask, content: list[dict[str, object]], text: str
 ) -> None:
@@ -667,7 +661,6 @@ NOT_A_MESSAGE = {"type": "future_item", "content": [replace(OUTPUT_TEXT, text="f
     [NOT_A_MESSAGE, {"content": [replace(OUTPUT_TEXT, text="from an item")]}],
     ids=["item-of-an-unknown-type", "item-without-a-type"],
 )
-@pytest.mark.xfail(strict=True)
 def test_an_output_item_that_is_not_a_message_is_not_read(
     ask: Ask, item: dict[str, object]
 ) -> None:
@@ -683,7 +676,6 @@ def test_an_output_item_that_is_not_a_message_is_not_read(
     [[], [NOT_A_MESSAGE]],
     ids=["no-output", "no-message"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_without_a_message_is_unavailable_without_a_status(
     ask: Ask, output: list[dict[str, object]]
 ) -> None:
@@ -699,7 +691,6 @@ def test_a_completed_reply_without_a_message_is_unavailable_without_a_status(
 @pytest.mark.parametrize(
     "status", ["incomplete", "in_progress", None], ids=["incomplete", "in-progress", "no-status"]
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_with_an_unfinished_message_is_truncated_with_its_text(
     ask: Ask, status: str | None
 ) -> None:
@@ -798,7 +789,7 @@ def test_a_failed_reply_is_unavailable_without_a_status(
         "bio_policy",
         "misalignment_policy_violation",
         "image_content_policy_violation",
-        pytest.param("refusal", marks=pytest.mark.xfail(strict=True)),
+        "refusal",
     ],
 )
 def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_explanation(
@@ -825,23 +816,11 @@ def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_expla
             IMAGE_INPUT_RESPONSE,
             output=[replace(MESSAGE, content=[replace(REFUSAL, refusal=5)])],
         ),
-        pytest.param(
-            replace(IMAGE_INPUT_RESPONSE, output=["nope"]), marks=pytest.mark.xfail(strict=True)
-        ),
-        pytest.param(
-            replace(IMAGE_INPUT_RESPONSE, output=[MESSAGE, 5]), marks=pytest.mark.xfail(strict=True)
-        ),
-        pytest.param(
-            replace(IMAGE_INPUT_RESPONSE, output=[None]), marks=pytest.mark.xfail(strict=True)
-        ),
-        pytest.param(
-            replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=["nope"])]),
-            marks=pytest.mark.xfail(strict=True),
-        ),
-        pytest.param(
-            replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=[OUTPUT_TEXT, 5])]),
-            marks=pytest.mark.xfail(strict=True),
-        ),
+        replace(IMAGE_INPUT_RESPONSE, output=["nope"]),
+        replace(IMAGE_INPUT_RESPONSE, output=[MESSAGE, 5]),
+        replace(IMAGE_INPUT_RESPONSE, output=[None]),
+        replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=["nope"])]),
+        replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=[OUTPUT_TEXT, 5])]),
     ],
     ids=[
         "body-is-not-an-object",
@@ -875,7 +854,6 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
 # The SDK validates a reply against its models when the caller's client asks it to, and then
 # raises its own error for a reply that does not fit.
 @pytest.mark.parametrize("body", [[], "nope"], ids=["list", "string"])
-@pytest.mark.xfail(strict=True)
 def test_a_reply_the_client_rejects_on_validation_is_unavailable_without_a_status(
     ask: Ask, body: object
 ) -> None:
@@ -884,7 +862,6 @@ def test_a_reply_the_client_rejects_on_validation_is_unavailable_without_a_statu
     assert exchange.outcome == Unavailable(status=None)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_reply_that_is_not_json_on_validation_is_unavailable_without_a_status(ask: Ask) -> None:
     reply = httpx2.Response(200, text="<html>502 Bad Gateway</html>")
 
@@ -944,9 +921,9 @@ def test_a_connection_that_fails_is_unavailable_without_a_status(
         (413, SERVER_OVERLOADED),
         (500, SERVER_OVERLOADED),
         (502, SERVER_OVERLOADED),
-        pytest.param(100, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
-        pytest.param(302, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
-        pytest.param(304, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
+        (100, SERVER_OVERLOADED),
+        (302, SERVER_OVERLOADED),
+        (304, SERVER_OVERLOADED),
     ],
 )
 def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
@@ -1001,7 +978,7 @@ def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(ask: Ask, co
     "code",
     [
         "image_content_policy_violation",
-        pytest.param("refusal", marks=pytest.mark.xfail(strict=True)),
+        "refusal",
     ],
 )
 def test_an_http_error_whose_code_names_a_refusal_is_a_refusal_without_an_explanation(
@@ -1036,7 +1013,6 @@ def test_a_rejected_request_raises_naming_only_its_status(
     assert message not in str(raised.value)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_rejected_request_does_not_carry_the_providers_error(ask: Ask) -> None:
     with pytest.raises(ConfigurationError) as raised:
         ask(respond(reject("Incorrect API key provided"), status=401))
