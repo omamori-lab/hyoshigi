@@ -194,7 +194,6 @@ def test_a_text_question_is_sent_as_a_noul_question_about_the_state(
 # https://docs.typesafe.ai/sdk/python/usage/basic.md, "Assets in structured objects", and
 # https://docs.typesafe.ai/images.md, "Turning on images": an Image in the state list is
 # uploaded as a multipart asset part referenced from state, with TypeSafe-Danger-Zone-Images.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     ("media_type", "image_bytes", "part_content_type"),
@@ -276,7 +275,6 @@ def test_a_media_type_typesafe_cannot_carry_raises_configuration_error(
         run_decision(model, question=question)
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_an_unsupported_media_type_after_an_unusable_image_still_raises_configuration_error(
     build_model: ModelBuilder,
@@ -323,7 +321,6 @@ def test_an_image_without_usable_bytes_returns_unavailable(
     assert outcome == Unavailable(status=None)
 
 
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     "question",
@@ -346,21 +343,7 @@ def test_a_lone_surrogate_in_the_question_returns_unavailable(
 # https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 429 Too Many Requests,
 # 529 Overloaded, plus HTTP 1xx, 3xx, 408, 409 and 5xx.
 @BUILDERS
-@pytest.mark.parametrize(
-    "status",
-    [
-        pytest.param(103, marks=pytest.mark.xfail(strict=True)),
-        pytest.param(302, marks=pytest.mark.xfail(strict=True)),
-        408,
-        409,
-        413,
-        429,
-        500,
-        502,
-        503,
-        529,
-    ],
-)
+@pytest.mark.parametrize("status", [103, 302, 408, 409, 413, 429, 500, 502, 503, 529])
 def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -377,7 +360,6 @@ def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_stat
 # https://docs.typesafe.ai/api.md, "Errors": HTTP 400 with "max_tokens_exceeded" means the
 # request exceeds the model's context length. The body's shape was observed from the live API,
 # relayed by OpenRouter, on 2026-10-17.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_context_length_http_error_returns_unavailable_with_status_400(
     build_model: ModelBuilder,
@@ -444,17 +426,7 @@ def test_a_connection_or_timeout_failure_returns_unavailable_without_a_status(
 # https://docs.typesafe.ai/api.md, "Compression" and "Errors": 415 Unsupported Media Type
 # means an unsupported Content-Encoding or more than one compression layer.
 @BUILDERS
-@pytest.mark.parametrize(
-    "status",
-    [
-        400,
-        401,
-        403,
-        404,
-        pytest.param(415, marks=pytest.mark.xfail(strict=True)),
-        422,
-    ],
-)
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 415, 422])
 def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
     build_model: ModelBuilder, status: int
 ) -> None:
@@ -480,7 +452,6 @@ def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
 
 
 # The provider's error, whose text can echo the prompt, stays out of the raised error's chain.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_client_http_error_leaves_the_provider_error_out_of_its_chain(
     build_model: ModelBuilder,
