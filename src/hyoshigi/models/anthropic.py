@@ -215,10 +215,10 @@ def read_reply(reply: Message | Failure) -> GenerationOutcome:
     match reply:
         case Message(type="message", role="assistant"):
             return read_message(reply)
-        case Message():
-            return Unavailable()
-        case _:
+        case APIError() | ValueError():
             return read_failure(reply)
+        case _:
+            return Unavailable()
 
 
 def read_failure(failure: Failure) -> Unavailable:
