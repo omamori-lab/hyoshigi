@@ -5,7 +5,6 @@ The decision model is the Decisions API, https://openrouter.ai/docs/guides/commu
 """
 
 import json
-from dataclasses import dataclass
 from typing import Literal, TypedDict, assert_never
 
 try:
@@ -95,13 +94,6 @@ class ImageObject(TypedDict):
     image_url: ImageUrl
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Rejection:
-    """A request the provider rejected as misuse, with the HTTP status."""
-
-    status: int
-
-
 def build_input(prompt: Prompt) -> components.InputsUnionTypedDict | None:
     """The prompt's content as the one user message of a Responses API request; None if a part
     is in a form the API cannot take.
@@ -137,13 +129,18 @@ def build_state_item(part: PromptPart) -> str | ImageObject | None:
             assert_never(part)
 
 
-def read_codes(payload: JSON) -> tuple[str, ...]:
-    """The machine-readable codes of an error: its error code and its error type.
+def read_codes(body: str) -> tuple[str, ...]:
+    """The machine-readable codes of an HTTP error body: its error code and its error type; a
+    body that is not JSON has none.
 
     The error type is where https://openrouter.ai/docs/api_reference/errors-and-debugging puts
     it: in the error's metadata, in the error itself (the Anthropic skin) and at the top level
     (a failed Responses reply). The error's message is not read; it can echo the prompt.
     """
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return ()
     codes: list[str] = []
     match payload:
         case {"error": {"code": str(code)}}:
@@ -160,37 +157,30 @@ def read_codes(payload: JSON) -> tuple[str, ...]:
     return tuple(codes)
 
 
-def read_body_codes(body: str) -> tuple[str, ...]:
-    """The machine-readable codes of an HTTP error body; a body that is not JSON has none."""
-    try:
-        payload = json.loads(body)
-    except ValueError:
-        return ()
-    return read_codes(payload)
-
-
-def is_temporary_failure(status: int) -> bool:
-    """Whether a status says no answer now: below 400 (no error), above 499, or to ask later."""
-    return status < 400 or status >= 500 or status in UNAVAILABLE_STATUSES
-
-
-def read_failure(status: int, *, codes: tuple[str, ...]) -> Refused | Unavailable | Rejection:
+def read_failure(status: int, *, codes: tuple[str, ...]) -> Refused | Unavailable:
     """The outcome of an HTTP failure with this status and these error codes.
 
-    A refusal is refused. No answer now, or input the provider rejects, is unavailable. Any
-    other rejection is misuse, to be raised by the caller outside the handling of the failure.
+    A refusal is refused. No answer now (a status below 400, above 499 or one to ask again
+    later), or input the provider rejects, is unavailable. Any other rejection is misuse: it
+    raises ConfigurationError naming only the status.
     """
     if any(map(responses.names_refusal, codes)):
         return Refused()
-    if is_temporary_failure(status) or not REJECTED_INPUT.isdisjoint(codes):
+    if (
+        not 400 <= status < 500
+        or status in UNAVAILABLE_STATUSES
+        or not REJECTED_INPUT.isdisjoint(codes)
+    ):
         return Unavailable(status=status)
-    return Rejection(status=status)
+    raise ConfigurationError(f"OpenRouter answered HTTP {status}")
 
 
-def read_error(error: Failure) -> Refused | Unavailable | Rejection:
+def read_error(error: Failure) -> Refused | Unavailable:
     """The outcome of an exception the SDK raised.
 
-    A success status with a reply the SDK could not read has no status to report.
+    A success status with a reply the SDK could not read has no status to report. This is
+    called outside the handler of the exception, so that the exception, whose message can
+    echo the prompt, is not in the chain of a ConfigurationError raised for a rejection.
     """
     match error:
         case httpx.RequestError() | errors.NoResponseError():
@@ -198,20 +188,9 @@ def read_error(error: Failure) -> Refused | Unavailable | Rejection:
         case errors.OpenRouterError(status_code=status) if 200 <= status < 300:
             return Unavailable()
         case errors.OpenRouterError(status_code=status, body=body):
-            return read_failure(status, codes=read_body_codes(body))
+            return read_failure(status, codes=read_codes(body))
         case _:
             assert_never(error)
-
-
-def settle[Outcome](outcome: Outcome | Rejection) -> Outcome:
-    """The outcome, or ConfigurationError naming the status of a rejection.
-
-    It is called after the handling of the failure ends, so that no exception of the
-    provider, whose message can echo the prompt, is in the raised error's chain.
-    """
-    if isinstance(outcome, Rejection):
-        raise ConfigurationError(f"OpenRouter answered HTTP {outcome.status}")
-    return outcome
 
 
 def read_reply(reply: object) -> GenerationOutcome:
@@ -272,11 +251,11 @@ def build_model(
             reply = client.responses.send(
                 model=model, instructions=prompt.system, input=request, max_output_tokens=limit
             )
-        except FAILURES as error:
-            outcome = read_error(error)
+        except FAILURES as caught:
+            error = caught
         else:
-            outcome = read_reply(reply)
-        return settle(outcome)
+            return read_reply(reply)
+        return read_error(error)
 
     return GenerativeModel(name=f"openrouter:{model}", generate=generate, perceives=perceives)
 
@@ -296,11 +275,11 @@ def build_async_model(
             reply = await client.responses.send_async(
                 model=model, instructions=prompt.system, input=request, max_output_tokens=limit
             )
-        except FAILURES as error:
-            outcome = read_error(error)
+        except FAILURES as caught:
+            error = caught
         else:
-            outcome = read_reply(reply)
-        return settle(outcome)
+            return read_reply(reply)
+        return read_error(error)
 
     return AsyncGenerativeModel(name=f"openrouter:{model}", generate=generate, perceives=perceives)
 
@@ -323,11 +302,11 @@ def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaType
                 state=state,
                 questions={QUESTION_NAME: {"type": "noul", "instructions": question.statement}},
             )
-        except FAILURES as error:
-            outcome = read_error(error)
+        except FAILURES as caught:
+            error = caught
         else:
-            outcome = read_decision(reply)
-        return settle(outcome)
+            return read_decision(reply)
+        return read_error(error)
 
     return DecisionModel(name=f"openrouter:{model}", decide=decide, perceives=perceives)
 
@@ -348,10 +327,10 @@ def build_async_decision_model(
                 state=state,
                 questions={QUESTION_NAME: {"type": "noul", "instructions": question.statement}},
             )
-        except FAILURES as error:
-            outcome = read_error(error)
+        except FAILURES as caught:
+            error = caught
         else:
-            outcome = read_decision(reply)
-        return settle(outcome)
+            return read_decision(reply)
+        return read_error(error)
 
     return AsyncDecisionModel(name=f"openrouter:{model}", decide=decide, perceives=perceives)
