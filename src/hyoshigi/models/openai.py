@@ -103,13 +103,13 @@ def read_body(body: bytes) -> GenerationOutcome:
 def read_failure(error: Failure) -> Refused | Unavailable:
     """The outcome of a request that failed after the client's retries.
 
-    An error code that is a refusal or names a policy is a refusal. A 4xx status that is not
-    one the SDK retries, and whose code does not blame the prompt's content, rejects the
-    request: it raises ConfigurationError naming only the status. This is called outside the
-    handler of the provider's error, so the provider's text, which can echo the prompt, is in
-    neither the raised error's cause nor its context. Any other failure, a connection error, a
-    timeout, a body that cannot be decoded, a prompt that cannot be encoded, or another status,
-    is unavailable.
+    An error code that is a refusal or names a policy is a refusal. A 4xx status other than 408,
+    409, 413 and 429, whose code does not blame the prompt's content, rejects the request: it
+    raises ConfigurationError naming only the status. This is called outside the handler of the
+    provider's error, so the provider's text, which can echo the prompt, is in neither the
+    raised error's cause nor its context. Any other failure, a connection error, a timeout, a
+    body that cannot be decoded, a prompt that cannot be encoded, or another status, is
+    unavailable.
     """
     match error:
         case APIStatusError(code=str(code)) if responses.names_refusal(code):
