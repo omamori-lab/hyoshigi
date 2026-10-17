@@ -401,14 +401,14 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
 
 
 @pytest.mark.parametrize(
-    ("model", "max_tokens"),
-    [("", MAX_TOKENS), (MODEL_ID, 0), (MODEL_ID, -1)],
+    ("model", "max_tokens", "argument"),
+    [("", MAX_TOKENS, "model"), (MODEL_ID, 0, "max_tokens"), (MODEL_ID, -1, "max_tokens")],
     ids=["no-model-id", "no-token", "negative"],
 )
-def test_a_model_without_a_model_id_or_a_token_to_write_raises_when_built(
-    build_driver: BuildDriver, model: str, max_tokens: int
+def test_a_model_without_a_model_id_or_a_token_to_write_raises_naming_the_argument_when_built(
+    build_driver: BuildDriver, model: str, max_tokens: int, argument: str
 ) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError, match=argument):
         build_driver(Wire(REFERENCE_RESPONSE).respond, model=model, max_tokens=max_tokens)
 
 
