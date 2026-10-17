@@ -648,16 +648,8 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
             [{"type": "message", "role": "assistant", "content": [{"type": "output_text"}]}],
             "$[0].content[0]",
         ),
-        pytest.param(
-            [{"type": "message", "content": "Hi"}],
-            "$[0]",
-            marks=pytest.mark.xfail(strict=True, reason="an output message's role is not read"),
-        ),
-        pytest.param(
-            [{"type": "message", "role": "user", "content": "Hi"}],
-            "$[0]",
-            marks=pytest.mark.xfail(strict=True, reason="an output message's role is not read"),
-        ),
+        ([{"type": "message", "content": "Hi"}], "$[0]"),
+        ([{"type": "message", "role": "user", "content": "Hi"}], "$[0]"),
     ],
     ids=[
         "not-a-list",
