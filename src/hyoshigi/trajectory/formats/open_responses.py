@@ -51,17 +51,22 @@ def read_response(output: JSON) -> Action:
         case _:
             raise FormatError(path="$", expected="a list of output items")
     for index, item in enumerate(items):
-        path = f"$[{index}]"
-        match item:
-            case {"type": "reasoning" | "function_call"} | {"type": "message", "role": "assistant"}:
-                pieces = read_model_item(item, path=path)
-            case {"type": str(kind)}:
-                pieces = [OpaquePart(kind=kind)]
-            case _:
-                raise FormatError(path=path, expected="an output item with a type")
-        for piece in pieces:
+        for piece in read_output_item(item, path=f"$[{index}]"):
             draft.add(piece)
     return draft.build()
+
+
+def read_output_item(item: JSON, *, path: str) -> list[Thought | Part | ToolCall]:
+    """Read an output item: the model's into an action's pieces, any other as opaque."""
+    match item:
+        case {"type": "reasoning" | "function_call"} | {"type": "message", "role": "assistant"}:
+            return read_model_item(item, path=path)
+        case {"type": "message"}:
+            raise FormatError(path=path, expected="an assistant message")
+        case {"type": str(kind)}:
+            return [OpaquePart(kind=kind)]
+        case _:
+            raise FormatError(path=path, expected="an output item with a type")
 
 
 def read_instructions(request: JSON) -> list[tuple[str, Event]]:
