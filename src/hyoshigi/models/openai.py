@@ -143,7 +143,7 @@ def build_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return read_body(reply.content)
+            return read_body(reply.http_response.content)
         return read_failure(error)
 
     return GenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
@@ -168,7 +168,7 @@ def build_async_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return read_body(reply.content)
+            return read_body(reply.http_response.content)
         return read_failure(error)
 
     return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
