@@ -107,7 +107,7 @@ def translate_error(
         return Unavailable()
     if isinstance(error, TypeSafeInternalServerError) or error.status in UNAVAILABLE_STATUSES:
         return Unavailable(status=error.status)
-    raise ConfigurationError(f"TypeSafe request failed with HTTP {error.status}") from error
+    raise ConfigurationError(f"TypeSafe request failed with HTTP {error.status}") from None
 
 
 def build_decision_model(

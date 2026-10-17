@@ -355,7 +355,6 @@ def test_a_client_http_error_raises_configuration_error_naming_only_the_status(
 
 
 # The provider's error, whose text can echo the prompt, stays out of the raised error's chain.
-@pytest.mark.xfail(strict=True, reason="the provider's error is chained")
 @BUILDERS
 def test_a_client_http_error_leaves_the_provider_error_out_of_its_chain(
     build_model: ModelBuilder,
