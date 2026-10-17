@@ -5,6 +5,7 @@ https://www.openresponses.org/specification/2026-04-24, and its OpenAPI document
 https://www.openresponses.org/openapi/2026-04-24/openapi.json.
 """
 
+from typing import assert_never
 from urllib.parse import urlsplit
 
 from hyoshigi.errors import FormatError
@@ -42,8 +43,9 @@ def read_request(request: JSON, *, authorship: Authorship) -> list[tuple[str, Ev
 def read_response(output: JSON) -> Action:
     """Read a response's output items into the action to rate, with a generated id.
 
-    An item the model did not write, such as a tool the provider ran, becomes an opaque
-    part.
+    An item of a type the model did not write, such as a tool the provider ran, becomes an
+    opaque part; a message that is not the assistant's, or an item without a type, raises
+    FormatError.
     """
     match output:
         case list(items):
@@ -57,7 +59,9 @@ def read_response(output: JSON) -> Action:
 
 
 def read_output_item(item: JSON, *, path: str) -> list[Thought | Part | ToolCall]:
-    """Read an output item: the model's into an action's pieces, any other as opaque."""
+    """Read an output item: the model's into an action's pieces, an item of another type as
+    opaque; a message must be the assistant's.
+    """
     match item:
         case {"type": "reasoning" | "function_call"} | {"type": "message", "role": "assistant"}:
             return read_model_item(item, path=path)
@@ -111,10 +115,12 @@ def read_items(items: list[JSON], *, authorship: Authorship) -> list[tuple[str, 
                 events.extend(close(draft))
                 draft = None
                 events.append((path, observation))
-            case pieces:
+            case list() as pieces:
                 draft = draft or ActionDraft(id=path)
                 for piece in pieces:
                     draft.add(piece)
+            case unreachable:
+                assert_never(unreachable)
     return events + close(draft)
 
 

@@ -66,9 +66,9 @@ class Action:
     def from_open_responses(output: JSON) -> Action:
         """Read an Open Responses response's output items into one action.
 
-        An item the model did not write, such as a tool the provider ran, becomes an opaque
-        part. Raises FormatError, naming the JSONPath of the first problem, on output that
-        is not in the format.
+        An item of a type the model did not write, such as a tool the provider ran, becomes
+        an opaque part. Raises FormatError, naming the JSONPath of the first problem, on
+        output that is not in the format, a message that is not the assistant's among it.
         """
         # Imported here because the format module builds actions: a top-level import
         # would be a cycle.
