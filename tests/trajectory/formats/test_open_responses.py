@@ -374,19 +374,23 @@ def test_a_request_without_input_is_its_instructions() -> None:
 
 
 @pytest.mark.parametrize(
-    ("authorship", "text", "author"),
+    ("authorship", "text", "event"),
     [
-        (marked({0}), "Hello!", Author.USER),
-        (attribute_nudges_to_the_scheduler, NUDGE, Author.SCAFFOLD),
+        (marked({0}), "Hello!", Observation(author=Author.USER, parts=(TextPart(text="Hello!"),))),
+        (
+            attribute_nudges_to_the_scheduler,
+            NUDGE,
+            Observation(author=Author.SCAFFOLD, parts=(TextPart(text="It's 9am: run the report"),)),
+        ),
     ],
     ids=["marked-first", "harness"],
 )
 def test_a_string_input_is_the_first_message_with_the_authorship_s_author(
-    authorship: Authorship, text: str, author: Author
+    authorship: Authorship, text: str, event: Event
 ) -> None:
     trajectory = Trajectory.from_open_responses({"input": text}, authorship=authorship)
 
-    assert trajectory.history == (Observation(author=author, parts=(TextPart(text=text),)),)
+    assert trajectory.history == (event,)
 
 
 def test_marked_authorship_makes_only_the_marked_message_the_user_s() -> None:
@@ -644,8 +648,24 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
             [{"type": "message", "role": "assistant", "content": [{"type": "output_text"}]}],
             "$[0].content[0]",
         ),
+        pytest.param(
+            [{"type": "message", "content": "Hi"}],
+            "$[0]",
+            marks=pytest.mark.xfail(strict=True, reason="an output message's role is not read"),
+        ),
+        pytest.param(
+            [{"type": "message", "role": "user", "content": "Hi"}],
+            "$[0]",
+            marks=pytest.mark.xfail(strict=True, reason="an output message's role is not read"),
+        ),
     ],
-    ids=["not-a-list", "item-without-type", "malformed-part"],
+    ids=[
+        "not-a-list",
+        "item-without-type",
+        "malformed-part",
+        "message-without-role",
+        "message-not-the-assistant-s",
+    ],
 )
 def test_a_malformed_output_raises_format_error_at_its_path(output: JSON, path: str) -> None:
     with pytest.raises(FormatError) as raised:
