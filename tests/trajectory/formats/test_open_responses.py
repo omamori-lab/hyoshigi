@@ -650,6 +650,19 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
         ),
         ([{"type": "message", "content": "Hi"}], "$[0]"),
         ([{"type": "message", "role": "user", "content": "Hi"}], "$[0]"),
+        pytest.param(
+            [
+                {
+                    "type": "function_call",
+                    "call_id": "c1",
+                    "name": "f",
+                    "arguments": 1,
+                    "content": "x",
+                }
+            ],
+            "$[0]",
+            marks=pytest.mark.xfail(strict=True, reason="a function call's content reads as text"),
+        ),
     ],
     ids=[
         "not-a-list",
@@ -657,6 +670,7 @@ def test_a_malformed_request_raises_format_error_at_its_path(request_body: JSON,
         "malformed-part",
         "message-without-role",
         "message-not-the-assistant-s",
+        "function-call-with-content",
     ],
 )
 def test_a_malformed_output_raises_format_error_at_its_path(output: JSON, path: str) -> None:
