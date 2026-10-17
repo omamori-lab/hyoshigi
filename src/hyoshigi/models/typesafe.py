@@ -133,9 +133,9 @@ def build_decision_model(
 ) -> DecisionModel:
     """A decision model on TypeSafe's API, through the caller's client.
 
-    Declaring image media types in ``perceives`` opts in to sending
-    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image. Raise
-    ConfigurationError if the model id is empty or perceives names media TypeSafe cannot carry.
+    A request whose state holds an image carries ``TypeSafe-Danger-Zone-Images: true``, which
+    TypeSafe requires for images. Raise ConfigurationError if the model id is empty or
+    perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
     check_perceives(perceives, carries=CARRIED_MEDIA)
@@ -165,9 +165,9 @@ def build_async_decision_model(
 ) -> AsyncDecisionModel:
     """A decision model on TypeSafe's API, through the caller's async client.
 
-    Declaring image media types in ``perceives`` opts in to sending
-    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image. Raise
-    ConfigurationError if the model id is empty or perceives names media TypeSafe cannot carry.
+    A request whose state holds an image carries ``TypeSafe-Danger-Zone-Images: true``, which
+    TypeSafe requires for images. Raise ConfigurationError if the model id is empty or
+    perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
     check_perceives(perceives, carries=CARRIED_MEDIA)
