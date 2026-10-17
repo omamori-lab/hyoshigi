@@ -31,7 +31,11 @@ type Respond = Callable[[httpx2.Request], httpx2.Response]
 
 MODEL_ID = "claude-opus-5-5"
 MAX_TOKENS = 1024
-PERCEIVES = MediaTypes("image/*", "application/pdf", "text/plain")
+# The media the API reads: https://platform.claude.com/docs/en/build-with-claude/vision,
+# "Supported formats"; pdf-support; and citations, "Plain text documents" (same path).
+PERCEIVES = MediaTypes(
+    "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain"
+)
 SYSTEM = "Today's date is 2024-06-01."
 
 # https://platform.claude.com/docs/en/api/messages, "Example": the published request has
@@ -332,12 +336,18 @@ class BuildDriver(Protocol):
         *,
         model: str = MODEL_ID,
         max_tokens: int = MAX_TOKENS,
+        perceives: MediaTypes = PERCEIVES,
         strict: bool = False,
     ) -> Driver: ...
 
 
 def build_sync_driver(
-    respond: Respond, *, model: str = MODEL_ID, max_tokens: int = MAX_TOKENS, strict: bool = False
+    respond: Respond,
+    *,
+    model: str = MODEL_ID,
+    max_tokens: int = MAX_TOKENS,
+    perceives: MediaTypes = PERCEIVES,
+    strict: bool = False,
 ) -> Driver:
     client = Anthropic(
         api_key="test-key",
@@ -346,13 +356,18 @@ def build_sync_driver(
         http_client=DefaultHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = GenerativeModel.from_anthropic(
-        client, model=model, perceives=PERCEIVES, max_tokens=max_tokens
+        client, model=model, perceives=perceives, max_tokens=max_tokens
     )
     return Driver(name=built.name, perceives=built.perceives, generate=built.generate)
 
 
 def build_async_driver(
-    respond: Respond, *, model: str = MODEL_ID, max_tokens: int = MAX_TOKENS, strict: bool = False
+    respond: Respond,
+    *,
+    model: str = MODEL_ID,
+    max_tokens: int = MAX_TOKENS,
+    perceives: MediaTypes = PERCEIVES,
+    strict: bool = False,
 ) -> Driver:
     client = AsyncAnthropic(
         api_key="test-key",
@@ -361,7 +376,7 @@ def build_async_driver(
         http_client=DefaultAsyncHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = AsyncGenerativeModel.from_anthropic(
-        client, model=model, perceives=PERCEIVES, max_tokens=max_tokens
+        client, model=model, perceives=perceives, max_tokens=max_tokens
     )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
@@ -398,6 +413,24 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
     model = build_driver(Wire(REFERENCE_RESPONSE).respond)
 
     assert model.perceives == PERCEIVES
+
+
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("image/*",), "image/*"),
+        (("image/svg+xml",), "image/svg+xml"),
+        (("application/zip",), "application/zip"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=["image-range", "image-type-outside-the-four", "zip", "the-first-of-those-it-cannot-carry"],
+)
+@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
+def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
+    build_driver: BuildDriver, patterns: tuple[str, ...], named: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        build_driver(Wire(REFERENCE_RESPONSE).respond, perceives=MediaTypes(*patterns))
 
 
 @pytest.mark.parametrize(

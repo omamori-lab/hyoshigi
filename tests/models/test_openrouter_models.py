@@ -331,43 +331,117 @@ def ask(request: pytest.FixtureRequest) -> Ask:
 
 
 @pytest.mark.parametrize(
-    ("build", "name"),
+    ("build", "name", "perceives"),
     [
         (
-            lambda client: GenerativeModel.from_openrouter(
-                client, model=MODEL, perceives=MediaTypes("image/*")
+            lambda client, perceives: GenerativeModel.from_openrouter(
+                client, model=MODEL, perceives=perceives
             ),
             f"openrouter:{MODEL}",
+            MediaTypes("image/*", "application/pdf", "text/plain"),
         ),
         (
-            lambda client: AsyncGenerativeModel.from_openrouter(
-                client, model=MODEL, perceives=MediaTypes("image/*")
+            lambda client, perceives: AsyncGenerativeModel.from_openrouter(
+                client, model=MODEL, perceives=perceives
             ),
             f"openrouter:{MODEL}",
+            MediaTypes("image/*", "application/pdf", "text/plain"),
         ),
         (
-            lambda client: DecisionModel.from_openrouter(
-                client, model=JEV, perceives=MediaTypes("image/*")
+            lambda client, perceives: DecisionModel.from_openrouter(
+                client, model=JEV, perceives=perceives
             ),
             f"openrouter:{JEV}",
+            MediaTypes("image/png", "image/jpeg", "image/webp"),
         ),
         (
-            lambda client: AsyncDecisionModel.from_openrouter(
-                client, model=JEV, perceives=MediaTypes("image/*")
+            lambda client, perceives: AsyncDecisionModel.from_openrouter(
+                client, model=JEV, perceives=perceives
             ),
             f"openrouter:{JEV}",
+            MediaTypes("image/png", "image/jpeg", "image/webp"),
         ),
     ],
     ids=["generative", "async-generative", "decision", "async-decision"],
 )
 def test_a_model_is_named_for_the_provider_and_the_model_id(
-    build: Callable[[OpenRouter], Model], name: str
+    build: Callable[[OpenRouter, MediaTypes], Model], name: str, perceives: MediaTypes
 ) -> None:
     client = Wire(build_reply(200, COMPLETED)).build_client()
 
-    model = build(client)
+    model = build(client, perceives)
 
-    assert (model.name, model.perceives) == (name, MediaTypes("image/*"))
+    assert (model.name, model.perceives) == (name, perceives)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda client, perceives: GenerativeModel.from_openrouter(
+            client, model=MODEL, perceives=perceives
+        ),
+        lambda client, perceives: AsyncGenerativeModel.from_openrouter(
+            client, model=MODEL, perceives=perceives
+        ),
+    ],
+    ids=["generative", "async-generative"],
+)
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("audio/*",), "audio/*"),
+        (("video/mp4",), "video/mp4"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=["range-of-another-type", "another-type", "the-first-of-those-it-cannot-carry"],
+)
+@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
+def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
+    build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
+) -> None:
+    client = Wire(build_reply(200, COMPLETED)).build_client()
+
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        build(client, MediaTypes(*patterns))
+
+
+# https://openrouter.ai/docs/guides/community/multimodal-decisions: the Decisions API reads png,
+# jpeg and webp images; a range such as image/* names types it cannot read.
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda client, perceives: DecisionModel.from_openrouter(
+            client, model=JEV, perceives=perceives
+        ),
+        lambda client, perceives: AsyncDecisionModel.from_openrouter(
+            client, model=JEV, perceives=perceives
+        ),
+    ],
+    ids=["decision", "async-decision"],
+)
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("image/*",), "image/*"),
+        (("image/gif",), "image/gif"),
+        (("application/pdf",), "application/pdf"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=[
+        "image-range",
+        "image-type-outside-the-three",
+        "pdf",
+        "the-first-of-those-it-cannot-carry",
+    ],
+)
+@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
+def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming_it_when_built(
+    build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
+) -> None:
+    client = Wire(build_reply(200, COMPLETED)).build_client()
+
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        build(client, MediaTypes(*patterns))
 
 
 @pytest.mark.parametrize(

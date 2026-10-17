@@ -30,6 +30,8 @@ type Handler = Callable[[httpx2.Request], httpx2.Response]
 type ModelBuilder = Callable[..., DecisionModel | AsyncDecisionModel]
 
 TEXT_ONLY = MediaTypes()
+# https://docs.typesafe.ai/images.md: the image formats TypeSafe reads.
+IMAGES = MediaTypes("image/png", "image/jpeg")
 
 # https://api.typesafe.ai/openapi.json, POST /v1/systemone, the "Noul", "Choice" and "Box"
 # examples, and components.schemas.HTTPValidationError.
@@ -135,11 +137,28 @@ BUILDERS = pytest.mark.parametrize(
 def test_the_model_carries_its_typesafe_name_with_its_media_types(
     build_model: ModelBuilder,
 ) -> None:
-    perceives = MediaTypes("image/png", "image/jpeg")
+    model = build_model(return_noul_response, model="jev-1.14.0", perceives=IMAGES)
 
-    model = build_model(return_noul_response, model="jev-1.14.0", perceives=perceives)
+    assert (model.name, model.perceives) == ("typesafe:jev-1.14.0", IMAGES)
 
-    assert (model.name, model.perceives) == ("typesafe:jev-1.14.0", perceives)
+
+@BUILDERS
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("image/*",), "image/*"),
+        (("image/webp",), "image/webp"),
+        (("application/pdf",), "application/pdf"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=["image-range", "image-type-outside-the-two", "pdf", "the-first-of-those-it-cannot-carry"],
+)
+@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
+def test_a_model_that_perceives_media_typesafe_cannot_carry_raises_naming_it_when_built(
+    build_model: ModelBuilder, patterns: tuple[str, ...], named: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        build_model(return_noul_response, perceives=MediaTypes(*patterns))
 
 
 @BUILDERS
@@ -224,7 +243,7 @@ def test_an_image_part_with_bytes_is_uploaded_as_an_image_asset(
             MediaPart(media_type=media_type, data=image_bytes),
         ),
     )
-    model = build_model(handler, model="jev-latest", perceives=MediaTypes("image/*"))
+    model = build_model(handler, model="jev-latest", perceives=IMAGES)
 
     outcome = run_decision(model, question=question)
 
@@ -266,10 +285,7 @@ def test_a_media_type_typesafe_cannot_carry_raises_configuration_error(
     build_model: ModelBuilder, part: MediaPart
 ) -> None:
     question = Question(statement=BILLING_STATEMENT, state=(part,))
-    model = build_model(
-        return_noul_response,
-        perceives=MediaTypes("audio/*", "application/*", "image/*"),
-    )
+    model = build_model(return_noul_response, perceives=IMAGES)
 
     with pytest.raises(ConfigurationError, match=part.media_type):
         run_decision(model, question=question)
@@ -286,7 +302,7 @@ def test_an_unsupported_media_type_after_an_unusable_image_still_raises_configur
             MediaPart(media_type="audio/wav", data=b"RIFF"),
         ),
     )
-    model = build_model(return_noul_response, perceives=MediaTypes("image/*", "audio/*"))
+    model = build_model(return_noul_response, perceives=IMAGES)
 
     with pytest.raises(ConfigurationError, match="audio/wav"):
         run_decision(model, question=question)
@@ -314,7 +330,7 @@ def test_an_image_without_usable_bytes_returns_unavailable(
     build_model: ModelBuilder, part: MediaPart
 ) -> None:
     question = Question(statement=BILLING_STATEMENT, state=(part,))
-    model = build_model(return_noul_response, perceives=MediaTypes("image/*"))
+    model = build_model(return_noul_response, perceives=IMAGES)
 
     outcome = run_decision(model, question=question)
 
