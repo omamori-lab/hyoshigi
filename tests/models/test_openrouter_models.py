@@ -753,7 +753,9 @@ def test_a_response_becomes_the_outcome_its_status_gives(
 ) -> None:
     client = Wire(build_reply(200, response)).build_client()
 
-    assert generate(client) == outcome
+    generated = generate(client)
+
+    assert generated == outcome
 
 
 # Constructed from the published envelope: a message, or a part of one, that names a documented
