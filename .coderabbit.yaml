@@ -141,9 +141,9 @@ reviews:
           or from logic in the test, instead of a literal, a published example
           or a property. Name a mutant of the code under test that the test
           lets survive.
-        - Flag a test double other than a scripted MonitorModel or a wire
-          stand-in for a model provider, and any check of calls made to
-          hyoshigi's own code.
+        - Flag a test double other than a scripted model (a GenerativeModel
+          or DecisionModel) or a wire stand-in for a model provider, and any
+          check of calls made to hyoshigi's own code.
         - Flag a test that reaches past the public interface.
         - Behaviour of a monitor or a model is tested under the sync and the
           async class in one parametrised test.
@@ -260,9 +260,10 @@ reviews:
           computed by the code under test, copied from its output, or derived
           by logic in the test, instead of written as a literal from the rule,
           taken from a published example, or stated as a property. Fail if a
-          test uses a test double other than a scripted MonitorModel or a wire
-          stand-in for a model provider, or checks calls made to hyoshigi's
-          own code. Name each test.
+          test uses a test double other than a scripted model (a
+          GenerativeModel or DecisionModel) or a wire stand-in for a model
+          provider, or checks calls made to hyoshigi's own code. Name each
+          test.
       - name: "Sync and async twins agree"
         mode: "warning"
         instructions: >-
