@@ -5,18 +5,26 @@ The API is OpenAI's Responses API reference, https://platform.openai.com/docs/ap
 
 import mimetypes
 from base64 import b64encode
+from dataclasses import dataclass
 from json import JSONDecodeError
-from typing import TypedDict, assert_never
+from typing import TypedDict, TypeGuard, assert_never
 
 try:
-    from openai import APIConnectionError, APIStatusError, AsyncOpenAI, Omit, OpenAI, omit
+    from openai import (
+        APIError,
+        APIStatusError,
+        AsyncOpenAI,
+        BaseModel,
+        Omit,
+        OpenAI,
+        omit,
+    )
     from openai.types.responses import (
         Response,
         ResponseInputContentParam,
         ResponseInputFileParam,
         ResponseInputImageParam,
         ResponseInputParam,
-        ResponseOutputItem,
         ResponseOutputMessage,
         ResponseOutputRefusal,
         ResponseOutputText,
@@ -40,19 +48,21 @@ from hyoshigi.models.model import (
     Refused,
     Truncated,
     Unavailable,
+    check_name,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Content = ResponseOutputText | ResponseOutputRefusal
-type Failure = APIConnectionError | APIStatusError | JSONDecodeError | UnicodeDecodeError
+type Failure = APIError | JSONDecodeError | UnicodeError
 
-# What a call to the client raises when it gets no usable reply. The SDK decodes a body
-# labelled JSON itself, and lets the decoding errors through.
-_FAILURES = (APIConnectionError, APIStatusError, JSONDecodeError, UnicodeDecodeError)
+# What a call to the client raises when it gets no usable reply: the SDK's own errors, the
+# errors of decoding a body it labels JSON, which it lets through, and of encoding a prompt
+# text that has no UTF-8 form, such as a lone surrogate.
+_FAILURES = (APIError, JSONDecodeError, UnicodeError)
 # The built-in table only: the platform's mime.types files differ between machines.
 _EXTENSIONS = mimetypes.MimeTypes()
 # Statuses that are no answer rather than a mistake: request timeout, conflict, payload too
-# large, too many requests; and every 5xx.
+# large and too many requests.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
 # The error codes that blame what the prompt holds, which an agent can shape, not the request:
 # an input beyond the context window (https://github.com/openai/openai-openapi, openapi.yaml,
@@ -88,21 +98,52 @@ class RequestArguments(TypedDict):
     store: bool
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Rejection:
+    """The API turned the request down for a mistake in it, with the HTTP status."""
+
+    status: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Written:
+    """What the messages of a reply wrote.
+
+    The text of their output text parts, the first refusal, the number of messages, and
+    whether a message was unfinished or held a part of a type that is not read.
+    """
+
+    text: str
+    refusal: str | None
+    messages: int
+    cut_off: bool
+
+
 def build_arguments(
     prompt: Prompt, *, model: str, max_output_tokens: int | None
-) -> RequestArguments:
-    """The prompt as one user message under the instructions, with nothing stored."""
+) -> RequestArguments | None:
+    """The prompt as one user message under the instructions, with nothing stored.
+
+    Every part is translated before the result is decided, so media the API can never carry
+    raises whatever parts come before it; None if a part is in a form the API cannot take.
+    """
+    translated = [build_part(part) for part in prompt.content]
+    content = [part for part in translated if part is not None]
+    if len(content) < len(translated):
+        return None
     return {
         "model": model,
         "instructions": prompt.system,
-        "input": [{"role": "user", "content": [build_part(part) for part in prompt.content]}],
+        "input": [{"role": "user", "content": content}],
         "max_output_tokens": omit if max_output_tokens is None else max_output_tokens,
         "store": False,
     }
 
 
-def build_part(part: PromptPart) -> ResponseInputContentParam:
-    """A text part as input text, a media part as an image or a file."""
+def build_part(part: PromptPart) -> ResponseInputContentParam | None:
+    """A text part as input text, a media part as an image or a file, None if it is in a form
+    the API cannot take.
+    """
     match part:
         case TextPart(text=text):
             return {"type": "input_text", "text": text}
@@ -112,118 +153,151 @@ def build_part(part: PromptPart) -> ResponseInputContentParam:
             assert_never(part)
 
 
-def build_media(part: MediaPart) -> ResponseInputImageParam | ResponseInputFileParam:
-    """Images become input images, application and text media input files; raise
-    ConfigurationError for any other media.
+def build_media(part: MediaPart) -> ResponseInputImageParam | ResponseInputFileParam | None:
+    """Images become input images, application and text media input files.
+
+    Raise ConfigurationError for any other media; None for the bytes of a media range, such
+    as image/*, which no data URL can name.
     """
-    match part.media_type.partition("/")[0].lower():
-        case "image":
-            return {"type": "input_image", "image_url": locate(part), "detail": "auto"}
-        case "application" | "text":
-            return build_file(part)
+    match part.media_type.partition("/")[0].lower(), locate(part):
+        case "image" | "application" | "text", None:
+            return None
+        case "image", str(image_url):
+            return {"type": "input_image", "image_url": image_url, "detail": "auto"}
+        case "application" | "text", str(file_url) if part.url is not None:
+            return {"type": "input_file", "file_url": file_url}
+        case "application" | "text", str(file_data):
+            return build_file_data(part, file_data=file_data)
         case _:
             raise ConfigurationError(f"the Responses API takes no {part.media_type} media")
 
 
-def build_file(part: MediaPart) -> ResponseInputFileParam:
-    """A file by URL, or its bytes as a data URL under a filename.
+def build_file_data(part: MediaPart, *, file_data: str) -> ResponseInputFileParam:
+    """A file's bytes as a data URL under a filename named for its media type.
 
-    The API takes file_data only with a filename, so the file is named for its media type,
-    as attachment.pdf. Its examples all carry a filename, such as draconomicon.pdf in
-    https://developers.openai.com/api/docs/guides/pdf-files.
+    The API takes file_data only with a filename, as attachment.pdf. Its examples all carry
+    one, such as draconomicon.pdf in https://developers.openai.com/api/docs/guides/pdf-files.
     """
-    match part:
-        case MediaPart(url=str(url)):
-            return {"type": "input_file", "file_url": url}
-        case _:
-            extension = _EXTENSIONS.guess_extension(part.media_type) or ""
-            return {
-                "type": "input_file",
-                "filename": f"attachment{extension}",
-                "file_data": locate(part),
-            }
+    extension = _EXTENSIONS.guess_extension(part.media_type) or ""
+    return {"type": "input_file", "filename": f"attachment{extension}", "file_data": file_data}
 
 
-def locate(part: MediaPart) -> str:
-    """The media's URL, or its bytes as a base64 data URL; raise ConfigurationError for the
-    bytes of a media range, which names no media type for the URL.
+def locate(part: MediaPart) -> str | None:
+    """The media's URL, or its bytes as a base64 data URL; None for the bytes of a media
+    range, which names no media type for the URL.
     """
     match part:
         case MediaPart(url=str(url)):
             return url
         case MediaPart(data=bytes(data)) if not part.media_type.endswith("/*"):
             return f"data:{part.media_type};base64,{b64encode(data).decode()}"
-        case _:
-            raise ConfigurationError(f"bytes need a media type, not the range {part.media_type}")
+    return None
 
 
 def read_response(response: Response) -> GenerationOutcome:
     """The outcome of a reply by its status; a reply nothing can read is unavailable."""
-    content = read_content(response)
+    written = read_output(response)
     match response:
-        case Response(status="failed", error=ResponseError(code=str(code))) if "policy" in code:
+        case Response(status="failed", error=ResponseError(code=str(code))) if is_refusal(code):
             return Refused()
         case Response(
             status="incomplete", incomplete_details=IncompleteDetails(reason="content_filter")
         ):
             return Refused()
-        case Response(status="completed") if content is not None:
-            return read_completed(content)
         case Response(status="failed"):
             return Unavailable()
-        case Response() if content is not None:
-            return Truncated(text=join_text(content))
+        case Response(status="completed") if written is not None:
+            return read_completed(written)
+        case Response() if written is not None:
+            return Truncated(text=written.text)
         case _:
             return Unavailable()
 
 
-def read_completed(content: list[Content]) -> Generation | Refused:
-    """A complete reply: its first refusal if it has one, else its text."""
-    refusal = next(
-        (part.refusal for part in content if isinstance(part, ResponseOutputRefusal)), None
+def read_completed(written: Written) -> GenerationOutcome:
+    """A complete reply: a refusal if it holds one, nothing readable if it holds no message,
+    the text so far if a message was unfinished or a part was not read, else the text.
+    """
+    if written.refusal is not None:
+        return Refused(explanation=written.refusal)
+    if written.messages == 0:
+        return Unavailable()
+    if written.cut_off:
+        return Truncated(text=written.text)
+    return Generation(text=written.text)
+
+
+def is_refusal(code: str) -> bool:
+    """Whether an error code is a refusal or names a policy."""
+    return code == "refusal" or "policy" in code
+
+
+def read_output(response: Response) -> Written | None:
+    """What the output's messages wrote; None if the output, or a message or a part in it
+    that is read, is not what the API documents.
+    """
+    messages = list_messages(response)
+    if messages is None:
+        return None
+    parts = [part for message in messages for part in message.content]
+    known = [part for part in parts if is_known(part)]
+    if not all(map(is_readable, known)):
+        return None
+    return Written(
+        text=join_text(known),
+        refusal=find_refusal(known),
+        messages=len(messages),
+        cut_off=len(known) < len(parts)
+        or any(message.status != "completed" for message in messages),
     )
-    if refusal is not None:
-        return Refused(explanation=refusal)
-    return Generation(text=join_text(content))
 
 
 def join_text(content: list[Content]) -> str:
-    """The text parts joined in order with no separator, as the SDK's output_text does."""
+    """The text of the output text parts, in order, with no separator, as the SDK's
+    output_text does.
+    """
     return "".join(part.text for part in content if isinstance(part, ResponseOutputText))
 
 
-def read_content(response: Response) -> list[Content] | None:
-    """The text and refusal parts of the output's messages, in order; None if the output, or
-    a message in it, is not what the API documents.
+def find_refusal(content: list[Content]) -> str | None:
+    """The first refusal among the parts, if there is one."""
+    return next((part.refusal for part in content if isinstance(part, ResponseOutputRefusal)), None)
+
+
+def list_messages(response: Response) -> list[ResponseOutputMessage] | None:
+    """The output's messages in order, skipping its items of other types; None unless the
+    output is a list of objects and each message's content is too.
+
+    The SDK builds an object it cannot place as the first variant of a union, so the type
+    field, not the class, tells what an item is.
     """
     match response:
-        case Response(output=list(items)):
-            content: list[Content] = []
-            for item in items:
-                parts = read_message(item)
-                if parts is None:
-                    return None
-                content.extend(parts)
-            return content
+        case Response(output=list(items)) if is_list_of_objects(items):
+            messages = [item for item in items if is_message(item)]
+            if all(is_list_of_objects(message.content) for message in messages):
+                return messages
     return None
 
 
-def read_message(item: ResponseOutputItem) -> list[Content] | None:
-    """The text and refusal parts of a message, none for another output item; None if the
-    message's content, or a part in it, is not what the API documents.
-    """
+def is_list_of_objects(value: object) -> bool:
+    """Whether a value is a list of objects, as the SDK leaves any other element."""
+    return isinstance(value, list) and all(isinstance(element, BaseModel) for element in value)
+
+
+def is_message(item: object) -> TypeGuard[ResponseOutputMessage]:
+    """Whether an output item is a message by its type."""
     match item:
-        case ResponseOutputMessage(content=list(parts)):
-            known = [
-                part
-                for part in parts
-                if isinstance(part, ResponseOutputText | ResponseOutputRefusal)
-            ]
-            return known if all(map(is_readable, known)) else None
-        case ResponseOutputMessage():
-            return None
-        case _:
-            return []
+        case ResponseOutputMessage(type="message"):
+            return True
+    return False
+
+
+def is_known(part: Content) -> bool:
+    """Whether a content part is output text or a refusal by its type."""
+    match part:
+        case ResponseOutputText(type="output_text") | ResponseOutputRefusal(type="refusal"):
+            return True
+    return False
 
 
 def is_readable(part: Content) -> bool:
@@ -234,27 +308,39 @@ def is_readable(part: Content) -> bool:
     return False
 
 
-def read_failure(error: Failure) -> Refused | Unavailable:
+def read_failure(error: Failure) -> Refused | Unavailable | Rejection:
     """The outcome of a request that failed after the client's retries.
 
-    A connection error or a timeout, a body that cannot be decoded, a status that may pass,
-    and a prompt the API cannot take are unavailable; an error code that names a policy is
-    a refusal. Any other status raises ConfigurationError naming it, without the provider's
-    text, which can echo the prompt.
+    An error code that is a refusal or names a policy is a refusal. A 4xx status that is not
+    one the SDK retries, and whose code does not blame the prompt's content, is a rejection of
+    the request. Any other failure, a connection error, a timeout, a body that cannot be
+    decoded or validated, a prompt that cannot be encoded, or another status, is unavailable.
     """
     match error:
-        case APIConnectionError() | JSONDecodeError() | UnicodeDecodeError():
-            return Unavailable()
-        case APIStatusError(code=str(code)) if "policy" in code:
+        case APIStatusError(code=str(code)) if is_refusal(code):
             return Refused()
         case APIStatusError(status_code=status, code=code) if (
-            code in _UNUSABLE_INPUT_CODES or status in _UNAVAILABLE_STATUSES or status >= 500
+            400 <= status < 500
+            and status not in _UNAVAILABLE_STATUSES
+            and code not in _UNUSABLE_INPUT_CODES
         ):
+            return Rejection(status=status)
+        case APIStatusError(status_code=status):
             return Unavailable(status=status)
+    return Unavailable()
+
+
+def settle(failure: Refused | Unavailable | Rejection) -> Refused | Unavailable:
+    """The failure as an outcome; a rejection raises ConfigurationError naming only its status.
+
+    The error is raised outside the handler of the provider's error, so the provider's text,
+    which can echo the prompt, is in neither its cause nor its context.
+    """
+    match failure:
+        case Rejection(status=status):
+            raise ConfigurationError(f"OpenAI rejected the request with HTTP status {status}")
         case _:
-            raise ConfigurationError(
-                f"OpenAI rejected the request with HTTP status {error.status_code}"
-            ) from None
+            return failure
 
 
 def build_model(
@@ -263,15 +349,21 @@ def build_model(
     """A model on the Responses API, through the caller's client.
 
     Each request sets store to false, so OpenAI does not retain the monitored agent's content.
+    Raise ConfigurationError if the model id is empty.
     """
+    check_name(model)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
+        if arguments is None:
+            return Unavailable()
         try:
             response = client.responses.create(**arguments)
         except _FAILURES as error:
-            return read_failure(error)
-        return read_response(response)
+            failure = read_failure(error)
+        else:
+            return read_response(response)
+        return settle(failure)
 
     return GenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
 
@@ -282,14 +374,20 @@ def build_async_model(
     """A model on the Responses API, through the caller's async client.
 
     Each request sets store to false, so OpenAI does not retain the monitored agent's content.
+    Raise ConfigurationError if the model id is empty.
     """
+    check_name(model)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
+        if arguments is None:
+            return Unavailable()
         try:
             response = await client.responses.create(**arguments)
         except _FAILURES as error:
-            return read_failure(error)
-        return read_response(response)
+            failure = read_failure(error)
+        else:
+            return read_response(response)
+        return settle(failure)
 
     return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
