@@ -689,6 +689,22 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
 
 
 @pytest.mark.parametrize(
+    "content",
+    [b'{"id": ', b"", b'{"id": "\xff"}'],
+    ids=["truncated", "empty", "not-utf-8"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_reply_labelled_json_that_cannot_be_decoded_is_unavailable_without_a_status(
+    ask: Ask, content: bytes
+) -> None:
+    reply = httpx2.Response(200, content=content, headers={"content-type": "application/json"})
+
+    exchange = ask(reply)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+@pytest.mark.parametrize(
     "failure",
     [httpx2.ConnectError("connection refused"), httpx2.ReadTimeout("read timed out")],
     ids=["connection-error", "timeout"],
