@@ -42,7 +42,9 @@ from hyoshigi.models.model import (
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Block = TextBlockParam | ImageBlockParam | DocumentBlockParam
-type Failure = APIError | JSONDecodeError | UnicodeError
+# JSONDecodeError and UnicodeError are ValueErrors; the ValueError that is neither is the SDK
+# refusing the request's arguments.
+type Failure = APIError | ValueError
 
 # What the client raises instead of a reply: the SDK's errors, a body that is not JSON or not
 # UTF-8, and text it cannot encode.
@@ -65,8 +67,9 @@ def build_model(
     """A model on the Messages API, through the caller's client.
 
     Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
-    media the API cannot carry. A max_tokens the SDK will not send without streaming raises the
-    SDK's own ValueError.
+    media the API cannot carry. Generating raises ConfigurationError if the SDK refuses the
+    request's arguments before sending them, as it does for a max_tokens that may take longer
+    than ten minutes without streaming.
     """
     check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
@@ -77,6 +80,8 @@ def build_model(
         try:
             reply: Message | Failure = client.messages.create(**request)
         except _FAILURES as error:
+            reply = error
+        except ValueError as error:
             reply = error
         return read_reply(reply)
 
@@ -89,8 +94,9 @@ def build_async_model(
     """A model on the Messages API, through the caller's async client.
 
     Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
-    media the API cannot carry. A max_tokens the SDK will not send without streaming raises the
-    SDK's own ValueError.
+    media the API cannot carry. Generating raises ConfigurationError if the SDK refuses the
+    request's arguments before sending them, as it does for a max_tokens that may take longer
+    than ten minutes without streaming.
     """
     check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
@@ -101,6 +107,8 @@ def build_async_model(
         try:
             reply: Message | Failure = await client.messages.create(**request)
         except _FAILURES as error:
+            reply = error
+        except ValueError as error:
             reply = error
         return read_reply(reply)
 
@@ -202,20 +210,38 @@ def translate_text(data: bytes) -> DocumentBlockParam | None:
 def read_reply(reply: Message | Failure) -> GenerationOutcome:
     """The outcome of a reply, or of the failure that stood in for it.
 
-    A client error other than 408, 409, 413 and 429 raises ConfigurationError naming the
-    status only, since the API's text can quote the prompt. It is raised here, outside the
-    handler of the SDK's error, so that error is not on the raised one's chain. A reply that is
-    not an assistant's message, and any other failure, is unavailable.
+    A reply that is not an assistant's message is unavailable.
     """
     match reply:
         case Message(type="message", role="assistant"):
             return read_message(reply)
+        case Message():
+            return Unavailable()
+        case _:
+            return read_failure(reply)
+
+
+def read_failure(failure: Failure) -> Unavailable:
+    """The outcome of a failure that stood in for a reply.
+
+    A client error other than 408, 409, 413 and 429 raises ConfigurationError naming the
+    status only, since the API's text can quote the prompt. So does a plain ValueError, which is
+    the SDK refusing the request's arguments before sending it; a body that is not JSON and
+    text that cannot be encoded are its subclasses. Both are raised here, outside the handler
+    of the SDK's error, so that error is not on the raised one's chain. Any other failure is
+    unavailable.
+    """
+    match failure:
         case APIStatusError(status_code=status) if (
             400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
         ):
             raise ConfigurationError(f"the Messages API answered HTTP {status}")
         case APIStatusError(status_code=status):
             return Unavailable(status=status)
+        case ValueError() if type(failure) is ValueError:
+            raise ConfigurationError(
+                "the Anthropic SDK refused the request's arguments before sending them"
+            )
         case _:
             return Unavailable()
 
