@@ -68,7 +68,8 @@ class Action:
 
         An item of a type the model did not write, such as a tool the provider ran, becomes
         an opaque part. Raises FormatError, naming the JSONPath of the first problem, on
-        output that is not in the format, a message that is not the assistant's among it.
+        output that is not in the format, or that holds a message the assistant did not
+        write.
         """
         # Imported here because the format module builds actions: a top-level import
         # would be a cycle.
