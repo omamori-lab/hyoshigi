@@ -4,6 +4,7 @@ The API is Anthropic's Messages API reference, https://platform.claude.com/docs/
 """
 
 from base64 import b64encode
+from json import JSONDecodeError
 
 try:
     from anthropic import Anthropic, APIConnectionError, APIStatusError, AsyncAnthropic
@@ -22,7 +23,7 @@ except ModuleNotFoundError as error:
         "Anthropic models need the extra: pip install 'hyoshigi[anthropic]'"
     ) from error
 
-from hyoshigi.errors import ConfigurationError, FormatError
+from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import (
     AsyncGenerativeModel,
     Generation,
@@ -58,7 +59,7 @@ def build_model(
             return Unavailable()
         try:
             message = client.messages.create(**request)
-        except (APIConnectionError, APIStatusError) as error:
+        except (APIConnectionError, APIStatusError, JSONDecodeError) as error:
             return read_failure(error)
         return read_message(message)
 
@@ -79,7 +80,7 @@ def build_async_model(
             return Unavailable()
         try:
             message = await client.messages.create(**request)
-        except (APIConnectionError, APIStatusError) as error:
+        except (APIConnectionError, APIStatusError, JSONDecodeError) as error:
             return read_failure(error)
         return read_message(message)
 
@@ -90,12 +91,10 @@ def build_request(
     prompt: Prompt, *, model: str, max_tokens: int
 ) -> MessageCreateParamsNonStreaming | None:
     """The prompt as one user message and a system prompt; None if a part cannot be sent."""
-    blocks: list[Block] = []
-    for part in prompt.content:
-        block = translate_part(part)
-        if block is None:
-            return None
-        blocks.append(block)
+    translated = [translate_part(part) for part in prompt.content]
+    blocks = [block for block in translated if block is not None]
+    if len(blocks) < len(translated):
+        return None
     return {
         "model": model,
         "max_tokens": max_tokens,
@@ -165,7 +164,8 @@ def translate_text(data: bytes) -> DocumentBlockParam | None:
 def read_message(message: Message) -> GenerationOutcome:
     """The outcome of a reply: only a turn that ended on its own is complete.
 
-    Any other stop reason, including one the API adds later, is truncated.
+    Any other stop reason, including one the API adds later, is truncated. A reply that is
+    not a message with readable content is unavailable.
     """
     match message:
         case Message(
@@ -175,34 +175,44 @@ def read_message(message: Message) -> GenerationOutcome:
             return Refused(explanation=explanation)
         case Message(stop_reason="refusal"):
             return Refused()
-        case Message(stop_reason="end_turn" | "stop_sequence", content=list(blocks)):
-            return Generation(text=read_text(blocks))
-        case Message(content=list(blocks)):
-            return Truncated(text=read_text(blocks))
+        case Message(stop_reason=stop_reason, content=list(blocks)):
+            return read_content(stop_reason, blocks=blocks)
         case _:
-            raise FormatError(path="$", expected="a message with a list of content blocks")
+            return Unavailable()
 
 
-def read_text(blocks: list[ContentBlock]) -> str:
-    """The text blocks of a reply, joined; thinking and tool use are not part of its text.
+def read_content(stop_reason: str | None, *, blocks: list[ContentBlock]) -> GenerationOutcome:
+    """The text of a reply's blocks as a generation if the turn ended on its own, else cut off."""
+    match (stop_reason, read_text(blocks)):
+        case (_, None):
+            return Unavailable()
+        case ("end_turn" | "stop_sequence", str(text)):
+            return Generation(text=text)
+        case (_, str(text)):
+            return Truncated(text=text)
 
-    The SDK reads a block of a type it does not know as a text block of that type.
+
+def read_text(blocks: list[ContentBlock]) -> str | None:
+    """The text blocks of a reply, joined; None if one has no text.
+
+    Thinking and tool use are not part of a reply's text. The SDK reads a block of a type it
+    does not know as a text block of that type.
     """
     texts: list[str] = []
-    for index, block in enumerate(blocks):
+    for block in blocks:
         match block:
             case TextBlock(type="text", text=str(text)):
                 texts.append(text)
             case TextBlock(type="text"):
-                raise FormatError(path=f"$.content[{index}]", expected="a text block with text")
+                return None
     return "".join(texts)
 
 
-def read_failure(error: APIConnectionError | APIStatusError) -> Unavailable:
-    """Unavailable for a failure the caller's retries did not clear; raise for a refused request.
+def read_failure(error: APIConnectionError | APIStatusError | JSONDecodeError) -> Unavailable:
+    """Unavailable for a connection failure, a reply that is not JSON and a status a retry or a
+    smaller prompt can clear; ConfigurationError for any other status.
 
-    The message of a refused request names the HTTP status only: the API's text can quote
-    the prompt.
+    The error names the HTTP status only: the API's text can quote the prompt.
     """
     match error:
         case APIStatusError(status_code=status) if status in _UNAVAILABLE_STATUSES or status >= 500:
