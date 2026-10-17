@@ -51,6 +51,12 @@ def check_parts(parts: tuple[PromptPart, ...]) -> None:
         raise ConfigurationError("a model is given text and media only")
 
 
+def collect[Item](items: list[Item | None]) -> list[Item] | None:
+    """The items, or None if any is None; every item is built before this decides."""
+    kept = [item for item in items if item is not None]
+    return kept if len(kept) == len(items) else None
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Prompt:
     """What a generative model is asked: the monitor's instructions, and the content."""
