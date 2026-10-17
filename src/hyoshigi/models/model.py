@@ -11,7 +11,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from hyoshigi.trajectory.parts import MediaPart, TextPart
+from hyoshigi.errors import ConfigurationError
+from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
     from anthropic import Anthropic, AsyncAnthropic
@@ -29,11 +30,15 @@ class MediaTypes:
     patterns: frozenset[str]
 
     def __init__(self, *patterns: str) -> None:
-        object.__setattr__(self, "patterns", frozenset(patterns))
+        if any(MEDIA_TYPE.fullmatch(pattern) is None for pattern in patterns):
+            raise ConfigurationError("each pattern must be an IANA media type, such as image/*")
+        object.__setattr__(self, "patterns", frozenset(map(str.lower, patterns)))
 
     def covers(self, media_type: str) -> bool:
         """Whether these patterns cover media of this type; a range only through its range."""
-        return False
+        media_type = media_type.lower()
+        top_level = media_type.partition("/")[0]
+        return media_type in self.patterns or f"{top_level}/*" in self.patterns
 
 
 # A model that perceives no media: media reaches it only as a description or a placeholder.
@@ -42,7 +47,8 @@ TEXT_ONLY = MediaTypes()
 
 def check_parts(parts: tuple[PromptPart, ...]) -> None:
     """Raise ConfigurationError unless every part is text or media."""
-    return
+    if not all(isinstance(part, TextPart | MediaPart) for part in parts):
+        raise ConfigurationError("a model is given text and media only")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -103,7 +109,10 @@ class Decision:
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        return
+        if not 0 <= self.probability <= 1:
+            raise ConfigurationError("probability must be between 0 and 1")
+        if self.confidence is not None and not 0 <= self.confidence <= 1:
+            raise ConfigurationError("confidence must be between 0 and 1")
 
 
 type GenerationOutcome = Generation | Truncated | Refused | Unavailable
@@ -112,7 +121,8 @@ type DecisionOutcome = Decision | Refused | Unavailable
 
 def check_name(name: str) -> None:
     """Raise ConfigurationError if a model's name is empty."""
-    return
+    if not name:
+        raise ConfigurationError("a model needs a name, such as the provider's model id")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

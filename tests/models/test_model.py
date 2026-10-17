@@ -25,7 +25,6 @@ async def build_refusal(prompt_or_question: Prompt | Question) -> Refused:
 
 # RFC 6838, section 4.2: media type names are case-insensitive; RFC 9110, section 12.5.1:
 # a range such as image/* stands for every subtype.
-@pytest.mark.xfail(strict=True, reason="the model interface is not checked yet")
 @pytest.mark.parametrize(
     ("patterns", "media_type"),
     [
@@ -74,13 +73,11 @@ def test_a_model_does_not_perceive_media_its_patterns_miss(
     assert not media.covers(media_type)
 
 
-@pytest.mark.xfail(strict=True, reason="the model interface is not checked yet")
 def test_a_pattern_that_is_not_a_media_type_raises() -> None:
     with pytest.raises(ConfigurationError):
         MediaTypes("image/*", "png")
 
 
-@pytest.mark.xfail(strict=True, reason="the model interface is not checked yet")
 @pytest.mark.parametrize(
     ("kind", "arguments"),
     [
@@ -94,7 +91,6 @@ def test_content_a_model_cannot_be_given_raises(kind: type, arguments: dict[str,
         kind(**arguments)
 
 
-@pytest.mark.xfail(strict=True, reason="the model interface is not checked yet")
 @pytest.mark.parametrize(
     ("probability", "confidence"),
     [(1.5, None), (-0.1, None), (math.nan, None), (0.5, 1.5), (0.5, -0.1), (0.5, math.nan)],
@@ -125,7 +121,6 @@ def test_a_decision_holds_probabilities_at_the_bounds(
     assert (decision.probability, decision.confidence) == (probability, confidence)
 
 
-@pytest.mark.xfail(strict=True, reason="the model interface is not checked yet")
 @pytest.mark.parametrize(
     ("kind", "function"),
     [
