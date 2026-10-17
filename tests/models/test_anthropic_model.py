@@ -425,7 +425,6 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
     ],
     ids=["image-range", "image-type-outside-the-four", "zip", "the-first-of-those-it-cannot-carry"],
 )
-@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
 def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
     build_driver: BuildDriver, patterns: tuple[str, ...], named: str
 ) -> None:

@@ -15,6 +15,7 @@ from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import (
     Generation,
     GenerationOutcome,
+    MediaTypes,
     Prompt,
     PromptPart,
     Refused,
@@ -27,6 +28,9 @@ from hyoshigi.trajectory.parts import MediaPart, OpaquePart, TextPart
 
 # The built-in table only: the platform's mime.types files differ between machines.
 _EXTENSIONS = mimetypes.MimeTypes()
+
+# The media build_media sends: images as input images, application and text media as input files.
+CARRIED_MEDIA = MediaTypes("image/*", "application/*", "text/*")
 
 
 class InputText(TypedDict):

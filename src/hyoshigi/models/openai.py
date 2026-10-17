@@ -25,6 +25,7 @@ from hyoshigi.models.model import (
     Refused,
     Unavailable,
     check_name,
+    check_perceives,
 )
 
 type Failure = APIError | UnicodeError
@@ -130,9 +131,11 @@ def build_model(
     """A model on the Responses API, through the caller's client.
 
     Each request sets store to false, so OpenAI does not retain the monitored agent's content.
-    The reply is read from its raw body. Raise ConfigurationError if the model id is empty.
+    The reply is read from its raw body. Raise ConfigurationError if the model id is empty or
+    perceives names media the API cannot carry.
     """
     check_name(model)
+    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
@@ -155,9 +158,11 @@ def build_async_model(
     """A model on the Responses API, through the caller's async client.
 
     Each request sets store to false, so OpenAI does not retain the monitored agent's content.
-    The reply is read from its raw body. Raise ConfigurationError if the model id is empty.
+    The reply is read from its raw body. Raise ConfigurationError if the model id is empty or
+    perceives names media the API cannot carry.
     """
     check_name(model)
+    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)

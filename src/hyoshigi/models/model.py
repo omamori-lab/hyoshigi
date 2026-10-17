@@ -131,6 +131,15 @@ def check_name(name: str) -> None:
         raise ConfigurationError("a model needs a name, such as the provider's model id")
 
 
+def check_perceives(perceives: MediaTypes, *, carries: MediaTypes) -> None:
+    """Raise ConfigurationError naming the first pattern, in sorted order, that the media an
+    API carries do not cover; a range such as image/* is covered only by a carried range.
+    """
+    for pattern in sorted(perceives.patterns):
+        if not carries.covers(pattern):
+            raise ConfigurationError(f"the API cannot carry {pattern} media")
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GenerativeModel:
     """A model that writes a reply to a prompt, through the caller's function.
