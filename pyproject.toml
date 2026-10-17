@@ -37,6 +37,13 @@ classifiers = [
 # The core runs on the standard library alone.
 dependencies = []
 
+[project.optional-dependencies]
+# Each provider adapter brings its own SDK; the core needs none of them.
+openai = ["openai>=3.33.0"]
+anthropic = ["anthropic>=1.15.0"]
+openrouter = ["openrouter>=1.3.63"]
+typesafe = ["typesafe-sdk>=0.7.5"]
+
 [project.urls]
 Repository = "https://github.com/omamori-lab/hyoshigi"
 Issues = "https://github.com/omamori-lab/hyoshigi/issues"
@@ -44,6 +51,7 @@ Changelog = "https://github.com/omamori-lab/hyoshigi/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
+    "hyoshigi[openai,anthropic,openrouter,typesafe]",
     "mutmut>=3.8.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
@@ -121,6 +129,11 @@ exclude = [
     "mutants/*",
     "docs/plans/*",
 ]
+
+# Each model adapter's SDK is an optional extra, so model.py imports the adapter where it is
+# asked for, not at the top.
+[tool.lanorme.per-file-ignores]
+"src/hyoshigi/models/model.py" = ["IMPORT-001"]
 
 [tool.lanorme.file_limits]
 func_warn_lines = 40
