@@ -34,6 +34,7 @@ from hyoshigi.models.model import (
     Question,
     Unavailable,
     check_name,
+    collect,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
@@ -74,13 +75,6 @@ def translate_part(part: PromptPart) -> StateItem | None:
             return translate_media(media)
         case _ as unreachable:
             assert_never(unreachable)
-
-
-def translate_state(parts: tuple[PromptPart, ...]) -> list[StateItem] | None:
-    """Translate state parts to a TypeSafe state list, or None when an image is unusable."""
-    items = [translate_part(part) for part in parts]
-    state = [item for item in items if item is not None]
-    return state if len(state) == len(items) else None
 
 
 def build_headers(state: list[StateItem]) -> dict[str, str] | None:
@@ -142,7 +136,7 @@ def build_decision_model(
     name = format_model_name(model)
 
     def decide(question: Question) -> DecisionOutcome:
-        state = translate_state(question.state)
+        state = collect([translate_part(part) for part in question.state])
         if state is None:
             return Unavailable()
         try:
@@ -172,7 +166,7 @@ def build_async_decision_model(
     name = format_model_name(model)
 
     async def decide(question: Question) -> DecisionOutcome:
-        state = translate_state(question.state)
+        state = collect([translate_part(part) for part in question.state])
         if state is None:
             return Unavailable()
         try:
