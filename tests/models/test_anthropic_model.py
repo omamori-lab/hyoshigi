@@ -450,6 +450,24 @@ def test_a_model_may_write_a_single_token(build_driver: BuildDriver) -> None:
     assert built.name == "anthropic:claude-opus-5-5"
 
 
+# https://platform.claude.com/docs/en/cli-sdks-libraries/sdks/python#long-requests: the SDK
+# requires streaming for a request that may take more than 10 minutes, and without it raises
+# ValueError before sending. Version 1.15.0 of the SDK expects 3600 s * max_tokens / 128000, so
+# it refuses 64000 tokens at the default timeout.
+@pytest.mark.xfail(strict=True, raises=ValueError, reason="the SDK's ValueError propagates")
+def test_a_max_tokens_the_sdk_will_not_send_without_streaming_raises_before_any_request(
+    build_driver: BuildDriver,
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond, max_tokens=64_000)
+
+    with pytest.raises(ConfigurationError, match="refused the request's arguments") as raised:
+        model.generate(HELLO)
+
+    error = raised.value
+    assert (error.__cause__, error.__context__, wire.requests) == (None, None, [])
+
+
 def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     build_driver: BuildDriver,
 ) -> None:
