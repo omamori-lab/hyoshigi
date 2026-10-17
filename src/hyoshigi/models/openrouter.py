@@ -196,14 +196,12 @@ def read_error(error: Failure) -> Refused | Unavailable:
 def read_reply(reply: object) -> GenerationOutcome:
     """The outcome of what the SDK returned: a result, or an event stream, which is not one.
 
-    The SDK gives no raw body for a result, so the result is read from its JSON dump, which
-    does not warn of a value the SDK kept unrecognized, such as a status it does not list.
+    The SDK gives no raw body for a result, so the result is read from its dump, which does
+    not warn of a value the SDK kept unrecognized, such as a status it does not list.
     """
     match reply:
         case components.OpenResponsesResult():
-            return responses.read_reply(
-                restore(reply.model_dump(mode="json", by_alias=True, warnings=False))
-            )
+            return responses.read_reply(restore(reply.model_dump(warnings=False)))
         case _:
             return Unavailable()
 
