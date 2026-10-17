@@ -5,6 +5,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 import httpx2
 import pytest
@@ -25,6 +26,8 @@ from hyoshigi import (
     Truncated,
     Unavailable,
 )
+
+NOT_YET = pytest.mark.xfail(strict=True, reason="the Anthropic model has not been changed yet")
 
 type Respond = Callable[[httpx2.Request], httpx2.Response]
 
@@ -128,6 +131,13 @@ THINKING_CONTENT: JSON = [
         "simpler one and use its result to constrain the second...",
         "signature": "WaUjzkypQ2mUEVM36O2Txu....",
     },
+    {"type": "text", "text": "Based on my analysis..."},
+]
+
+# https://platform.claude.com/docs/en/build-with-claude/thinking, "Redacted thinking blocks",
+# before the text block above.
+REDACTED_THINKING_CONTENT: JSON = [
+    {"type": "redacted_thinking", "data": "..."},
     {"type": "text", "text": "Based on my analysis..."},
 ]
 
@@ -297,6 +307,17 @@ def send_cut_off_json(request: httpx2.Request) -> httpx2.Response:
     )
 
 
+def send_invalid_utf8(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(
+        200, content=b'{"id": "\xff"}', headers={"content-type": "application/json"}
+    )
+
+
+def send_corrupt_gzip(request: httpx2.Request) -> httpx2.Response:
+    headers = {"content-type": "application/json", "content-encoding": "gzip"}
+    return httpx2.Response(200, content=b"not gzip", headers=headers)
+
+
 @dataclass(frozen=True, slots=True)
 class Driver:
     """A model built by one of the two families, driven to a result either way."""
@@ -306,35 +327,49 @@ class Driver:
     generate: Callable[[Prompt], GenerationOutcome]
 
 
-type BuildDriver = Callable[[Respond], Driver]
+class BuildDriver(Protocol):
+    def __call__(
+        self,
+        respond: Respond,
+        *,
+        model: str = MODEL_ID,
+        max_tokens: int = MAX_TOKENS,
+        strict: bool = False,
+    ) -> Driver: ...
 
 
-def build_sync_driver(respond: Respond) -> Driver:
+def build_sync_driver(
+    respond: Respond, *, model: str = MODEL_ID, max_tokens: int = MAX_TOKENS, strict: bool = False
+) -> Driver:
     client = Anthropic(
         api_key="test-key",
         max_retries=0,
+        _strict_response_validation=strict,
         http_client=DefaultHttpxClient(transport=httpx2.MockTransport(respond)),
     )
-    model = GenerativeModel.from_anthropic(
-        client, model=MODEL_ID, perceives=PERCEIVES, max_tokens=MAX_TOKENS
+    built = GenerativeModel.from_anthropic(
+        client, model=model, perceives=PERCEIVES, max_tokens=max_tokens
     )
-    return Driver(name=model.name, perceives=model.perceives, generate=model.generate)
+    return Driver(name=built.name, perceives=built.perceives, generate=built.generate)
 
 
-def build_async_driver(respond: Respond) -> Driver:
+def build_async_driver(
+    respond: Respond, *, model: str = MODEL_ID, max_tokens: int = MAX_TOKENS, strict: bool = False
+) -> Driver:
     client = AsyncAnthropic(
         api_key="test-key",
         max_retries=0,
+        _strict_response_validation=strict,
         http_client=DefaultAsyncHttpxClient(transport=httpx2.MockTransport(respond)),
     )
-    model = AsyncGenerativeModel.from_anthropic(
-        client, model=MODEL_ID, perceives=PERCEIVES, max_tokens=MAX_TOKENS
+    built = AsyncGenerativeModel.from_anthropic(
+        client, model=model, perceives=PERCEIVES, max_tokens=max_tokens
     )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
-        return asyncio.run(await_outcome(model.generate(prompt)))
+        return asyncio.run(await_outcome(built.generate(prompt)))
 
-    return Driver(name=model.name, perceives=model.perceives, generate=generate)
+    return Driver(name=built.name, perceives=built.perceives, generate=generate)
 
 
 async def await_outcome(outcome: Awaitable[GenerationOutcome]) -> GenerationOutcome:
@@ -365,6 +400,25 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
     model = build_driver(Wire(REFERENCE_RESPONSE).respond)
 
     assert model.perceives == PERCEIVES
+
+
+@NOT_YET
+@pytest.mark.parametrize(
+    ("model", "max_tokens"),
+    [("", MAX_TOKENS), (MODEL_ID, 0), (MODEL_ID, -1)],
+    ids=["no-model-id", "no-token", "negative"],
+)
+def test_a_model_without_a_model_id_or_a_token_to_write_raises_when_built(
+    build_driver: BuildDriver, model: str, max_tokens: int
+) -> None:
+    with pytest.raises(ConfigurationError):
+        build_driver(Wire(REFERENCE_RESPONSE).respond, model=model, max_tokens=max_tokens)
+
+
+def test_a_model_may_write_a_single_token(build_driver: BuildDriver) -> None:
+    built = build_driver(Wire(REFERENCE_RESPONSE).respond, max_tokens=1)
+
+    assert built.name == "anthropic:claude-opus-5-5"
 
 
 def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
@@ -498,6 +552,51 @@ def test_each_image_type_the_api_supports_is_sent_by_url(
     assert wire.requests == [build_request([{"type": "image", "source": source}])]
 
 
+@NOT_YET
+def test_empty_text_is_not_sent(build_driver: BuildDriver) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+    content = (TextPart(text=""), TextPart(text="Hello, world"), TextPart(text=""))
+
+    model.generate(Prompt(system=SYSTEM, content=content))
+
+    assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
+
+
+@NOT_YET
+@pytest.mark.parametrize("content", [(TextPart(text=""),), ()], ids=["empty-text", "no-content"])
+def test_a_prompt_without_content_to_send_is_unavailable_before_any_request(
+    build_driver: BuildDriver, content: tuple[TextPart, ...]
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+
+    outcome = model.generate(Prompt(system=SYSTEM, content=content))
+
+    assert (outcome, wire.requests) == (Unavailable(status=None), [])
+
+
+# json.loads gives a lone surrogate for "\ud800" in a tool's output.
+@NOT_YET
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        Prompt(system=SYSTEM, content=(TextPart(text="a\ud800b"),)),
+        Prompt(system="a\ud800b", content=(TextPart(text="Hello, world"),)),
+    ],
+    ids=["text", "system"],
+)
+def test_text_that_cannot_be_encoded_is_unavailable_before_any_request(
+    build_driver: BuildDriver, prompt: Prompt
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+
+    outcome = model.generate(prompt)
+
+    assert (outcome, wire.requests) == (Unavailable(status=None), [])
+
+
 @pytest.mark.parametrize(
     "part",
     [
@@ -591,8 +690,12 @@ def test_the_text_blocks_of_a_reply_are_joined_without_a_separator(
 
 @pytest.mark.parametrize(
     ("content", "text"),
-    [(THINKING_CONTENT, "Based on my analysis..."), (FUTURE_CONTENT, "first last")],
-    ids=["thinking", "block-type-added-later"],
+    [
+        (THINKING_CONTENT, "Based on my analysis..."),
+        (REDACTED_THINKING_CONTENT, "Based on my analysis..."),
+        (FUTURE_CONTENT, "first last"),
+    ],
+    ids=["thinking", "redacted-thinking", "block-type-added-later"],
 )
 def test_blocks_that_are_not_text_are_not_part_of_the_reply(
     build_driver: BuildDriver, content: JSON, text: str
@@ -666,12 +769,46 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
 @pytest.mark.parametrize(
     "body",
     [
-        {**STOP_REASONS_RESPONSE, "content": "Here is a string"},
-        {"id": "msg_01234", "type": "message", "role": "assistant"},
-        "a string",
-        {**STOP_REASONS_RESPONSE, "content": [{"type": "text"}]},
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": "Here is a string"}, id="content-is-a-string"
+        ),
+        pytest.param({"id": "msg_01234", "type": "message", "role": "assistant"}, id="no-content"),
+        pytest.param("a string", id="not-a-message"),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": [{"type": "text"}]}, id="text-block-without-text"
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": [{"type": "text", "text": 123}]},
+            id="text-is-not-a-string",
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": ["not a block"]},
+            marks=NOT_YET,
+            id="element-is-not-a-block",
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": [{"text": "missing type"}]},
+            marks=NOT_YET,
+            id="block-without-type",
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "content": [{"type": 123, "text": "bad type"}]},
+            marks=NOT_YET,
+            id="block-type-is-not-a-string",
+        ),
+        pytest.param(
+            {"stop_reason": "end_turn", "content": []}, marks=NOT_YET, id="no-type-or-role"
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "type": "error"}, marks=NOT_YET, id="type-is-not-message"
+        ),
+        pytest.param(
+            {**STOP_REASONS_RESPONSE, "role": "user"}, marks=NOT_YET, id="role-is-not-assistant"
+        ),
+        pytest.param(
+            {**REFUSAL_RESPONSE, "type": "error"}, marks=NOT_YET, id="refusal-is-not-a-message"
+        ),
     ],
-    ids=["content-is-a-string", "no-content", "not-a-message", "text-block-without-text"],
 )
 def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
     build_driver: BuildDriver, body: JSON
@@ -683,11 +820,37 @@ def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
+@NOT_YET
+def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
+    build_driver: BuildDriver,
+) -> None:
+    model = build_driver(Wire({"type": "message"}).respond, strict=True)
+
+    outcome = model.generate(HELLO)
+
+    assert outcome == Unavailable(status=None)
+
+
 # https://platform.claude.com/docs/en/api/errors, "HTTP errors": 409, 413, 429, 500, 504 and
 # 529 are documented; 408 and 503 are the statuses the SDK retries and names. 413, a request
-# too large, is a status the prompt's content can cause.
-@pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 503, 504, 529])
-def test_an_error_status_a_retry_or_a_smaller_prompt_clears_is_unavailable_with_its_status(
+# too large, is a status the prompt's content can cause. 301 and 304 are statuses that are not
+# a success and not an error of the request.
+@pytest.mark.parametrize(
+    "status",
+    [
+        pytest.param(301, marks=NOT_YET),
+        pytest.param(304, marks=NOT_YET),
+        408,
+        409,
+        413,
+        429,
+        500,
+        503,
+        504,
+        529,
+    ],
+)
+def test_a_status_that_is_not_a_configuration_error_is_unavailable_with_its_status(
     build_driver: BuildDriver, status: int
 ) -> None:
     wire = Wire(OVERLOADED_ERROR, status=status)
@@ -700,8 +863,14 @@ def test_an_error_status_a_retry_or_a_smaller_prompt_clears_is_unavailable_with_
 
 @pytest.mark.parametrize(
     "respond",
-    [fail_to_connect, time_out, send_html, send_cut_off_json],
-    ids=["connection", "timeout", "html", "cut-off-json"],
+    [
+        pytest.param(fail_to_connect, id="connection"),
+        pytest.param(time_out, id="timeout"),
+        pytest.param(send_html, id="html"),
+        pytest.param(send_cut_off_json, id="cut-off-json"),
+        pytest.param(send_invalid_utf8, marks=NOT_YET, id="invalid-utf-8"),
+        pytest.param(send_corrupt_gzip, id="corrupt-gzip"),
+    ],
 )
 def test_a_connection_that_failed_or_a_reply_that_is_not_json_is_unavailable_without_a_status(
     build_driver: BuildDriver, respond: Respond
@@ -723,6 +892,7 @@ def test_any_other_error_status_raises_naming_the_status(
         model.generate(HELLO)
 
 
+@NOT_YET
 def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     build_driver: BuildDriver,
 ) -> None:
@@ -731,7 +901,9 @@ def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     with pytest.raises(ConfigurationError) as raised:
         model.generate(HELLO)
 
-    assert (NOT_FOUND_MESSAGE in str(raised.value), raised.value.__suppress_context__) == (
+    error = raised.value
+    assert (NOT_FOUND_MESSAGE in str(error), error.__cause__, error.__context__) == (
         False,
-        True,
+        None,
+        None,
     )
