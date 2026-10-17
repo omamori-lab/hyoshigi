@@ -27,8 +27,6 @@ from hyoshigi import (
     Unavailable,
 )
 
-STUB = pytest.mark.xfail(strict=True, reason="the Anthropic adapter is a stub")
-
 type Respond = Callable[[httpx2.Request], httpx2.Response]
 
 MODEL_ID = "claude-opus-5-5"
@@ -344,7 +342,6 @@ def build_request(content: list[JSON]) -> JSON:
     }
 
 
-@STUB
 def test_the_model_is_named_for_the_provider_and_the_model_id(build_driver: BuildDriver) -> None:
     model = build_driver(Wire(REFERENCE_RESPONSE).respond)
 
@@ -357,7 +354,6 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
     assert model.perceives == PERCEIVES
 
 
-@STUB
 def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     build_driver: BuildDriver,
 ) -> None:
@@ -369,7 +365,6 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
 
 
-@STUB
 @pytest.mark.parametrize(
     ("parts", "content"),
     [
@@ -497,7 +492,6 @@ def test_media_is_sent_in_the_content_block_the_api_documents_for_it(
     assert wire.requests == [build_request(content)]
 
 
-@STUB
 @pytest.mark.parametrize(
     "part",
     [
@@ -522,7 +516,6 @@ def test_a_media_type_the_api_cannot_carry_raises_naming_the_type_before_any_req
     assert wire.requests == []
 
 
-@STUB
 @pytest.mark.parametrize(
     "part",
     [
@@ -543,7 +536,6 @@ def test_media_in_a_form_the_api_cannot_take_is_unavailable_before_any_request(
     assert (outcome, wire.requests) == (Unavailable(status=None), [])
 
 
-@STUB
 @pytest.mark.parametrize(
     ("body", "text"),
     [
@@ -569,7 +561,6 @@ def test_a_reply_that_stopped_on_its_own_is_a_generation_of_its_text(
     assert outcome == Generation(text=text)
 
 
-@STUB
 def test_the_text_blocks_of_a_reply_are_joined_without_a_separator(
     build_driver: BuildDriver,
 ) -> None:
@@ -580,7 +571,6 @@ def test_the_text_blocks_of_a_reply_are_joined_without_a_separator(
     assert outcome == Generation(text=CITED_TEXT)
 
 
-@STUB
 @pytest.mark.parametrize(
     ("content", "text"),
     [(THINKING_CONTENT, "Based on my analysis..."), (FUTURE_CONTENT, "first last")],
@@ -596,7 +586,6 @@ def test_blocks_that_are_not_text_are_not_part_of_the_reply(
     assert outcome == Generation(text=text)
 
 
-@STUB
 @pytest.mark.parametrize(
     "body",
     [
@@ -618,7 +607,6 @@ def test_a_reply_that_stopped_for_another_reason_is_truncated_with_its_text_so_f
     assert outcome == Truncated(text=ANSWER)
 
 
-@STUB
 def test_a_reply_that_stopped_to_use_a_tool_is_truncated_with_the_text_before_the_call(
     build_driver: BuildDriver,
 ) -> None:
@@ -630,7 +618,6 @@ def test_a_reply_that_stopped_to_use_a_tool_is_truncated_with_the_text_before_th
     assert outcome == Truncated(text=TOOL_USE_TEXT)
 
 
-@STUB
 def test_a_refusal_is_refused_with_the_explanation_the_api_gives(build_driver: BuildDriver) -> None:
     model = build_driver(Wire(REFUSAL_RESPONSE).respond)
 
@@ -658,7 +645,6 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
     assert outcome == Refused(explanation=None)
 
 
-@STUB
 @pytest.mark.parametrize(
     ("body", "path"),
     [
@@ -686,7 +672,6 @@ def test_a_reply_that_is_not_a_message_raises_format_error_at_its_path(
 
 # https://platform.claude.com/docs/en/api/errors, "HTTP errors": 409, 413, 429, 500, 504 and
 # 529 are documented; 408 and 503 are the statuses the SDK retries and names.
-@STUB
 @pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 503, 504, 529])
 def test_an_error_status_the_client_gave_up_retrying_is_unavailable_with_its_status(
     build_driver: BuildDriver, status: int
@@ -699,7 +684,6 @@ def test_an_error_status_the_client_gave_up_retrying_is_unavailable_with_its_sta
     assert (outcome, len(wire.requests)) == (Unavailable(status=status), 1)
 
 
-@STUB
 @pytest.mark.parametrize("respond", [fail_to_connect, time_out], ids=["connection", "timeout"])
 def test_a_connection_that_failed_is_unavailable_without_a_status(
     build_driver: BuildDriver, respond: Respond
@@ -711,7 +695,6 @@ def test_a_connection_that_failed_is_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
-@STUB
 @pytest.mark.parametrize("status", [400, 401, 402, 403, 404])
 def test_any_other_error_status_raises_naming_the_status(
     build_driver: BuildDriver, status: int
@@ -722,7 +705,6 @@ def test_any_other_error_status_raises_naming_the_status(
         model.generate(HELLO)
 
 
-@STUB
 def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     build_driver: BuildDriver,
 ) -> None:
