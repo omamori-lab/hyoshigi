@@ -460,11 +460,16 @@ def test_a_max_tokens_the_sdk_will_not_send_without_streaming_raises_before_any_
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond, max_tokens=64_000)
 
-    with pytest.raises(ConfigurationError, match="refused the request's arguments") as raised:
+    with pytest.raises(ConfigurationError) as raised:
         model.generate(HELLO)
 
     error = raised.value
-    assert (error.__cause__, error.__context__, wire.requests) == (None, None, [])
+    assert (str(error), error.__cause__, error.__context__, wire.requests) == (
+        "the Anthropic SDK refused the request's arguments before sending them",
+        None,
+        None,
+        [],
+    )
 
 
 def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
