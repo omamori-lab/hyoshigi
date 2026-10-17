@@ -34,9 +34,6 @@ from hyoshigi import (
 type Model = GenerativeModel | AsyncGenerativeModel | DecisionModel | AsyncDecisionModel
 type Respond = Callable[[httpx.Request], httpx.Response]
 
-# A case the adapter does not yet handle: it fails today and passes once the case is handled.
-UNHANDLED = pytest.mark.xfail(strict=True)
-
 MODEL = "openai/gpt-4o"
 JEV = "typesafe/jev-1.14"
 PROMPT = Prompt(system="Rate the action.", content=(TextPart(text="Run: ls"),))
@@ -373,7 +370,6 @@ def test_a_model_is_named_for_the_provider_and_the_model_id(
     assert (model.name, model.perceives) == (name, MediaTypes("image/*"))
 
 
-@UNHANDLED
 @pytest.mark.parametrize(
     "build",
     [
@@ -581,7 +577,6 @@ RANGE_BYTES = MediaPart(media_type="image/*", data=b"\x89PNG")
 AUDIO = MediaPart(media_type="audio/mpeg", data=b"ID3")
 
 
-@UNHANDLED
 @pytest.mark.parametrize(
     "part",
     [RANGE_BYTES, MediaPart(media_type="application/*", data=b"%PDF-1.7")],
@@ -601,7 +596,7 @@ def test_bytes_of_a_media_range_are_unavailable_without_a_status(
 @pytest.mark.parametrize(
     "content",
     [
-        pytest.param((RANGE_BYTES, AUDIO), id="range-first", marks=UNHANDLED),
+        pytest.param((RANGE_BYTES, AUDIO), id="range-first"),
         pytest.param((AUDIO, RANGE_BYTES), id="range-last"),
     ],
 )
@@ -700,7 +695,6 @@ CRACKED_MESSAGE: JSON = {
 }
 
 
-@UNHANDLED
 @pytest.mark.parametrize(
     "response",
     [
@@ -863,7 +857,6 @@ def test_media_the_decisions_api_cannot_carry_raises_naming_its_type(
 # https://openrouter.ai/docs/guides/community/multimodal-decisions: an image is a base64 data URL
 # in the state, and "remote http(s) URLs are not fetched". A MediaPart URL is a URL even if it
 # is a data URL; the bytes of a range such as image/* have no type to put in one.
-@UNHANDLED
 @pytest.mark.parametrize(
     "part",
     [
@@ -891,7 +884,6 @@ def test_an_image_in_a_form_the_decisions_api_cannot_take_is_unavailable_without
         pytest.param(
             (MediaPart(media_type="image/png", url="https://example.com/image.png"), AUDIO),
             id="image-by-url-first",
-            marks=UNHANDLED,
         ),
         pytest.param(
             (AUDIO, MediaPart(media_type="image/png", url="https://example.com/image.png")),
@@ -976,7 +968,6 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
     ],
     ids=["400", "401", "402", "403", "404", "422", "invalid-request", "permission-denied"],
 )
-@UNHANDLED
 def test_any_other_rejection_raises_naming_only_the_status(
     ask: Ask, status: int, fields: dict[str, JSON]
 ) -> None:
@@ -1019,12 +1010,9 @@ def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask)
         pytest.param(
             build_typed_error(403, "content_policy_violation"),
             id="metadata-policy",
-            marks=UNHANDLED,
         ),
-        pytest.param(build_typed_error(403, "refusal"), id="metadata-refusal", marks=UNHANDLED),
-        pytest.param(
-            build_skin_error("content_policy_violation"), id="skin-policy", marks=UNHANDLED
-        ),
+        pytest.param(build_typed_error(403, "refusal"), id="metadata-refusal"),
+        pytest.param(build_skin_error("content_policy_violation"), id="skin-policy"),
     ],
 )
 def test_a_request_the_provider_blocks_is_refused_without_an_explanation(
@@ -1071,16 +1059,11 @@ CODED_REJECTIONS = [
     ("status", "body"),
     [
         *(
-            pytest.param(
-                status, build_typed_error(status, error_type), id=error_type, marks=UNHANDLED
-            )
+            pytest.param(status, build_typed_error(status, error_type), id=error_type)
             for status, error_type in TYPED_REJECTIONS
         ),
-        *(
-            pytest.param(400, build_coded_error(code), id=code, marks=UNHANDLED)
-            for code in CODED_REJECTIONS
-        ),
-        pytest.param(400, build_skin_error("context_length_exceeded"), id="skin", marks=UNHANDLED),
+        *(pytest.param(400, build_coded_error(code), id=code) for code in CODED_REJECTIONS),
+        pytest.param(400, build_skin_error("context_length_exceeded"), id="skin"),
         pytest.param(413, build_typed_error(413, "payload_too_large"), id="payload_too_large"),
         pytest.param(400, build_error(400, error_type="context_length_exceeded"), id="top-level"),
     ],
@@ -1112,7 +1095,6 @@ def test_a_connection_failure_is_unavailable_without_a_status(ask: Ask, error: E
     assert outcome == Unavailable()
 
 
-@UNHANDLED
 def test_no_response_is_unavailable_without_a_status(ask: Ask) -> None:
     client = build_silent_client()
 
@@ -1128,12 +1110,10 @@ def test_no_response_is_unavailable_without_a_status(ask: Ask) -> None:
     "respond",
     [
         pytest.param(build_reply(200, {}), id="json-of-no-known-shape"),
-        pytest.param(
-            build_reply(200, {"error_type": "refusal"}), id="refusal-in-no-reply", marks=UNHANDLED
-        ),
+        pytest.param(build_reply(200, {"error_type": "refusal"}), id="refusal-in-no-reply"),
         pytest.param(build_page(200), id="gateway-page"),
         pytest.param(build_truncation(), id="truncated-json"),
-        pytest.param(build_bad_encoding(), id="bad-content-encoding", marks=UNHANDLED),
+        pytest.param(build_bad_encoding(), id="bad-content-encoding"),
         pytest.param(lambda request: httpx.Response(204), id="no-content"),
     ],
 )
@@ -1147,7 +1127,6 @@ def test_a_reply_that_cannot_be_read_is_unavailable_without_a_status(
     assert outcome == Unavailable()
 
 
-@UNHANDLED
 def test_an_event_stream_is_unavailable_without_a_status(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
@@ -1158,12 +1137,14 @@ def test_an_event_stream_is_unavailable_without_a_status(
     assert outcome == Unavailable()
 
 
-@UNHANDLED
-def test_a_redirect_is_unavailable_with_its_status(ask: Ask) -> None:
+@pytest.mark.parametrize("status", [300, 302])
+def test_a_status_between_success_and_error_is_unavailable_with_that_status(
+    ask: Ask, status: int
+) -> None:
     client = Wire(
-        lambda request: httpx.Response(302, headers={"location": "https://openrouter.ai/"})
+        lambda request: httpx.Response(status, headers={"location": "https://openrouter.ai/"})
     ).build_client()
 
     outcome = ask(client)
 
-    assert outcome == Unavailable(status=302)
+    assert outcome == Unavailable(status=status)
