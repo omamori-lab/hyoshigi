@@ -454,6 +454,10 @@ def test_the_output_limit_is_sent_only_when_given(
             {"type": "input_file", "file_url": BERKSHIRE_LETTER},
         ),
         (
+            MediaPart(media_type="text/plain", url="https://example.com/notes.txt"),
+            {"type": "input_file", "file_url": "https://example.com/notes.txt"},
+        ),
+        (
             MediaPart(media_type="application/pdf", data=b"foob"),
             {
                 "type": "input_file",
@@ -482,6 +486,7 @@ def test_the_output_limit_is_sent_only_when_given(
         "image-bytes-as-a-data-url",
         "image-range-by-url",
         "file-by-url",
+        "text-by-url",
         "pdf-bytes-with-a-filename",
         "text-bytes-with-a-filename",
         "file-of-unknown-extension-with-a-bare-filename",
