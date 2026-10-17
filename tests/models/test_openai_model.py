@@ -48,8 +48,10 @@ class Ask(Protocol):
         reply: httpx2.Response | Exception,
         prompt: Prompt = ...,
         *,
+        model: str = ...,
         max_output_tokens: int | None = None,
         perceives: MediaTypes = ...,
+        strict_validation: bool = False,
     ) -> Exchange: ...
 
 
@@ -76,42 +78,48 @@ def generate_synchronously(
     reply: httpx2.Response | Exception,
     prompt: Prompt = PROMPT,
     *,
+    model: str = MODEL,
     max_output_tokens: int | None = None,
     perceives: MediaTypes = TEXT_ONLY,
+    strict_validation: bool = False,
 ) -> Exchange:
     requests: list[dict[str, object]] = []
     client = OpenAI(
         api_key=API_KEY,
         max_retries=0,
         http_client=httpx2.Client(transport=serve(reply, requests)),
+        _strict_response_validation=strict_validation,
     )
-    model = GenerativeModel.from_openai(
-        client, model=MODEL, max_output_tokens=max_output_tokens, perceives=perceives
+    built = GenerativeModel.from_openai(
+        client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
     )
-    return Exchange(model=model, outcome=model.generate(prompt), requests=requests)
+    return Exchange(model=built, outcome=built.generate(prompt), requests=requests)
 
 
 def generate_asynchronously(
     reply: httpx2.Response | Exception,
     prompt: Prompt = PROMPT,
     *,
+    model: str = MODEL,
     max_output_tokens: int | None = None,
     perceives: MediaTypes = TEXT_ONLY,
+    strict_validation: bool = False,
 ) -> Exchange:
     requests: list[dict[str, object]] = []
     client = AsyncOpenAI(
         api_key=API_KEY,
         max_retries=0,
         http_client=httpx2.AsyncClient(transport=serve(reply, requests)),
+        _strict_response_validation=strict_validation,
     )
-    model = AsyncGenerativeModel.from_openai(
-        client, model=MODEL, max_output_tokens=max_output_tokens, perceives=perceives
+    built = AsyncGenerativeModel.from_openai(
+        client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
     )
 
     async def generate() -> GenerationOutcome:
-        return await model.generate(prompt)
+        return await built.generate(prompt)
 
-    return Exchange(model=model, outcome=asyncio.run(generate()), requests=requests)
+    return Exchange(model=built, outcome=asyncio.run(generate()), requests=requests)
 
 
 @pytest.fixture(params=[generate_synchronously, generate_asynchronously], ids=["sync", "async"])
@@ -496,9 +504,8 @@ def test_media_is_sent_as_the_content_part_of_its_kind(
     [
         MediaPart(media_type="audio/wav", data=b"foob"),
         MediaPart(media_type="video/mp4", url="https://example.com/clip.mp4"),
-        MediaPart(media_type="image/*", data=b"foob"),
     ],
-    ids=["audio", "video", "bytes-of-a-media-range"],
+    ids=["audio", "video"],
 )
 def test_media_the_api_cannot_carry_raises_naming_its_media_type(
     ask: Ask, media: MediaPart
@@ -507,6 +514,73 @@ def test_media_the_api_cannot_carry_raises_naming_its_media_type(
 
     with pytest.raises(ConfigurationError, match=re.escape(media.media_type)):
         ask(respond(IMAGE_INPUT_RESPONSE), prompt)
+
+
+# The type is carried by a media range given as bytes: no data URL can name its subtype.
+@pytest.mark.parametrize(
+    "media",
+    [
+        MediaPart(media_type="image/*", data=b"foob"),
+        MediaPart(media_type="application/*", data=b"foob"),
+        MediaPart(media_type="text/*", data=b"foob"),
+    ],
+    ids=["image-range", "application-range", "text-range"],
+)
+@pytest.mark.xfail(strict=True)
+def test_media_in_a_form_the_api_cannot_take_is_unavailable_without_a_status(
+    ask: Ask, media: MediaPart
+) -> None:
+    prompt = Prompt(system="You are a helpful assistant.", content=(media,))
+
+    exchange = ask(respond(IMAGE_INPUT_RESPONSE), prompt)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+RANGE_BYTES = MediaPart(media_type="image/*", data=b"foob")
+AUDIO = MediaPart(media_type="audio/wav", data=b"foob")
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        pytest.param(
+            (RANGE_BYTES, AUDIO), id="unusable-form-first", marks=pytest.mark.xfail(strict=True)
+        ),
+        pytest.param((AUDIO, RANGE_BYTES), id="never-carried-first"),
+    ],
+)
+def test_media_the_api_can_never_carry_raises_whatever_the_order_of_the_parts(
+    ask: Ask, content: tuple[MediaPart, ...]
+) -> None:
+    prompt = Prompt(system="You are a helpful assistant.", content=content)
+
+    with pytest.raises(ConfigurationError, match=re.escape("audio/wav")):
+        ask(respond(IMAGE_INPUT_RESPONSE), prompt)
+
+
+# A lone surrogate, as json.loads produces from "a\\ud800b", has no UTF-8 encoding.
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        Prompt(system="a\ud800b", content=()),
+        Prompt(system="You are a helpful assistant.", content=(TextPart(text="a\ud800b"),)),
+    ],
+    ids=["instructions", "text-part"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_prompt_that_cannot_be_encoded_is_unavailable_without_a_status(
+    ask: Ask, prompt: Prompt
+) -> None:
+    exchange = ask(respond(IMAGE_INPUT_RESPONSE), prompt)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_model_without_a_model_id_raises_when_it_is_built(ask: Ask) -> None:
+    with pytest.raises(ConfigurationError):
+        ask(respond(IMAGE_INPUT_RESPONSE), model="")
 
 
 def test_a_completed_reply_is_a_generation_of_its_text(ask: Ask) -> None:
@@ -551,6 +625,89 @@ def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
     exchange = ask(respond(body))
 
     assert exchange.outcome == Refused(explanation="final refusal text")
+
+
+# openapi.yaml, schemas OutputMessage and ReasoningTextContent: output items and content parts
+# are told apart by their type field. The SDK builds an object it cannot place as the first
+# variant of its union, so a part with no type, or of an unknown one, looks like output text.
+REASONING_TEXT = {"type": "reasoning_text", "text": "internal thought"}
+
+
+@pytest.mark.parametrize(
+    ("content", "text"),
+    [
+        ([{"text": "spoofed"}], ""),
+        ([REASONING_TEXT], ""),
+        ([OUTPUT_TEXT, REASONING_TEXT], BOARDWALK_DESCRIPTION),
+        ([REASONING_TEXT, OUTPUT_TEXT], BOARDWALK_DESCRIPTION),
+    ],
+    ids=[
+        "part-without-a-type",
+        "part-of-another-type",
+        "known-part-before-another-type",
+        "known-part-after-another-type",
+    ],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_completed_reply_with_a_part_of_an_unknown_type_is_truncated_with_the_known_text(
+    ask: Ask, content: list[dict[str, object]], text: str
+) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=content)])
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Truncated(text=text)
+
+
+NOT_A_MESSAGE = {"type": "future_item", "content": [replace(OUTPUT_TEXT, text="from an item")]}
+
+
+@pytest.mark.parametrize(
+    "item",
+    [NOT_A_MESSAGE, {"content": [replace(OUTPUT_TEXT, text="from an item")]}],
+    ids=["item-of-an-unknown-type", "item-without-a-type"],
+)
+@pytest.mark.xfail(strict=True)
+def test_an_output_item_that_is_not_a_message_is_not_read(
+    ask: Ask, item: dict[str, object]
+) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=[item, MESSAGE])
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Generation(text=BOARDWALK_DESCRIPTION)
+
+
+@pytest.mark.parametrize(
+    "output",
+    [[], [NOT_A_MESSAGE]],
+    ids=["no-output", "no-message"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_completed_reply_without_a_message_is_unavailable_without_a_status(
+    ask: Ask, output: list[dict[str, object]]
+) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=output)
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+# openapi.yaml, schema OutputMessage: a message's status is in_progress, completed or
+# incomplete.
+@pytest.mark.parametrize(
+    "status", ["incomplete", "in_progress", None], ids=["incomplete", "in-progress", "no-status"]
+)
+@pytest.mark.xfail(strict=True)
+def test_a_completed_reply_with_an_unfinished_message_is_truncated_with_its_text(
+    ask: Ask, status: str | None
+) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, status=status)])
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Truncated(text=BOARDWALK_DESCRIPTION)
 
 
 # The "response.incomplete" example has no output yet; the second case gives it the "Image
@@ -634,12 +791,17 @@ def test_a_failed_reply_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
-# openapi.yaml, schema ResponseErrorCode: the codes that name a policy.
+# openapi.yaml, schema ResponseErrorCode: the codes that name a policy; and the code "refusal".
 @pytest.mark.parametrize(
     "code",
-    ["bio_policy", "misalignment_policy_violation", "image_content_policy_violation"],
+    [
+        "bio_policy",
+        "misalignment_policy_violation",
+        "image_content_policy_violation",
+        pytest.param("refusal", marks=pytest.mark.xfail(strict=True)),
+    ],
 )
-def test_a_failed_reply_whose_code_names_a_policy_is_a_refusal_without_an_explanation(
+def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_explanation(
     ask: Ask, code: str
 ) -> None:
     body = replace(FAILED_RESPONSE, error={"code": code, "message": "Blocked."})
@@ -663,6 +825,23 @@ def test_a_failed_reply_whose_code_names_a_policy_is_a_refusal_without_an_explan
             IMAGE_INPUT_RESPONSE,
             output=[replace(MESSAGE, content=[replace(REFUSAL, refusal=5)])],
         ),
+        pytest.param(
+            replace(IMAGE_INPUT_RESPONSE, output=["nope"]), marks=pytest.mark.xfail(strict=True)
+        ),
+        pytest.param(
+            replace(IMAGE_INPUT_RESPONSE, output=[MESSAGE, 5]), marks=pytest.mark.xfail(strict=True)
+        ),
+        pytest.param(
+            replace(IMAGE_INPUT_RESPONSE, output=[None]), marks=pytest.mark.xfail(strict=True)
+        ),
+        pytest.param(
+            replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=["nope"])]),
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=[OUTPUT_TEXT, 5])]),
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "body-is-not-an-object",
@@ -670,6 +849,11 @@ def test_a_failed_reply_whose_code_names_a_policy_is_a_refusal_without_an_explan
         "content-is-not-a-list",
         "text-is-not-a-string",
         "refusal-is-not-a-string",
+        "output-element-is-a-string",
+        "output-element-is-a-number",
+        "output-element-is-null",
+        "content-element-is-a-string",
+        "content-element-is-a-number",
     ],
 )
 def test_a_reply_with_fields_of_the_wrong_type_is_unavailable_without_a_status(
@@ -688,6 +872,27 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
     assert exchange.outcome == Unavailable(status=None)
 
 
+# The SDK validates a reply against its models when the caller's client asks it to, and then
+# raises its own error for a reply that does not fit.
+@pytest.mark.parametrize("body", [[], "nope"], ids=["list", "string"])
+@pytest.mark.xfail(strict=True)
+def test_a_reply_the_client_rejects_on_validation_is_unavailable_without_a_status(
+    ask: Ask, body: object
+) -> None:
+    exchange = ask(respond(body), strict_validation=True)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_reply_that_is_not_json_on_validation_is_unavailable_without_a_status(ask: Ask) -> None:
+    reply = httpx2.Response(200, text="<html>502 Bad Gateway</html>")
+
+    exchange = ask(reply, strict_validation=True)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
 @pytest.mark.parametrize(
     "content",
     [b'{"id": ', b"", b'{"id": "\xff"}'],
@@ -697,6 +902,17 @@ def test_a_reply_labelled_json_that_cannot_be_decoded_is_unavailable_without_a_s
     ask: Ask, content: bytes
 ) -> None:
     reply = httpx2.Response(200, content=content, headers={"content-type": "application/json"})
+
+    exchange = ask(reply)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+def test_a_reply_whose_content_encoding_cannot_be_decoded_is_unavailable_without_a_status(
+    ask: Ask,
+) -> None:
+    headers = {"content-type": "application/json", "content-encoding": "gzip"}
+    reply = httpx2.Response(200, headers=headers, stream=httpx2.ByteStream(b"not gzip"))
 
     exchange = ask(reply)
 
@@ -728,6 +944,9 @@ def test_a_connection_that_fails_is_unavailable_without_a_status(
         (413, SERVER_OVERLOADED),
         (500, SERVER_OVERLOADED),
         (502, SERVER_OVERLOADED),
+        pytest.param(100, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
+        pytest.param(302, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
+        pytest.param(304, SERVER_OVERLOADED, marks=pytest.mark.xfail(strict=True)),
     ],
 )
 def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
@@ -777,11 +996,18 @@ def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(ask: Ask, co
     assert exchange.outcome == Unavailable(status=400)
 
 
-# openapi.yaml, schema ResponseErrorCode: image_content_policy_violation.
-def test_an_http_error_whose_code_names_a_policy_is_a_refusal_without_an_explanation(
-    ask: Ask,
+# openapi.yaml, schema ResponseErrorCode: image_content_policy_violation; and the code "refusal".
+@pytest.mark.parametrize(
+    "code",
+    [
+        "image_content_policy_violation",
+        pytest.param("refusal", marks=pytest.mark.xfail(strict=True)),
+    ],
+)
+def test_an_http_error_whose_code_names_a_refusal_is_a_refusal_without_an_explanation(
+    ask: Ask, code: str
 ) -> None:
-    body = reject("The image was blocked.", code="image_content_policy_violation")
+    body = reject("The image was blocked.", code=code)
 
     exchange = ask(respond(body, status=400))
 
@@ -795,6 +1021,9 @@ def test_an_http_error_whose_code_names_a_policy_is_a_refusal_without_an_explana
         (400, "Invalid service_tier argument: The requested service tier is not allowed."),
         (401, "Incorrect API key provided"),
         (403, "Country, region, or territory not supported"),
+        (404, "Incorrect API key provided"),
+        (422, "Incorrect API key provided"),
+        (499, "Incorrect API key provided"),
     ],
 )
 def test_a_rejected_request_raises_naming_only_its_status(
@@ -807,9 +1036,10 @@ def test_a_rejected_request_raises_naming_only_its_status(
     assert message not in str(raised.value)
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_rejected_request_does_not_carry_the_providers_error(ask: Ask) -> None:
     with pytest.raises(ConfigurationError) as raised:
         ask(respond(reject("Incorrect API key provided"), status=401))
 
     assert raised.value.__cause__ is None
-    assert raised.value.__suppress_context__
+    assert raised.value.__context__ is None
