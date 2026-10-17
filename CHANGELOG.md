@@ -31,6 +31,15 @@ minor version.
 - `Trajectory.from_open_responses` and `Action.from_open_responses`, which read
   the Open Responses format of 2026-04-24: a request into a trajectory, a
   response's output items into the action to rate.
+- `GenerativeModel` and `DecisionModel`, with `AsyncGenerativeModel` and
+  `AsyncDecisionModel`: the model a monitor asks, around the caller's function,
+  with `Prompt`, `Question`, `MediaTypes` and the outcomes `Generation`,
+  `Truncated`, `Refused`, `Unavailable` and `Decision`.
+- Adapters for the caller's SDK client, each behind its own extra:
+  `GenerativeModel.from_openai` (OpenAI's Responses API, `hyoshigi[openai]`),
+  `from_anthropic` (the Messages API, `hyoshigi[anthropic]`), `from_openrouter`
+  and `DecisionModel.from_openrouter` (`hyoshigi[openrouter]`), and
+  `DecisionModel.from_typesafe` (TypeSafe's Jev, `hyoshigi[typesafe]`).
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
   `image/*` in `MediaPart`.
