@@ -584,12 +584,7 @@ def test_each_image_type_the_api_supports_is_sent_by_url(
 # https://platform.claude.com/docs/en/api/messages, TextBlockParam: text has minLength 1. The API
 # answers a block of only whitespace with 400 invalid_request_error, "text content blocks must
 # contain non-whitespace text".
-SENDS_WHITESPACE = pytest.mark.xfail(strict=True, reason="whitespace-only text is sent")
-
-
-@pytest.mark.parametrize(
-    "blank", ["", pytest.param(" \n\t", marks=SENDS_WHITESPACE)], ids=["empty", "whitespace"]
-)
+@pytest.mark.parametrize("blank", ["", " \n\t"], ids=["empty", "whitespace"])
 def test_blank_text_is_not_sent(build_driver: BuildDriver, blank: str) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
@@ -602,11 +597,7 @@ def test_blank_text_is_not_sent(build_driver: BuildDriver, blank: str) -> None:
 
 @pytest.mark.parametrize(
     "content",
-    [
-        (TextPart(text=""),),
-        pytest.param((TextPart(text=" \n\t"),), marks=SENDS_WHITESPACE),
-        (),
-    ],
+    [(TextPart(text=""),), (TextPart(text=" \n\t"),), ()],
     ids=["empty-text", "whitespace-text", "no-content"],
 )
 def test_a_prompt_without_content_to_send_is_unavailable_before_any_request(

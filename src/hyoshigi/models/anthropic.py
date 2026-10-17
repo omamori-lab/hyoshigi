@@ -122,9 +122,10 @@ def build_request(
 ) -> MessageCreateParamsNonStreaming | None:
     """The prompt as one user message and a system prompt; None if there is nothing to send.
 
-    Empty text is left out, and the prompt is not sent if a part cannot be taken in its form.
+    Text with no non-whitespace character is left out, and the prompt is not sent if a part
+    cannot be taken in its form.
     """
-    blocks = collect([translate_part(part) for part in prompt.content if part != TextPart(text="")])
+    blocks = collect([translate_part(part) for part in prompt.content if not is_blank(part)])
     if not blocks:
         return None
     return {
@@ -133,6 +134,11 @@ def build_request(
         "system": prompt.system,
         "messages": [{"role": "user", "content": blocks}],
     }
+
+
+def is_blank(part: PromptPart) -> bool:
+    """Whether a part is text with no non-whitespace character, which the API rejects."""
+    return isinstance(part, TextPart) and not part.text.strip()
 
 
 def translate_part(part: PromptPart) -> Block | None:
