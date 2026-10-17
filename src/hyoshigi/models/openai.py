@@ -4,7 +4,6 @@ The API is OpenAI's Responses API reference, https://platform.openai.com/docs/ap
 """
 
 import json
-from dataclasses import dataclass
 from typing import TypedDict, cast
 
 try:
@@ -70,13 +69,6 @@ class RequestArguments(TypedDict):
     store: bool
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class Rejection:
-    """The API turned the request down for a mistake in it, with the HTTP status."""
-
-    status: int
-
-
 def build_arguments(
     prompt: Prompt, *, model: str, max_output_tokens: int | None
 ) -> RequestArguments | None:
@@ -107,13 +99,16 @@ def read_body(body: bytes) -> GenerationOutcome:
     return responses.read_reply(reply)
 
 
-def read_failure(error: Failure) -> Refused | Unavailable | Rejection:
+def read_failure(error: Failure) -> Refused | Unavailable:
     """The outcome of a request that failed after the client's retries.
 
     An error code that is a refusal or names a policy is a refusal. A 4xx status that is not
-    one the SDK retries, and whose code does not blame the prompt's content, is a rejection of
-    the request. Any other failure, a connection error, a timeout, a body that cannot be
-    decoded, a prompt that cannot be encoded, or another status, is unavailable.
+    one the SDK retries, and whose code does not blame the prompt's content, rejects the
+    request: it raises ConfigurationError naming only the status. This is called outside the
+    handler of the provider's error, so the provider's text, which can echo the prompt, is in
+    neither the raised error's cause nor its context. Any other failure, a connection error, a
+    timeout, a body that cannot be decoded, a prompt that cannot be encoded, or another status,
+    is unavailable.
     """
     match error:
         case APIStatusError(code=str(code)) if responses.names_refusal(code):
@@ -123,23 +118,10 @@ def read_failure(error: Failure) -> Refused | Unavailable | Rejection:
             and status not in _UNAVAILABLE_STATUSES
             and code not in _UNUSABLE_INPUT_CODES
         ):
-            return Rejection(status=status)
+            raise ConfigurationError(f"OpenAI rejected the request with HTTP status {status}")
         case APIStatusError(status_code=status):
             return Unavailable(status=status)
     return Unavailable()
-
-
-def settle(failure: Refused | Unavailable | Rejection) -> Refused | Unavailable:
-    """The failure as an outcome; a rejection raises ConfigurationError naming only its status.
-
-    The error is raised outside the handler of the provider's error, so the provider's text,
-    which can echo the prompt, is in neither its cause nor its context.
-    """
-    match failure:
-        case Rejection(status=status):
-            raise ConfigurationError(f"OpenAI rejected the request with HTTP status {status}")
-        case _:
-            return failure
 
 
 def build_model(
@@ -158,11 +140,11 @@ def build_model(
             return Unavailable()
         try:
             reply = client.responses.with_raw_response.create(**arguments)
-        except _FAILURES as error:
-            failure = read_failure(error)
+        except _FAILURES as caught:
+            error = caught
         else:
             return read_body(reply.content)
-        return settle(failure)
+        return read_failure(error)
 
     return GenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
 
@@ -183,10 +165,10 @@ def build_async_model(
             return Unavailable()
         try:
             reply = await client.responses.with_raw_response.create(**arguments)
-        except _FAILURES as error:
-            failure = read_failure(error)
+        except _FAILURES as caught:
+            error = caught
         else:
             return read_body(reply.content)
-        return settle(failure)
+        return read_failure(error)
 
     return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
