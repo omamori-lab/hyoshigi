@@ -628,21 +628,18 @@ def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
 
 
 # openapi.yaml, schemas OutputMessage and ReasoningTextContent: output items and content parts
-# are told apart by their type field. The SDK builds an object it cannot place as the first
-# variant of its union, so a part with no type, or of an unknown one, looks like output text.
+# are told apart by their type field.
 REASONING_TEXT = {"type": "reasoning_text", "text": "internal thought"}
 
 
 @pytest.mark.parametrize(
     ("content", "text"),
     [
-        ([{"text": "spoofed"}], ""),
         ([REASONING_TEXT], ""),
         ([OUTPUT_TEXT, REASONING_TEXT], BOARDWALK_DESCRIPTION),
         ([REASONING_TEXT, OUTPUT_TEXT], BOARDWALK_DESCRIPTION),
     ],
     ids=[
-        "part-without-a-type",
         "part-of-another-type",
         "known-part-before-another-type",
         "known-part-after-another-type",
@@ -661,15 +658,8 @@ def test_a_completed_reply_with_a_part_of_an_unknown_type_is_truncated_with_the_
 NOT_A_MESSAGE = {"type": "future_item", "content": [replace(OUTPUT_TEXT, text="from an item")]}
 
 
-@pytest.mark.parametrize(
-    "item",
-    [NOT_A_MESSAGE, {"content": [replace(OUTPUT_TEXT, text="from an item")]}],
-    ids=["item-of-an-unknown-type", "item-without-a-type"],
-)
-def test_an_output_item_that_is_not_a_message_is_not_read(
-    ask: Ask, item: dict[str, object]
-) -> None:
-    body = replace(IMAGE_INPUT_RESPONSE, output=[item, MESSAGE])
+def test_an_output_item_that_is_not_a_message_is_not_read(ask: Ask) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=[NOT_A_MESSAGE, MESSAGE])
 
     exchange = ask(respond(body))
 
@@ -826,6 +816,8 @@ def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_expla
         replace(IMAGE_INPUT_RESPONSE, output=[None]),
         replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=["nope"])]),
         replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=[OUTPUT_TEXT, 5])]),
+        replace(IMAGE_INPUT_RESPONSE, output=[{"content": [OUTPUT_TEXT]}, MESSAGE]),
+        replace(IMAGE_INPUT_RESPONSE, output=[replace(MESSAGE, content=[{"text": "spoofed"}])]),
     ],
     ids=[
         "body-is-not-an-object",
@@ -838,6 +830,8 @@ def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_expla
         "output-element-is-null",
         "content-element-is-a-string",
         "content-element-is-a-number",
+        "output-element-without-a-type",
+        "content-element-without-a-type",
     ],
 )
 def test_a_reply_with_fields_of_the_wrong_type_is_unavailable_without_a_status(
