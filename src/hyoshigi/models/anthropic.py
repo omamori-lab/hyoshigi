@@ -35,6 +35,8 @@ from hyoshigi.models.model import (
     Refused,
     Truncated,
     Unavailable,
+    check_name,
+    collect,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
@@ -48,8 +50,6 @@ _FAILURES = (APIError, JSONDecodeError, UnicodeError)
 # The client errors a retry or a smaller prompt can clear: the SDK retries 408, 409 and 429, and
 # the prompt's content can make a request too large (413), so these fail closed.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
-
-_EMPTY_TEXT = TextPart(text="")
 
 
 def build_model(
@@ -98,8 +98,7 @@ def build_async_model(
 
 def check_arguments(*, model: str, max_tokens: int) -> None:
     """Raise ConfigurationError unless there is a model id and room for a token."""
-    if not model:
-        raise ConfigurationError(f"model must be a model id, not {model!r}")
+    check_name(model)
     if max_tokens < 1:
         raise ConfigurationError(f"max_tokens must be at least 1, not {max_tokens}")
 
@@ -111,9 +110,8 @@ def build_request(
 
     Empty text is left out, and the prompt is not sent if a part cannot be taken in its form.
     """
-    translated = [translate_part(part) for part in prompt.content if part != _EMPTY_TEXT]
-    blocks = [block for block in translated if block is not None]
-    if not blocks or len(blocks) < len(translated):
+    blocks = collect([translate_part(part) for part in prompt.content if part != TextPart(text="")])
+    if not blocks:
         return None
     return {
         "model": model,
