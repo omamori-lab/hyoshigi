@@ -33,6 +33,7 @@ from hyoshigi.models.model import (
     Refused,
     Unavailable,
     check_name,
+    check_perceives,
     collect,
 )
 from hyoshigi.trajectory.json_data import JSON
@@ -236,9 +237,11 @@ def build_model(
     """A model on the Responses API, through the caller's client.
 
     The API is stateless and the SDK sends store false, so no stored response holds the
-    monitored agent's content.
+    monitored agent's content. Raise ConfigurationError if the model id is empty or perceives
+    names media the API cannot carry.
     """
     check_name(model)
+    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
     limit = UNSET if max_output_tokens is None else max_output_tokens
 
     def generate(prompt: Prompt) -> GenerationOutcome:
@@ -263,6 +266,7 @@ def build_async_model(
 ) -> AsyncGenerativeModel:
     """A model on the Responses API, through the caller's client, awaited."""
     check_name(model)
+    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
     limit = UNSET if max_output_tokens is None else max_output_tokens
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
@@ -286,9 +290,11 @@ def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaType
     """A decision model on the Decisions API, through the caller's client.
 
     The question is one noul question, whose instructions are the statement; the probability
-    of its answer is the decision's.
+    of its answer is the decision's. Raise ConfigurationError if the model id is empty or
+    perceives names media the API cannot read.
     """
     check_name(model)
+    check_perceives(perceives, carries=DECISION_IMAGES)
 
     def decide(question: Question) -> DecisionOutcome:
         state = collect([build_state_item(part) for part in question.state])
@@ -314,6 +320,7 @@ def build_async_decision_model(
 ) -> AsyncDecisionModel:
     """A decision model on the Decisions API, through the caller's client, awaited."""
     check_name(model)
+    check_perceives(perceives, carries=DECISION_IMAGES)
 
     async def decide(question: Question) -> DecisionOutcome:
         state = collect([build_state_item(part) for part in question.state])

@@ -36,6 +36,7 @@ from hyoshigi.models.model import (
     Truncated,
     Unavailable,
     check_name,
+    check_perceives,
     collect,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
@@ -51,15 +52,23 @@ _FAILURES = (APIError, JSONDecodeError, UnicodeError)
 # the prompt's content can make a request too large (413), so these fail closed.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
 
+# The media translate_url and translate_data send: the image types, PDF and plain text documents
+# of https://platform.claude.com/docs/en/build-with-claude/vision, pdf-support and citations.
+CARRIED_MEDIA = MediaTypes(
+    "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain"
+)
+
 
 def build_model(
     client: Anthropic, *, model: str, max_tokens: int, perceives: MediaTypes
 ) -> GenerativeModel:
     """A model on the Messages API, through the caller's client.
 
-    A max_tokens the SDK will not send without streaming raises the SDK's own ValueError.
+    Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
+    media the API cannot carry. A max_tokens the SDK will not send without streaming raises the
+    SDK's own ValueError.
     """
-    check_arguments(model=model, max_tokens=max_tokens)
+    check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_request(prompt, model=model, max_tokens=max_tokens)
@@ -79,9 +88,11 @@ def build_async_model(
 ) -> AsyncGenerativeModel:
     """A model on the Messages API, through the caller's async client.
 
-    A max_tokens the SDK will not send without streaming raises the SDK's own ValueError.
+    Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
+    media the API cannot carry. A max_tokens the SDK will not send without streaming raises the
+    SDK's own ValueError.
     """
-    check_arguments(model=model, max_tokens=max_tokens)
+    check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_request(prompt, model=model, max_tokens=max_tokens)
@@ -96,11 +107,14 @@ def build_async_model(
     return AsyncGenerativeModel(name=f"anthropic:{model}", generate=generate, perceives=perceives)
 
 
-def check_arguments(*, model: str, max_tokens: int) -> None:
-    """Raise ConfigurationError unless there is a model id and room for a token."""
+def check_arguments(*, model: str, max_tokens: int, perceives: MediaTypes) -> None:
+    """Raise ConfigurationError unless there is a model id, room for a token and perceives
+    names only media the API carries.
+    """
     check_name(model)
     if max_tokens < 1:
         raise ConfigurationError(f"max_tokens must be at least 1, not {max_tokens}")
+    check_perceives(perceives, carries=CARRIED_MEDIA)
 
 
 def build_request(

@@ -34,6 +34,7 @@ from hyoshigi.models.model import (
     Question,
     Unavailable,
     check_name,
+    check_perceives,
     collect,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
@@ -42,6 +43,8 @@ type StateItem = str | Image
 
 QUESTION_KEY = "statement"
 IMAGE_MEDIA_TYPES = frozenset({"image/png", "image/jpeg", "image/*"})
+# https://docs.typesafe.ai/images.md, the limits table: PNG or JPEG.
+CARRIED_MEDIA = MediaTypes("image/png", "image/jpeg")
 IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 # https://docs.typesafe.ai/images.md, "Turning on images".
 IMAGE_HEADERS = {"TypeSafe-Danger-Zone-Images": "true"}
@@ -131,9 +134,11 @@ def build_decision_model(
     """A decision model on TypeSafe's API, through the caller's client.
 
     Declaring image media types in ``perceives`` opts in to sending
-    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image.
+    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image. Raise
+    ConfigurationError if the model id is empty or perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
+    check_perceives(perceives, carries=CARRIED_MEDIA)
 
     def decide(question: Question) -> DecisionOutcome:
         state = collect([translate_part(part) for part in question.state])
@@ -161,9 +166,11 @@ def build_async_decision_model(
     """A decision model on TypeSafe's API, through the caller's async client.
 
     Declaring image media types in ``perceives`` opts in to sending
-    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image.
+    ``TypeSafe-Danger-Zone-Images: true`` on requests that contain an image. Raise
+    ConfigurationError if the model id is empty or perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
+    check_perceives(perceives, carries=CARRIED_MEDIA)
 
     async def decide(question: Question) -> DecisionOutcome:
         state = collect([translate_part(part) for part in question.state])

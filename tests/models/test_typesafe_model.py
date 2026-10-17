@@ -153,7 +153,6 @@ def test_the_model_carries_its_typesafe_name_with_its_media_types(
     ],
     ids=["image-range", "image-type-outside-the-two", "pdf", "the-first-of-those-it-cannot-carry"],
 )
-@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
 def test_a_model_that_perceives_media_typesafe_cannot_carry_raises_naming_it_when_built(
     build_model: ModelBuilder, patterns: tuple[str, ...], named: str
 ) -> None:

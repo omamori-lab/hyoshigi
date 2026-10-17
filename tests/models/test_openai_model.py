@@ -431,7 +431,6 @@ def test_a_model_perceives_the_media_it_was_given(ask: Ask, perceives: MediaType
     ],
     ids=["range-of-another-type", "another-type", "the-first-of-those-it-cannot-carry"],
 )
-@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
 def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
     ask: Ask, patterns: tuple[str, ...], named: str
 ) -> None:

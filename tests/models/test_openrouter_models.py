@@ -395,7 +395,6 @@ def test_a_model_is_named_for_the_provider_and_the_model_id(
     ],
     ids=["range-of-another-type", "another-type", "the-first-of-those-it-cannot-carry"],
 )
-@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
 def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
     build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
 ) -> None:
@@ -434,7 +433,6 @@ def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_nami
         "the-first-of-those-it-cannot-carry",
     ],
 )
-@pytest.mark.xfail(strict=True, reason="perceives is not checked when the model is built")
 def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming_it_when_built(
     build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
 ) -> None:
