@@ -197,6 +197,14 @@ def build_page(status: int) -> Respond:
     return lambda request: httpx.Response(status, text="<html>Gateway page</html>")
 
 
+def build_truncation() -> Respond:
+    return lambda request: httpx.Response(
+        200,
+        content=b'{"id": "resp_abc123", "output": [',
+        headers={"content-type": "application/json"},
+    )
+
+
 def build_failure(error: Exception) -> Respond:
     def fail(request: httpx.Request) -> httpx.Response:
         raise error
@@ -261,7 +269,6 @@ def ask(request: pytest.FixtureRequest) -> Ask:
     return request.param
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "name"),
     [
@@ -302,7 +309,6 @@ def test_a_model_is_named_for_the_provider_and_the_model_id(
     assert (model.name, model.perceives) == (name, MediaTypes("image/*"))
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_published_completed_response_is_a_generation(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
@@ -313,7 +319,6 @@ def test_the_published_completed_response_is_a_generation(
     assert outcome == Generation(text=JOKE)
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_prompt_becomes_instructions_and_one_user_message(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
@@ -341,7 +346,6 @@ def test_the_prompt_becomes_instructions_and_one_user_message(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("max_output_tokens", "sent"), [(None, [{}]), (256, [{"max_output_tokens": 256}])]
 )
@@ -355,7 +359,6 @@ def test_the_output_limit_is_sent_only_when_given(
     assert wire.read_bodies("max_output_tokens") == sent
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("part", "content"),
     [
@@ -368,6 +371,14 @@ def test_the_output_limit_is_sent_only_when_given(
             },
         ),
         (PNG, {"type": "input_image", "detail": "auto", "image_url": PNG_URL}),
+        (
+            MediaPart(media_type="IMAGE/PNG", url="https://example.com/image.png"),
+            {
+                "type": "input_image",
+                "detail": "auto",
+                "image_url": "https://example.com/image.png",
+            },
+        ),
         (
             MediaPart(media_type="application/pdf", url="https://bitcoin.org/bitcoin.pdf"),
             {"type": "input_file", "file_url": "https://bitcoin.org/bitcoin.pdf"},
@@ -388,8 +399,24 @@ def test_the_output_limit_is_sent_only_when_given(
                 "filename": "attachment.txt",
             },
         ),
+        (
+            MediaPart(media_type="application/x-unlisted", data=b"ls"),
+            {
+                "type": "input_file",
+                "file_data": "data:application/x-unlisted;base64,bHM=",
+                "filename": "attachment",
+            },
+        ),
     ],
-    ids=["image-by-url", "image-bytes", "file-by-url", "pdf-bytes", "text-bytes"],
+    ids=[
+        "image-by-url",
+        "image-bytes",
+        "uppercase-type",
+        "file-by-url",
+        "pdf-bytes",
+        "text-bytes",
+        "unknown-type-bytes",
+    ],
 )
 def test_media_becomes_the_responses_api_s_image_and_file_content(
     generate: Callable[..., GenerationOutcome], part: MediaPart, content: JSON
@@ -412,7 +439,6 @@ def test_media_becomes_the_responses_api_s_image_and_file_content(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "part",
     [
@@ -432,7 +458,6 @@ def test_media_the_responses_api_cannot_carry_raises_naming_its_type(
         generate(client, prompt)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("response", "outcome"),
     [
@@ -533,7 +558,6 @@ def test_a_response_the_provider_blocks_is_refused(
     assert outcome == Refused()
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("answer", "probability"),
     [
@@ -554,7 +578,6 @@ def test_the_noul_answer_is_the_probability_the_statement_holds(
     assert outcome == Decision(probability=probability, confidence=None)
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_question_becomes_one_noul_question_about_the_state(
     decide: Callable[..., DecisionOutcome],
 ) -> None:
@@ -574,7 +597,6 @@ def test_the_question_becomes_one_noul_question_about_the_state(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("part", "item"),
     [
@@ -610,7 +632,6 @@ def test_an_image_becomes_an_image_url_object_in_the_state(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "part",
     [
@@ -631,7 +652,6 @@ def test_media_the_decisions_api_cannot_carry_raises_naming_its_type(
         decide(client, question)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "answers",
     [
@@ -659,7 +679,6 @@ def test_an_answer_that_is_not_a_probability_is_unavailable_without_a_status(
     assert outcome == Unavailable()
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 502, 503, 524, 529])
 def test_a_status_that_means_try_later_is_unavailable_with_that_status(
     ask: Ask, status: int
@@ -671,7 +690,6 @@ def test_a_status_that_means_try_later_is_unavailable_with_that_status(
     assert outcome == Unavailable(status=status)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
     client = Wire(build_page(502)).build_client()
 
@@ -680,7 +698,6 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
     assert outcome == Unavailable(status=502)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("status", "fields"),
     [
@@ -712,7 +729,6 @@ def test_any_other_rejection_raises_naming_only_the_status(
     ) == (True, False, True)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask) -> None:
     client = Wire(build_page(403)).build_client()
 
@@ -742,7 +758,6 @@ def test_a_request_the_provider_blocks_is_refused_without_an_explanation(
     assert outcome == Refused()
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("status", "error_type"),
     [
@@ -766,7 +781,6 @@ def test_input_the_provider_rejects_is_unavailable_with_the_status(
     assert outcome == Unavailable(status=status)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "error",
     [
@@ -784,11 +798,10 @@ def test_a_connection_failure_is_unavailable_without_a_status(ask: Ask, error: E
     assert outcome == Unavailable()
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "respond",
-    [build_reply(200, {}), build_page(200)],
-    ids=["json-of-no-known-shape", "gateway-page"],
+    [build_reply(200, {}), build_page(200), build_truncation()],
+    ids=["json-of-no-known-shape", "gateway-page", "truncated-json"],
 )
 def test_a_reply_that_cannot_be_read_is_unavailable_without_a_status(
     ask: Ask, respond: Respond
