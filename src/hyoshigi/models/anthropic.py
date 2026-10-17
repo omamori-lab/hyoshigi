@@ -7,7 +7,7 @@ from base64 import b64encode
 from json import JSONDecodeError
 
 try:
-    from anthropic import Anthropic, APIConnectionError, APIStatusError, AsyncAnthropic
+    from anthropic import Anthropic, APIError, APIStatusError, AsyncAnthropic, BaseModel
     from anthropic.types import (
         ContentBlock,
         DocumentBlockParam,
@@ -39,10 +39,17 @@ from hyoshigi.models.model import (
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Block = TextBlockParam | ImageBlockParam | DocumentBlockParam
+type Failure = APIError | JSONDecodeError | UnicodeError
 
-# The statuses the SDK retries other than 5xx, and 413: the prompt's content makes a request
-# too large, so the error fails closed instead of raising.
+# What the client raises instead of a reply: the SDK's errors, a body that is not JSON or not
+# UTF-8, and text it cannot encode.
+_FAILURES = (APIError, JSONDecodeError, UnicodeError)
+
+# The client errors a retry or a smaller prompt can clear: the SDK retries 408, 409 and 429, and
+# the prompt's content can make a request too large (413), so these fail closed.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
+
+_EMPTY_TEXT = TextPart(text="")
 
 
 def build_model(
@@ -52,16 +59,17 @@ def build_model(
 
     A max_tokens the SDK will not send without streaming raises the SDK's own ValueError.
     """
+    check_arguments(model=model, max_tokens=max_tokens)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_request(prompt, model=model, max_tokens=max_tokens)
         if request is None:
             return Unavailable()
         try:
-            message = client.messages.create(**request)
-        except (APIConnectionError, APIStatusError, JSONDecodeError) as error:
-            return read_failure(error)
-        return read_message(message)
+            reply: Message | Failure = client.messages.create(**request)
+        except _FAILURES as error:
+            reply = error
+        return read_reply(reply)
 
     return GenerativeModel(name=f"anthropic:{model}", generate=generate, perceives=perceives)
 
@@ -73,27 +81,39 @@ def build_async_model(
 
     A max_tokens the SDK will not send without streaming raises the SDK's own ValueError.
     """
+    check_arguments(model=model, max_tokens=max_tokens)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_request(prompt, model=model, max_tokens=max_tokens)
         if request is None:
             return Unavailable()
         try:
-            message = await client.messages.create(**request)
-        except (APIConnectionError, APIStatusError, JSONDecodeError) as error:
-            return read_failure(error)
-        return read_message(message)
+            reply: Message | Failure = await client.messages.create(**request)
+        except _FAILURES as error:
+            reply = error
+        return read_reply(reply)
 
     return AsyncGenerativeModel(name=f"anthropic:{model}", generate=generate, perceives=perceives)
+
+
+def check_arguments(*, model: str, max_tokens: int) -> None:
+    """Raise ConfigurationError unless there is a model id and room for a token."""
+    if not model:
+        raise ConfigurationError(f"model must be a model id, not {model!r}")
+    if max_tokens < 1:
+        raise ConfigurationError(f"max_tokens must be at least 1, not {max_tokens}")
 
 
 def build_request(
     prompt: Prompt, *, model: str, max_tokens: int
 ) -> MessageCreateParamsNonStreaming | None:
-    """The prompt as one user message and a system prompt; None if a part cannot be sent."""
-    translated = [translate_part(part) for part in prompt.content]
+    """The prompt as one user message and a system prompt; None if there is nothing to send.
+
+    Empty text is left out, and the prompt is not sent if a part cannot be taken in its form.
+    """
+    translated = [translate_part(part) for part in prompt.content if part != _EMPTY_TEXT]
     blocks = [block for block in translated if block is not None]
-    if len(blocks) < len(translated):
+    if not blocks or len(blocks) < len(translated):
         return None
     return {
         "model": model,
@@ -161,11 +181,32 @@ def translate_text(data: bytes) -> DocumentBlockParam | None:
     }
 
 
-def read_message(message: Message) -> GenerationOutcome:
-    """The outcome of a reply: only a turn that ended on its own is complete.
+def read_reply(reply: Message | Failure) -> GenerationOutcome:
+    """The outcome of a reply, or of the failure that stood in for it.
 
-    Any other stop reason, including one the API adds later, is truncated. A reply that is
-    not a message with readable content is unavailable.
+    A client error other than 408, 409, 413 and 429 raises ConfigurationError naming the
+    status only, since the API's text can quote the prompt. It is raised here, outside the
+    handler of the SDK's error, so that error is not on the raised one's chain. A reply that is
+    not an assistant's message, and any other failure, is unavailable.
+    """
+    match reply:
+        case Message(type="message", role="assistant"):
+            return read_message(reply)
+        case APIStatusError(status_code=status) if (
+            400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
+        ):
+            raise ConfigurationError(f"the Messages API answered HTTP {status}")
+        case APIStatusError(status_code=status):
+            return Unavailable(status=status)
+        case _:
+            return Unavailable()
+
+
+def read_message(message: Message) -> GenerationOutcome:
+    """The outcome of an assistant's message: only a turn that ended on its own is complete.
+
+    Any other stop reason, including one the API adds later, is truncated. A message without
+    readable content is unavailable.
     """
     match message:
         case Message(
@@ -193,10 +234,11 @@ def read_content(stop_reason: str | None, *, blocks: list[ContentBlock]) -> Gene
 
 
 def read_text(blocks: list[ContentBlock]) -> str | None:
-    """The text blocks of a reply, joined; None if one has no text.
+    """The text blocks of a reply, joined; None if an element is not a block with a type or a
+    text block has no text.
 
-    Thinking and tool use are not part of a reply's text. The SDK reads a block of a type it
-    does not know as a text block of that type.
+    Thinking, tool use and a block type the API adds later are not part of a reply's text. The
+    SDK reads a block of a type it does not know as a text block of that type.
     """
     texts: list[str] = []
     for block in blocks:
@@ -205,19 +247,8 @@ def read_text(blocks: list[ContentBlock]) -> str | None:
                 texts.append(text)
             case TextBlock(type="text"):
                 return None
+            case BaseModel(type=str()):
+                pass
+            case _:
+                return None
     return "".join(texts)
-
-
-def read_failure(error: APIConnectionError | APIStatusError | JSONDecodeError) -> Unavailable:
-    """Unavailable for a connection failure, a reply that is not JSON and a status a retry or a
-    smaller prompt can clear; ConfigurationError for any other status.
-
-    The error names the HTTP status only: the API's text can quote the prompt.
-    """
-    match error:
-        case APIStatusError(status_code=status) if status in _UNAVAILABLE_STATUSES or status >= 500:
-            return Unavailable(status=status)
-        case APIStatusError(status_code=status):
-            raise ConfigurationError(f"the Messages API answered HTTP {status}") from None
-        case _:
-            return Unavailable(status=None)

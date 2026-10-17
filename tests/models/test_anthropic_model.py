@@ -27,8 +27,6 @@ from hyoshigi import (
     Unavailable,
 )
 
-NOT_YET = pytest.mark.xfail(strict=True, reason="the Anthropic model has not been changed yet")
-
 type Respond = Callable[[httpx2.Request], httpx2.Response]
 
 MODEL_ID = "claude-opus-5-5"
@@ -402,7 +400,6 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
     assert model.perceives == PERCEIVES
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("model", "max_tokens"),
     [("", MAX_TOKENS), (MODEL_ID, 0), (MODEL_ID, -1)],
@@ -552,7 +549,6 @@ def test_each_image_type_the_api_supports_is_sent_by_url(
     assert wire.requests == [build_request([{"type": "image", "source": source}])]
 
 
-@NOT_YET
 def test_empty_text_is_not_sent(build_driver: BuildDriver) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
@@ -563,7 +559,6 @@ def test_empty_text_is_not_sent(build_driver: BuildDriver) -> None:
     assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
 
 
-@NOT_YET
 @pytest.mark.parametrize("content", [(TextPart(text=""),), ()], ids=["empty-text", "no-content"])
 def test_a_prompt_without_content_to_send_is_unavailable_before_any_request(
     build_driver: BuildDriver, content: tuple[TextPart, ...]
@@ -577,7 +572,6 @@ def test_a_prompt_without_content_to_send_is_unavailable_before_any_request(
 
 
 # json.loads gives a lone surrogate for "\ud800" in a tool's output.
-@NOT_YET
 @pytest.mark.parametrize(
     "prompt",
     [
@@ -783,31 +777,20 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
         ),
         pytest.param(
             {**STOP_REASONS_RESPONSE, "content": ["not a block"]},
-            marks=NOT_YET,
             id="element-is-not-a-block",
         ),
         pytest.param(
             {**STOP_REASONS_RESPONSE, "content": [{"text": "missing type"}]},
-            marks=NOT_YET,
             id="block-without-type",
         ),
         pytest.param(
             {**STOP_REASONS_RESPONSE, "content": [{"type": 123, "text": "bad type"}]},
-            marks=NOT_YET,
             id="block-type-is-not-a-string",
         ),
-        pytest.param(
-            {"stop_reason": "end_turn", "content": []}, marks=NOT_YET, id="no-type-or-role"
-        ),
-        pytest.param(
-            {**STOP_REASONS_RESPONSE, "type": "error"}, marks=NOT_YET, id="type-is-not-message"
-        ),
-        pytest.param(
-            {**STOP_REASONS_RESPONSE, "role": "user"}, marks=NOT_YET, id="role-is-not-assistant"
-        ),
-        pytest.param(
-            {**REFUSAL_RESPONSE, "type": "error"}, marks=NOT_YET, id="refusal-is-not-a-message"
-        ),
+        pytest.param({"stop_reason": "end_turn", "content": []}, id="no-type-or-role"),
+        pytest.param({**STOP_REASONS_RESPONSE, "type": "error"}, id="type-is-not-message"),
+        pytest.param({**STOP_REASONS_RESPONSE, "role": "user"}, id="role-is-not-assistant"),
+        pytest.param({**REFUSAL_RESPONSE, "type": "error"}, id="refusal-is-not-a-message"),
     ],
 )
 def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
@@ -820,7 +803,6 @@ def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
-@NOT_YET
 def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
     build_driver: BuildDriver,
 ) -> None:
@@ -838,8 +820,8 @@ def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
 @pytest.mark.parametrize(
     "status",
     [
-        pytest.param(301, marks=NOT_YET),
-        pytest.param(304, marks=NOT_YET),
+        301,
+        304,
         408,
         409,
         413,
@@ -868,7 +850,7 @@ def test_a_status_that_is_not_a_configuration_error_is_unavailable_with_its_stat
         pytest.param(time_out, id="timeout"),
         pytest.param(send_html, id="html"),
         pytest.param(send_cut_off_json, id="cut-off-json"),
-        pytest.param(send_invalid_utf8, marks=NOT_YET, id="invalid-utf-8"),
+        pytest.param(send_invalid_utf8, id="invalid-utf-8"),
         pytest.param(send_corrupt_gzip, id="corrupt-gzip"),
     ],
 )
@@ -892,7 +874,6 @@ def test_any_other_error_status_raises_naming_the_status(
         model.generate(HELLO)
 
 
-@NOT_YET
 def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     build_driver: BuildDriver,
 ) -> None:
