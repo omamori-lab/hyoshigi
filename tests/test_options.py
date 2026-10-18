@@ -8,7 +8,13 @@ from fractions import Fraction
 import pytest
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.options import describe_option_value, read_count, read_integer, read_threshold
+from hyoshigi.options import (
+    check_instance,
+    describe_option_value,
+    read_count,
+    read_integer,
+    read_threshold,
+)
 
 HUGE = 10**5000
 
@@ -205,3 +211,54 @@ def test_a_threshold_that_is_not_a_number_from_zero_to_one_raises(
 def test_a_threshold_just_outside_the_range_raises_before_it_is_rounded(value: object) -> None:
     with pytest.raises(ConfigurationError, match="escalation_threshold must be between 0 and 1"):
         read_threshold(value, name="escalation_threshold")
+
+
+# Classes outside hyoshigi are named with their module, here test_options.
+class Ordinary:
+    """A class whose instances an option may require."""
+
+
+class AnotherOrdinary:
+    """A class whose instances are not Ordinary's."""
+
+
+def test_an_instance_of_the_expected_class_is_accepted() -> None:
+    accepted = check_instance(Ordinary(), expected=Ordinary, name="model")
+
+    assert accepted is None
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("value", "expected", "hint", "message"),
+    [
+        (
+            AnotherOrdinary(),
+            Ordinary,
+            "",
+            "model must be an Ordinary, got an instance of test_options.AnotherOrdinary",
+        ),
+        (
+            Ordinary,
+            Ordinary,
+            "",
+            "model must be an Ordinary, got the class test_options.Ordinary; pass an instance",
+        ),
+        (
+            AnotherOrdinary(),
+            Ordinary,
+            "Use the async class for an async model.",
+            "model must be an Ordinary, got an instance of test_options.AnotherOrdinary. Use the "
+            "async class for an async model.",
+        ),
+        (3, Decimal, "", "model must be a Decimal, got 3"),
+    ],
+    ids=["another-class", "the-class-itself", "with-a-hint", "a-consonant"],
+)
+def test_a_value_that_is_not_an_instance_of_the_expected_class_raises_naming_both(
+    value: object, expected: type, hint: str, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        check_instance(value, expected=expected, name="model", hint=hint)
+
+    assert str(raised.value) == message

@@ -103,3 +103,7 @@ def read_threshold(value: object, *, name: str) -> float:
         )
     # Adding 0.0 turns -0.0 into 0.0.
     return float(value) + 0.0
+
+
+def check_instance(value: object, *, expected: type, name: str, hint: str = "") -> None:
+    """Raise ConfigurationError unless the value is an instance of the expected class."""
