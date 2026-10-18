@@ -93,6 +93,30 @@ def test_a_prompt_that_is_not_a_format_string_raises_naming_its_part(
         MonitorPrompt(system=system, request=request_text)
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("system", "request_text", "message"),
+    [
+        (123, REQUEST, "system must be a str, got 123"),
+        (b"Rate it.", REQUEST, "system must be a str, got an instance of bytes"),
+        ("Rate it.", None, "request must be a str, got None"),
+        (
+            "Rate it.",
+            ["{trajectory}", "{proposed_action}"],
+            "request must be a str, got an instance of list",
+        ),
+    ],
+    ids=["integer-system", "bytes-system", "none-request", "list-request"],
+)
+def test_a_prompt_whose_system_text_or_request_is_not_a_string_raises_naming_it(
+    system: object, request_text: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        MonitorPrompt(system=system, request=request_text)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
+
+
 def test_building_places_the_rendering_among_the_formatted_text() -> None:
     prompt = MonitorPrompt(
         system="Score from {lowest_score} to {highest_score}.",
