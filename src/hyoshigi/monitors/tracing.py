@@ -10,14 +10,16 @@ conventions for generative AI, docs/gen-ai/gen-ai-events.md, in development), an
 score failed closed, with its cause's class when it did. Langfuse's default export filter keeps
 a span with a gen_ai.* attribute and drops one without (langfuse 5.0.2,
 langfuse/_client/span_filter.py, is_default_export_span). An exception raised during the
-rating is recorded on the span and raised on. Without the package, a rating opens no span.
+rating marks the span as an error by its type alone, since its message can quote the request,
+and is raised on. Without the package, a rating opens no span.
 """
 
 # Tracer and Span are imported only to type, since opentelemetry-api is an optional extra.
 from __future__ import annotations
 
 import functools
-from contextlib import AbstractContextManager, nullcontext
+from collections.abc import Generator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from typing import TYPE_CHECKING, assert_never
 
 from hyoshigi.monitors.score import (
@@ -60,7 +62,37 @@ def trace_rating(monitor: object) -> AbstractContextManager[Span | None]:
     tracer = find_tracer()
     if tracer is None:
         return nullcontext()
-    return tracer.start_as_current_span(f"rate {type(monitor).__name__}")
+    return _open_span(
+        tracer,
+        name=f"rate {type(monitor).__name__}",
+    )
+
+
+@contextmanager
+def _open_span(
+    tracer: Tracer,
+    *,
+    name: str,
+) -> Generator[Span]:
+    """Open the span as the current one, and mark it as an error by the exception's type alone."""
+    # Imported here because opentelemetry-api is the optional extra hyoshigi[opentelemetry].
+    from opentelemetry.trace import Status, StatusCode
+
+    with tracer.start_as_current_span(
+        name,
+        record_exception=False,
+        set_status_on_exception=False,
+    ) as span:
+        try:
+            yield span
+        except Exception as error:
+            span.set_status(
+                Status(
+                    StatusCode.ERROR,
+                    type(error).__name__,
+                ),
+            )
+            raise
 
 
 def record_rating(

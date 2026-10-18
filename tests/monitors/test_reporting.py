@@ -856,7 +856,6 @@ parent = NonRecordingSpan(
 """
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "script",
     [

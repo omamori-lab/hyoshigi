@@ -91,7 +91,11 @@ class ReportedMonitor(Monitor):
                 ),
                 span=span,
             )
-        context = read_sendable_context(span)
+            recorded = span is not None and span.is_recording()
+        context = read_sendable_context(
+            span,
+            recorded=recorded,
+        )
         if context is not None:
             send_reports(
                 score,
@@ -147,7 +151,11 @@ class AsyncReportedMonitor(AsyncMonitor):
                 ),
                 span=span,
             )
-        context = read_sendable_context(span)
+            recorded = span is not None and span.is_recording()
+        context = read_sendable_context(
+            span,
+            recorded=recorded,
+        )
         if context is not None:
             await await_reports(
                 score,
@@ -192,23 +200,35 @@ def _check_tracing(monitor: ReportedMonitor | AsyncReportedMonitor) -> None:
         )
 
 
-def read_sendable_context(span: Span | None) -> SpanContext | None:
-    """The span's context when a backend can hold the span, valid and sampled; otherwise log
-    that nothing was sent and return None.
+def read_sendable_context(
+    span: Span | None,
+    *,
+    recorded: bool,
+) -> SpanContext | None:
+    """The span's context when a backend can hold the span; otherwise log that nothing was sent.
 
-    An invalid context means no tracer provider records spans, which is a misconfiguration;
-    an unsampled one is a sampler's decision.
+    An unsampled span is a sampler's decision. Any other span that was not recorded means no
+    tracer provider is set up, which is a misconfiguration, even when the span carries the
+    sampled context of a parent from another process.
     """
-    context = None if span is None else span.get_span_context()
-    if context is None or not context.is_valid:
+    context = _read_valid_context(span)
+    if context is not None and not context.trace_flags.sampled:
+        logger.debug("No report was sent: the rating's span is not sampled.")
+        return None
+    if context is None or not recorded:
         logger.warning(
             "No report was sent: no OpenTelemetry tracer provider recorded the rating's span.",
         )
         return None
-    if not context.trace_flags.sampled:
-        logger.debug("No report was sent: the rating's span is not sampled.")
-        return None
     return context
+
+
+def _read_valid_context(span: Span | None) -> SpanContext | None:
+    """The span's context, or None when there is no span or its context is not valid."""
+    if span is None:
+        return None
+    context = span.get_span_context()
+    return context if context.is_valid else None
 
 
 def send_reports(
