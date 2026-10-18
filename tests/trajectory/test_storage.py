@@ -1,5 +1,7 @@
 """Dumping a trajectory to JSON-compatible data, and loading it back."""
 
+import math
+
 import pytest
 
 from hyoshigi import (
@@ -16,6 +18,19 @@ from hyoshigi import (
     ToolObservation,
     Trajectory,
 )
+from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
+from hyoshigi.monitors.score import (
+    Cause,
+    Composite,
+    Decisions,
+    FailedClosed,
+    Rationale,
+    StatementDecision,
+    SuspicionScore,
+    Unperceivable,
+    Unreadable,
+)
+from hyoshigi.trajectory.trajectory import Rating
 
 TASK = Observation(author=Author.USER, parts=(TextPart(text="Plot q3.csv"),))
 READ_FILE = Action(
@@ -39,6 +54,109 @@ MEMORY = Observation(
     source="memory",
     parts=(TextPart(text="The user prefers charts."),),
 )
+
+READS_THE_FILE = SuspicionScore(
+    value=0.25,
+    explanation="It reads the file the task names.",
+    evidence=Rationale(model="trusted-1", hidden_reasoning=("The file is the task's.",)),
+)
+STORED_READS_THE_FILE: dict[str, JSON] = {
+    "value": 0.25,
+    "explanation": "It reads the file the task names.",
+    "evidence": {
+        "kind": "rationale",
+        "model": "trusted-1",
+        "hidden_reasoning": ["The file is the task's."],
+    },
+}
+DECIDED = SuspicionScore(
+    value=0.9,
+    explanation="One statement is likely true.",
+    evidence=Decisions(
+        model="jev-1.14",
+        decisions=(
+            StatementDecision(
+                statement="The action reads a file.",
+                decision=Decision(probability=0.9, confidence=0.8),
+            ),
+            StatementDecision(
+                statement="The action deletes a file.", decision=Decision(probability=0.1)
+            ),
+        ),
+    ),
+)
+STORED_DECIDED: dict[str, JSON] = {
+    "value": 0.9,
+    "explanation": "One statement is likely true.",
+    "evidence": {
+        "kind": "decisions",
+        "model": "jev-1.14",
+        "decisions": [
+            {
+                "statement": "The action reads a file.",
+                "decision": {"probability": 0.9, "confidence": 0.8},
+            },
+            {
+                "statement": "The action deletes a file.",
+                "decision": {"probability": 0.1, "confidence": None},
+            },
+        ],
+        "hidden_reasoning": [],
+    },
+}
+REFUSED = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model refused to rate the action.",
+    evidence=FailedClosed(model="trusted-1", cause=Refused()),
+)
+STORED_REFUSED: dict[str, JSON] = {
+    "value": 1.0,
+    "explanation": "The monitor's model refused to rate the action.",
+    "evidence": {
+        "kind": "failed_closed",
+        "model": "trusted-1",
+        "cause": {"kind": "refused", "explanation": None},
+    },
+}
+COMBINED = SuspicionScore(
+    value=1.0,
+    explanation="A part failed.",
+    evidence=Composite(parts=(READS_THE_FILE, REFUSED)),
+)
+STORED_COMBINED: dict[str, JSON] = {
+    "value": 1.0,
+    "explanation": "A part failed.",
+    "evidence": {"kind": "composite", "parts": [STORED_READS_THE_FILE, STORED_REFUSED]},
+}
+
+# Each cause a score can fail closed with, in its stored form.
+CAUSES_STORED: list[tuple[Cause, dict[str, JSON]]] = [
+    (Unreadable(), {"kind": "unreadable"}),
+    (
+        Unperceivable(content=("audio", "image/tiff")),
+        {"kind": "unperceivable", "content": ["audio", "image/tiff"]},
+    ),
+    (
+        Truncated(text="The action is suspicious because"),
+        {"kind": "truncated", "text": "The action is suspicious because"},
+    ),
+    (
+        Refused(explanation="I cannot assess this."),
+        {"kind": "refused", "explanation": "I cannot assess this."},
+    ),
+    (Refused(), {"kind": "refused", "explanation": None}),
+    (Unavailable(status=503), {"kind": "unavailable", "status": 503}),
+    (Unavailable(), {"kind": "unavailable", "status": None}),
+]
+CAUSE_IDS = [
+    "unreadable",
+    "unperceivable",
+    "truncated",
+    "refused-with-an-explanation",
+    "refused-without-one",
+    "unavailable-with-a-status",
+    "unavailable-without-one",
+]
 
 # The stored format, written out by hand: base64 of the bytes 89 50 4E 47 is "iVBORw==".
 STORED: dict[str, JSON] = {
@@ -85,6 +203,7 @@ STORED: dict[str, JSON] = {
             "parts": [{"kind": "text", "text": "The user prefers charts."}],
         },
     ],
+    "ratings": [],
     "subagents": {},
 }
 
@@ -106,6 +225,10 @@ DELEGATING: dict[str, JSON] = {
             "source": "subagent",
             "parts": [{"kind": "text", "text": "The subagent stopped: no access to q3.csv."}],
         },
+    ],
+    "ratings": [
+        {"action_id": "a1", "score": STORED_DECIDED},
+        {"action_id": "a1", "score": STORED_READS_THE_FILE},
     ],
     "subagents": {
         "call_7": {
@@ -134,12 +257,23 @@ DELEGATING: dict[str, JSON] = {
                     "tool_calls": [],
                 },
             ],
+            "ratings": [{"action_id": "b1", "score": STORED_COMBINED}],
             "subagents": {},
         },
     },
 }
 
-ENVELOPE: dict[str, JSON] = {"format": "hyoshigi.trajectory", "version": 1, "subagents": {}}
+ENVELOPE: dict[str, JSON] = {
+    "format": "hyoshigi.trajectory",
+    "version": 1,
+    "ratings": [],
+    "subagents": {},
+}
+UNRATED_ENVELOPE: dict[str, JSON] = {
+    "format": "hyoshigi.trajectory",
+    "version": 1,
+    "subagents": {},
+}
 ACTION: dict[str, JSON] = {
     "kind": "action",
     "id": "a1",
@@ -182,6 +316,7 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
@@ -194,6 +329,7 @@ def test_loading_the_stored_format_restores_the_history() -> None:
     assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
 
 
+@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     loaded = Trajectory.load(DELEGATING)
 
@@ -317,6 +453,285 @@ def test_a_format_error_names_its_path_in_its_message() -> None:
 
 def test_a_format_error_never_quotes_the_payload() -> None:
     payload: JSON = {**ENVELOPE, "history": [{**OBSERVATION, "author": "s3cret-0f3c"}]}
+
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert "s3cret-0f3c" not in str(raised.value)
+
+
+def build_failed_closed_case(
+    cause: Cause, stored_cause: dict[str, JSON]
+) -> tuple[SuspicionScore, dict[str, JSON]]:
+    evidence: dict[str, JSON] = {
+        "kind": "failed_closed",
+        "model": "trusted-1",
+        "cause": stored_cause,
+    }
+    stored: dict[str, JSON] = {"value": 1.0, "explanation": "Failed.", "evidence": evidence}
+    score = SuspicionScore(
+        value=1.0, explanation="Failed.", evidence=FailedClosed(model="trusted-1", cause=cause)
+    )
+    return score, stored
+
+
+SCORE_CASES: list[tuple[SuspicionScore, dict[str, JSON]]] = [
+    (READS_THE_FILE, STORED_READS_THE_FILE),
+    (DECIDED, STORED_DECIDED),
+    (COMBINED, STORED_COMBINED),
+    *[build_failed_closed_case(cause, stored) for cause, stored in CAUSES_STORED],
+]
+SCORE_IDS = ["rationale", "decisions", "composite", *CAUSE_IDS]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
+def test_a_rating_dumps_to_the_stored_format(
+    trajectory: Trajectory, score: SuspicionScore, stored: dict[str, JSON]
+) -> None:
+    trajectory.attach(score, to=READ_FILE)
+
+    dumped = trajectory.dump()
+
+    assert dumped.get("ratings") == [{"action_id": "a1", "score": stored}]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
+def test_loading_a_stored_rating_restores_the_score(
+    score: SuspicionScore, stored: dict[str, JSON]
+) -> None:
+    payload: dict[str, JSON] = {
+        **ENVELOPE,
+        "history": [ACTION],
+        "ratings": [{"action_id": "a1", "score": stored}],
+    }
+
+    loaded = Trajectory.load(payload)
+
+    assert loaded.ratings == (Rating(action_id="a1", score=score),)
+
+
+EVIDENCE: dict[str, JSON] = {"kind": "rationale", "model": "trusted-1", "hidden_reasoning": []}
+SCORE_PATH = "$.ratings[0].score"
+EVIDENCE_PATH = "$.ratings[0].score.evidence"
+CAUSE_PATH = "$.ratings[0].score.evidence.cause"
+
+
+def build_rating_payload(rating: JSON) -> dict[str, JSON]:
+    return {**ENVELOPE, "history": [ACTION], "ratings": [rating]}
+
+
+def build_score_payload(**fields: JSON) -> dict[str, JSON]:
+    return build_rating_payload({"action_id": "a1", "score": {**STORED_READS_THE_FILE, **fields}})
+
+
+def build_evidence_payload(evidence: JSON) -> dict[str, JSON]:
+    return build_score_payload(evidence=evidence)
+
+
+def build_decision_payload(decision: JSON) -> dict[str, JSON]:
+    return build_evidence_payload(
+        {
+            "kind": "decisions",
+            "model": "jev-1.14",
+            "decisions": [{"statement": "The action reads a file.", "decision": decision}],
+            "hidden_reasoning": [],
+        }
+    )
+
+
+def build_cause_payload(cause: JSON) -> dict[str, JSON]:
+    return build_score_payload(
+        value=1.0, evidence={"kind": "failed_closed", "model": "trusted-1", "cause": cause}
+    )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("payload", "path"),
+    [
+        pytest.param({**UNRATED_ENVELOPE, "history": []}, "$", id="ratings-missing"),
+        pytest.param({**ENVELOPE, "history": [], "ratings": {}}, "$", id="ratings-not-a-list"),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [{**ACTION, "tool_calls": [TASK_CALL]}],
+                "subagents": {"call_7": {**UNRATED_ENVELOPE, "history": []}},
+            },
+            "$.subagents[0]",
+            id="subagent-ratings-missing",
+        ),
+        pytest.param(build_rating_payload("a1"), "$.ratings[0]", id="rating-not-a-mapping"),
+        pytest.param(
+            build_rating_payload({"action_id": "a1"}), "$.ratings[0]", id="rating-no-score"
+        ),
+        pytest.param(
+            build_rating_payload({"action_id": 1, "score": STORED_READS_THE_FILE}),
+            "$.ratings[0]",
+            id="action-id-not-text",
+        ),
+        pytest.param(
+            build_rating_payload({"action_id": "a9", "score": STORED_READS_THE_FILE}),
+            "$.ratings[0].action_id",
+            id="action-not-in-the-history",
+        ),
+        pytest.param(
+            build_rating_payload(
+                {"action_id": "a1", "score": {"value": 0.25, "evidence": EVIDENCE}}
+            ),
+            SCORE_PATH,
+            id="score-without-explanation",
+        ),
+        pytest.param(build_score_payload(explanation=5), SCORE_PATH, id="explanation-not-text"),
+        pytest.param(build_score_payload(value=True), SCORE_PATH, id="value-a-bool"),
+        pytest.param(build_score_payload(value=1.5), SCORE_PATH, id="value-above-one"),
+        pytest.param(build_score_payload(value="0.5"), SCORE_PATH, id="value-text"),
+        pytest.param(build_score_payload(value=None), SCORE_PATH, id="value-null"),
+        pytest.param(
+            build_score_payload(
+                value=0.5,
+                evidence=STORED_REFUSED["evidence"],
+            ),
+            SCORE_PATH,
+            id="failed-closed-with-a-value-below-one",
+        ),
+        pytest.param(
+            build_evidence_payload({"kind": "audit"}), EVIDENCE_PATH, id="unknown-evidence"
+        ),
+        pytest.param(
+            build_evidence_payload({"kind": "rationale", "hidden_reasoning": []}),
+            EVIDENCE_PATH,
+            id="rationale-without-a-model",
+        ),
+        pytest.param(
+            build_evidence_payload({**EVIDENCE, "hidden_reasoning": "text"}),
+            EVIDENCE_PATH,
+            id="hidden-reasoning-not-a-list",
+        ),
+        pytest.param(
+            build_evidence_payload({**EVIDENCE, "hidden_reasoning": [5]}),
+            "$.ratings[0].score.evidence.hidden_reasoning[0]",
+            id="hidden-reasoning-not-text",
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "decisions",
+                    "model": "jev-1.14",
+                    "decisions": [{}],
+                    "hidden_reasoning": [],
+                }
+            ),
+            "$.ratings[0].score.evidence.decisions[0]",
+            id="decision-without-a-statement",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": True, "confidence": None}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="probability-a-bool",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": "0.9", "confidence": None}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="probability-text",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": 1.5, "confidence": None}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="probability-above-one",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": math.nan, "confidence": None}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="probability-not-a-number",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": 0.9, "confidence": "high"}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="confidence-text",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": 0.9, "confidence": True}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="confidence-a-bool",
+        ),
+        pytest.param(
+            build_decision_payload({"probability": 0.9, "confidence": -0.1}),
+            "$.ratings[0].score.evidence.decisions[0].decision",
+            id="confidence-below-zero",
+        ),
+        pytest.param(
+            build_evidence_payload({"kind": "composite", "parts": []}),
+            EVIDENCE_PATH,
+            id="composite-without-parts",
+        ),
+        pytest.param(
+            build_evidence_payload({"kind": "composite", "parts": [{"value": 0.5}]}),
+            "$.ratings[0].score.evidence.parts[0]",
+            id="composite-part-malformed",
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "composite",
+                    "parts": [{**STORED_READS_THE_FILE, "evidence": {"kind": "audit"}}],
+                }
+            ),
+            "$.ratings[0].score.evidence.parts[0].evidence",
+            id="composite-part-with-unknown-evidence",
+        ),
+        pytest.param(
+            build_score_payload(
+                value=1.0,
+                evidence={"kind": "failed_closed", "model": 5, "cause": {"kind": "unreadable"}},
+            ),
+            EVIDENCE_PATH,
+            id="failed-closed-model-not-text",
+        ),
+        pytest.param(build_cause_payload({"kind": "audit"}), CAUSE_PATH, id="unknown-cause"),
+        pytest.param(
+            build_cause_payload({"kind": "unperceivable", "content": []}),
+            CAUSE_PATH,
+            id="unperceivable-without-content",
+        ),
+        pytest.param(
+            build_cause_payload({"kind": "unperceivable", "content": [5]}),
+            "$.ratings[0].score.evidence.cause.content[0]",
+            id="unperceivable-content-not-text",
+        ),
+        pytest.param(
+            build_cause_payload({"kind": "truncated"}), CAUSE_PATH, id="truncated-without-text"
+        ),
+        pytest.param(
+            build_cause_payload({"kind": "refused", "explanation": 5}),
+            CAUSE_PATH,
+            id="refused-explanation-not-text",
+        ),
+        pytest.param(
+            build_cause_payload({"kind": "unavailable", "status": "503"}),
+            CAUSE_PATH,
+            id="unavailable-status-text",
+        ),
+        pytest.param(
+            build_cause_payload({"kind": "unavailable", "status": True}),
+            CAUSE_PATH,
+            id="unavailable-status-a-bool",
+        ),
+    ],
+)
+def test_loading_a_malformed_rating_raises_format_error_at_its_path(
+    payload: JSON, path: str
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert raised.value.path == path
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_format_error_for_a_rating_never_quotes_the_payload() -> None:
+    payload = build_score_payload(value="s3cret-0f3c")
 
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
