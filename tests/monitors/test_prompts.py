@@ -12,7 +12,6 @@ REQUEST = "{trajectory}\n{proposed_action}"
 PNG = MediaPart(media_type="image/png", data=b"\x89PNG\r\n\x1a\n")
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("system", "request_text", "field"),
     [
@@ -49,7 +48,6 @@ def test_a_prompt_with_a_field_that_cannot_work_raises_naming_it(
         MonitorPrompt(system=system, request=request_text)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("system", "request_text"),
     [("Rate it {", REQUEST), ("Rate it.", "{trajectory}}\n{proposed_action}")],
@@ -60,7 +58,6 @@ def test_a_prompt_that_is_not_a_format_string_raises(system: str, request_text: 
         MonitorPrompt(system=system, request=request_text)
 
 
-@pytest.mark.xfail(strict=True)
 def test_building_places_the_rendering_among_the_formatted_text() -> None:
     prompt = MonitorPrompt(
         system="Score from {lowest_score} to {highest_score}.",
@@ -90,7 +87,6 @@ def test_building_places_the_rendering_among_the_formatted_text() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_default_prompts_system_text_names_exactly_the_tags_rendering_emits() -> None:
     tags = set(re.findall(r"</?([a-z_]+)", DEFAULT_PROMPT.system))
 
@@ -114,7 +110,6 @@ def test_the_default_prompts_system_text_names_exactly_the_tags_rendering_emits(
     }
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_default_prompt_wraps_the_rendering_in_its_request() -> None:
     rendering = Rendering(
         trajectory=(TextPart(text="<user>Summarise q3.md</user>"),),
