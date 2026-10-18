@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run every gate: the gitleaks secrets scan, ruff, ty, the test suite, the
-# lanorme standards, a package build, and an import of the built wheel in a
-# fresh environment. Run this before committing or finishing a change. No
-# arguments.
+# Run every gate: the gitleaks secrets scan, ruff, the spread check, ty, the
+# test suite, the lanorme standards, a package build, and an import of the
+# built wheel in a fresh environment. Run this before committing or finishing
+# a change. No arguments.
 #
 #   scripts/check.sh
 #
@@ -35,6 +35,11 @@ fi
 echo "==> ruff"
 uv run --group dev ruff check .
 uv run --group dev ruff format --check .
+
+echo "==> spread"
+# Every tracked Python file and the python blocks of the Markdown files.
+git ls-files -z '*.py' README.md CONTRIBUTING.md 'docs/*.md' |
+  xargs -0 uv run --group dev python scripts/spread.py --check
 
 echo "==> ty (type checking)"
 uv run --group dev ty check

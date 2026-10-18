@@ -34,11 +34,11 @@ One script runs every gate:
 scripts/check.sh
 ```
 
-It scans for secrets with gitleaks and `.gitleaks.toml`, then runs ruff, ty
-(type checking), the test suite and the lanorme standards (naming,
-complexity, docstrings, prose), builds the package and imports the built
-wheel in a fresh environment. CI runs the same script on Python 3.12, 3.13
-and 3.14, and scans the whole history for secrets.
+It scans for secrets with gitleaks and `.gitleaks.toml`, then runs ruff, the
+spread check, ty (type checking), the test suite and the lanorme standards
+(naming, complexity, docstrings, prose), builds the package and imports the
+built wheel in a fresh environment. CI runs the same script on Python 3.12,
+3.13 and 3.14, and scans the whole history for secrets.
 
 The domain is mutation-tested: run `uv run --group dev mutmut run`, then
 `uv run --group dev mutmut results`, and explain every surviving mutant in

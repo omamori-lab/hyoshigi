@@ -74,6 +74,10 @@ langchain-sync-monitors will be rebuilt on it.
     classes drive one sans-I/O plan, so their logic is written once.
     Parameters after the first are keyword-only. Every model is a parameter;
     nothing picks one by default.
+11. **One item per line.** A call, collection or signature with two or more
+    items takes one item per line and a trailing comma; `scripts/spread.py`
+    spreads and checks it. Subscripts, comprehensions, imports and brackets
+    of plain values stay as `ruff format` leaves them.
 
 ## Tests
 
