@@ -648,46 +648,53 @@ def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
     assert values[0] != values[1]
 
 
-RATE_SEEDED_ACTION = """
-import asyncio
-import sys
-
-from hyoshigi import Action, AsyncGenerativeModel, Generation, GenerativeModel, TextPart, Trajectory
-from hyoshigi.monitors.composition import AsyncCalibratedMonitor, CalibratedMonitor
-from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
+RATE_SEEDED_SYNCHRONOUSLY = """
+from hyoshigi import Action, Generation, GenerativeModel, TextPart, Trajectory
+from hyoshigi.monitors.composition import CalibratedMonitor
+from hyoshigi.monitors.llm import LLMMonitor
 
 reply = Generation(text="<reasoning>r</reasoning><score>3</score>")
+model = GenerativeModel(name="trusted-1", generate=lambda prompt: reply)
+monitor = CalibratedMonitor(
+    monitor=LLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
+)
 trajectory = Trajectory.from_run("Summarise q3.md", answer="Done.").trajectory
 action = Action(parts=(TextPart(text="Reading q3.md."),))
+print(monitor.rate(action, trajectory=trajectory).value)
+"""
+RATE_SEEDED_ASYNCHRONOUSLY = """
+import asyncio
+
+from hyoshigi import Action, AsyncGenerativeModel, Generation, TextPart, Trajectory
+from hyoshigi.monitors.composition import AsyncCalibratedMonitor
+from hyoshigi.monitors.llm import AsyncLLMMonitor
+
+reply = Generation(text="<reasoning>r</reasoning><score>3</score>")
 
 
-async def generate_asynchronously(prompt):
+async def generate(prompt):
     return reply
 
 
-if sys.argv[1] == "sync":
-    model = GenerativeModel(name="trusted-1", generate=lambda prompt: reply)
-    monitor = CalibratedMonitor(
-        monitor=LLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
-    )
-    score = monitor.rate(action, trajectory=trajectory)
-else:
-    model = AsyncGenerativeModel(name="trusted-1", generate=generate_asynchronously)
-    monitor = AsyncCalibratedMonitor(
-        monitor=AsyncLLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
-    )
-    score = asyncio.run(monitor.rate(action, trajectory=trajectory))
-print(score.value)
+model = AsyncGenerativeModel(name="trusted-1", generate=generate)
+monitor = AsyncCalibratedMonitor(
+    monitor=AsyncLLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
+)
+trajectory = Trajectory.from_run("Summarise q3.md", answer="Done.").trajectory
+action = Action(parts=(TextPart(text="Reading q3.md."),))
+print(asyncio.run(monitor.rate(action, trajectory=trajectory)).value)
 """
 
 
 @pytest.mark.parametrize("hash_seed", ["0", "1"])
-@pytest.mark.parametrize("family_name", ["sync", "async"])
+@pytest.mark.parametrize(
+    "script", [RATE_SEEDED_SYNCHRONOUSLY, RATE_SEEDED_ASYNCHRONOUSLY], ids=["sync", "async"]
+)
 def test_a_seeded_rating_is_the_same_in_processes_started_with_different_hash_seeds(
-    family_name: str, hash_seed: str
+    script: str, hash_seed: str
 ) -> None:
     process = subprocess.run(
-        [sys.executable, "-c", RATE_SEEDED_ACTION, family_name],
+        [sys.executable, "-c", script],
         env={**os.environ, "PYTHONHASHSEED": hash_seed},
         capture_output=True,
         text=True,
@@ -696,8 +703,9 @@ def test_a_seeded_rating_is_the_same_in_processes_started_with_different_hash_se
 
     # A raw score of 0.3 against the honest scores 0.1, 0.2, 0.2, 0.3 ranks (3 + u * 2) / 5.
     # u is the first number of random.Random(seed, a line break and the key): CPython
-    # seeds a str by its SHA-512 whatever the hash seed, and reading the same bytes into
-    # numpy's MT19937 gives u = 0.5883713825888017, so the value is 0.8353485530355208.
+    # seeds a str by its SHA-512 whatever the hash seed. The key is the history and the
+    # action as the stored format writes them, written out by hand; their bytes read into
+    # numpy's MT19937 give u = 0.5883713825888017, so the value is 0.8353485530355208.
     assert process.stdout == "0.8353485530355208\n"
 
 
