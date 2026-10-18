@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import assert_never
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
+from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import (
     AsyncGenerativeModel,
     Generation,
@@ -41,6 +42,7 @@ from hyoshigi.monitors.score import (
     fail_closed,
 )
 from hyoshigi.monitors.view import View
+from hyoshigi.options import check_instance, describe_option_value, read_count, read_integer
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
 
@@ -53,7 +55,14 @@ _FINAL_SCORE = re.compile(r"\s*<score>(?P<score>[^<]*)</score>\s*", flags=re.IGN
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LLMMonitor(Monitor):
-    """Rates an action with a generative model that reasons, then scores on an integer scale."""
+    """Rates an action with a generative model that reasons, then scores on an integer scale.
+
+    A reply with no readable score, and one cut off at the model's output limit, is asked for
+    again, up to `max_parse_retries` more times; with no score by then the rating fails
+    closed. A custom `prompt` must ask for the reply's shape, or every reply is unreadable.
+    The ends of the scale are integers, the lowest below the highest; an option that cannot
+    work raises ConfigurationError when the monitor is built.
+    """
 
     model: GenerativeModel
     view: View = field(default_factory=View)
@@ -61,6 +70,15 @@ class LLMMonitor(Monitor):
     lowest_score: int = 0
     highest_score: int = 10
     max_parse_retries: int = 2
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.model,
+            expected=GenerativeModel,
+            name="model",
+            hint="Use AsyncLLMMonitor for an AsyncGenerativeModel.",
+        )
+        _check_options(self)
 
     def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
@@ -71,7 +89,7 @@ class LLMMonitor(Monitor):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AsyncLLMMonitor(AsyncMonitor):
-    """Rates an action with an async generative model that reasons, then scores."""
+    """Rates an action as LLMMonitor does, with a generative model that is awaited."""
 
     model: AsyncGenerativeModel
     view: View = field(default_factory=View)
@@ -80,11 +98,51 @@ class AsyncLLMMonitor(AsyncMonitor):
     highest_score: int = 10
     max_parse_retries: int = 2
 
+    def __post_init__(self) -> None:
+        check_instance(
+            self.model,
+            expected=AsyncGenerativeModel,
+            name="model",
+            hint="Use LLMMonitor for a GenerativeModel.",
+        )
+        _check_options(self)
+
     async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
         return await drive_concurrently(
             plan_rating(self, action=action, trajectory=trajectory), ask=self.model.generate
         )
+
+
+def _check_options(monitor: LLMMonitor | AsyncLLMMonitor) -> None:
+    """Raise ConfigurationError for an option that cannot work, naming it.
+
+    The scale's ends and the retry count are kept as ints, whatever whole numbers were given.
+    """
+    check_instance(monitor.view, expected=View, name="view")
+    check_instance(monitor.prompt, expected=MonitorPrompt, name="prompt")
+    lowest = _read_scale_end(monitor.lowest_score, name="lowest_score")
+    highest = _read_scale_end(monitor.highest_score, name="highest_score")
+    if lowest >= highest:
+        raise ConfigurationError(f"lowest_score ({lowest}) must be below highest_score ({highest})")
+    retries = read_count(monitor.max_parse_retries, name="max_parse_retries", minimum=0)
+    # The dataclass is frozen, so the ints are set past its guard.
+    object.__setattr__(monitor, "lowest_score", lowest)
+    object.__setattr__(monitor, "highest_score", highest)
+    object.__setattr__(monitor, "max_parse_retries", retries)
+
+
+def _read_scale_end(value: object, *, name: str) -> int:
+    """Read an end of the scale as an int that Python can write out, since the prompt shows it."""
+    end = read_integer(value, name=name)
+    try:
+        str(end)
+    except ValueError:
+        # Python refuses to write an integer of more than 4,300 digits, by default.
+        raise ConfigurationError(
+            f"{name} must be an integer Python can write out, got {describe_option_value(end)}"
+        ) from None
+    return end
 
 
 # The cause of an attempt that is asked again.
