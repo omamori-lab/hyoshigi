@@ -399,7 +399,7 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CalibratedMonitor for a Monitor.",
         ),
-        pytest.param(
+        (
             partial(
                 CascadeMonitor,
                 fast=ASYNCHRONOUS_LLM,
@@ -408,9 +408,8 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             ),
             "fast must be a Monitor, got an instance of AsyncLLMMonitor. "
             "Use AsyncCascadeMonitor for an AsyncMonitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             partial(
                 CascadeMonitor,
                 fast=SYNCHRONOUS_LLM,
@@ -419,9 +418,8 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             ),
             "careful must be a Monitor, got an instance of AsyncLLMMonitor. "
             "Use AsyncCascadeMonitor for an AsyncMonitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             partial(
                 AsyncCascadeMonitor,
                 fast=SYNCHRONOUS_LLM,
@@ -430,9 +428,8 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             ),
             "fast must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CascadeMonitor for a Monitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             partial(
                 AsyncCascadeMonitor,
                 fast=ASYNCHRONOUS_LLM,
@@ -441,7 +438,6 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             ),
             "careful must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CascadeMonitor for a Monitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -721,7 +717,6 @@ def test_a_seed_that_is_a_whole_number_but_not_an_int_is_kept_as_an_int(
     assert (type(calibrated.random_seed), calibrated.random_seed) == (int, 7)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("fast_reply", "kept", "careful_asks"),
     [
@@ -745,7 +740,6 @@ def test_a_fast_score_below_the_threshold_is_kept_and_one_at_or_above_it_escalat
     assert (score, len(careful.received)) == (kept, careful_asks)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("escalation_threshold", [0.5, 1.0], ids=["half", "one"])
 def test_a_fast_score_that_failed_closed_always_escalates(
     family: Family[Monitor] | Family[AsyncMonitor], escalation_threshold: float
@@ -758,7 +752,6 @@ def test_a_fast_score_that_failed_closed_always_escalates(
     assert score == build_score(0.9, "careful")
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_careful_score_that_failed_closed_is_returned_unchanged(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -770,7 +763,6 @@ def test_a_careful_score_that_failed_closed_is_returned_unchanged(
     assert score == UNAVAILABLE_SCORE
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("escalation_threshold", "message"),
     [
@@ -794,7 +786,6 @@ def test_an_escalation_threshold_that_is_not_from_0_to_1_is_refused_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "build",
     [
