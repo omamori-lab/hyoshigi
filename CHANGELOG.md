@@ -80,3 +80,12 @@ minor version.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
   `image/*` in `MediaPart`.
+- A span in OpenTelemetry for every rating of every monitor, wrappers
+  included, when `opentelemetry-api` is installed (`hyoshigi[opentelemetry]`):
+  named `rate` and the monitor's class, from the global tracer provider's
+  tracer `hyoshigi`, and current while the monitor rates, so a wrapper's inner
+  ratings and an instrumented client's model calls nest inside it. It carries
+  the score as `gen_ai.evaluation.name` (`suspicion`),
+  `gen_ai.evaluation.score.value` and `gen_ai.evaluation.explanation`, with
+  `hyoshigi.failed_closed` and, for a score that failed closed,
+  `hyoshigi.cause`.

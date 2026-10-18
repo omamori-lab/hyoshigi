@@ -43,6 +43,7 @@ from hyoshigi.monitors.score import (
     average_values,
     fail_closed,
 )
+from hyoshigi.monitors.tracing import record_rating, trace_rating
 from hyoshigi.monitors.view import View
 from hyoshigi.options import check_instance
 from hyoshigi.trajectory.history import Action
@@ -102,14 +103,18 @@ class DecisionMonitor(Monitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far."""
-        return drive(
-            plan_decision(
-                self,
-                action=action,
-                trajectory=trajectory,
-            ),
-            ask=self.model.decide,
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                drive(
+                    plan_decision(
+                        self,
+                        action=action,
+                        trajectory=trajectory,
+                    ),
+                    ask=self.model.decide,
+                ),
+                span=span,
+            )
 
 
 @dataclass(
@@ -139,14 +144,18 @@ class AsyncDecisionMonitor(AsyncMonitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far."""
-        return await drive_concurrently(
-            plan_decision(
-                self,
-                action=action,
-                trajectory=trajectory,
-            ),
-            ask=self.model.decide,
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                await drive_concurrently(
+                    plan_decision(
+                        self,
+                        action=action,
+                        trajectory=trajectory,
+                    ),
+                    ask=self.model.decide,
+                ),
+                span=span,
+            )
 
 
 def check_decision_options(

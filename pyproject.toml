@@ -137,10 +137,11 @@ exclude = [
     "docs/plans/*",
 ]
 
-# Each model adapter's SDK is an optional extra, so model.py imports the adapter where it is
-# asked for, not at the top.
+# Each model adapter's SDK and OpenTelemetry are optional extras, so model.py imports the
+# adapter where it is asked for, and tracing.py OpenTelemetry at the first rating, not at the top.
 [tool.lanorme.per-file-ignores]
 "src/hyoshigi/models/model.py" = ["IMPORT-001"]
+"src/hyoshigi/monitors/tracing.py" = ["IMPORT-001"]
 
 [tool.lanorme.file_limits]
 # Code with two or more items in a call or collection takes one item per line, so the line

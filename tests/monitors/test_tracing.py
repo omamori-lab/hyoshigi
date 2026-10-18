@@ -318,7 +318,6 @@ def read_last_attributes(spans: InMemorySpanExporter) -> list[Attributes]:
     return [span.attributes for span in spans.get_finished_spans()][-1:]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("family", "build", "names"),
     [
@@ -431,7 +430,6 @@ CALM = {
 }
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "attributes"),
     [
@@ -493,7 +491,6 @@ def test_every_monitors_span_carries_its_score_as_an_evaluation_result(
     assert read_last_attributes(spans) == [attributes]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "explanation", "cause"),
     [
@@ -566,7 +563,6 @@ def build_two_of_two_calls(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "outcomes", "explanation", "cause"),
     [
@@ -626,7 +622,6 @@ def test_a_wrapper_that_failed_closed_names_the_cause_of_its_first_failed_part(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_wrappers_inner_ratings_nest_inside_its_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -650,7 +645,6 @@ def test_a_wrappers_inner_ratings_nest_inside_its_span(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_span_the_model_function_opens_nests_inside_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -667,7 +661,6 @@ def test_a_span_the_model_function_opens_nests_inside_the_ratings_span(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_exception_from_the_model_function_is_recorded_on_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
