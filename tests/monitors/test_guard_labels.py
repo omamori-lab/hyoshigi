@@ -679,6 +679,16 @@ def test_a_keyed_safe_verdict_stands_when_no_other_line_names_a_suspicious_label
     assert read == "safe"
 
 
+def test_a_keyed_safe_verdict_stands_when_its_own_key_names_a_suspicious_label() -> None:
+    labels = GuardLabels(
+        suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="Unsafe content"
+    )
+
+    read = read_label("Unsafe content: safe", labels=labels)
+
+    assert read == "safe"
+
+
 def test_a_key_of_several_words_is_read_through_the_markup_around_each() -> None:
     labels = GuardLabels(
         suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="User Safety"
