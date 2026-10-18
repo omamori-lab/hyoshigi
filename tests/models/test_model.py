@@ -93,7 +93,6 @@ def test_content_a_model_cannot_be_given_raises(kind: type, arguments: dict[str,
         kind(**arguments)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("probability", "confidence", "message"),
     [
@@ -132,7 +131,6 @@ def test_a_decision_that_is_not_a_number_from_zero_to_one_raises_naming_the_fiel
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("probability", "confidence", "kept"),
     [
