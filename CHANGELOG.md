@@ -40,6 +40,17 @@ minor version.
   `from_anthropic` (the Messages API, `hyoshigi[anthropic]`), `from_openrouter`
   and `DecisionModel.from_openrouter` (`hyoshigi[openrouter]`), and
   `DecisionModel.from_typesafe` (TypeSafe's Jev, `hyoshigi[typesafe]`).
+- `reasoning_effort` on `GenerativeModel.from_openai` and its async twin, in the
+  OpenAI SDK's own `ReasoningEffort`, sent as the request's reasoning effort
+  when given.
+- `reasoning_effort` on `GenerativeModel.from_openrouter` and its async twin, in
+  the OpenRouter SDK's own `ReasoningEffort`, sent as the request's reasoning
+  effort when given.
+- `thinking` on `GenerativeModel.from_anthropic` and its async twin, in the
+  Anthropic SDK's own `ThinkingConfigParam`, sent as the request's thinking
+  when given.
+- `DecisionModel.from_openai`, OpenAI's Decisions API (`gpt-6-luna`), with an
+  async twin: the probability of a predicate answer, over text and images.
 - `Monitor` and `AsyncMonitor`, which `rate(action, *, trajectory)` an action
   the agent proposes and always return a `SuspicionScore`: a value from 0 to 1,
   an explanation, the only part an agent may see (the default prompt asks the
