@@ -232,17 +232,25 @@ def read_decision(reply: components.DecisionsResponse) -> DecisionOutcome:
 
 
 def build_model(
-    client: OpenRouter, *, model: str, max_output_tokens: int | None, perceives: MediaTypes
+    client: OpenRouter,
+    *,
+    model: str,
+    max_output_tokens: int | None,
+    reasoning_effort: components.ReasoningEffort | None,
+    perceives: MediaTypes,
 ) -> GenerativeModel:
     """A model on the Responses API, through the caller's client.
 
     The API is stateless and the SDK sends store false, so no stored response holds the
-    monitored agent's content. Raise ConfigurationError if the model id is empty or perceives
-    names media the API cannot carry.
+    monitored agent's content. The reasoning effort is sent only when given. Raise
+    ConfigurationError if the model id is empty or perceives names media the API cannot carry.
     """
     check_name(model)
     check_perceives(perceives, carries=responses.CARRIED_MEDIA)
     limit = UNSET if max_output_tokens is None else max_output_tokens
+    reasoning = (
+        UNSET if reasoning_effort is None else components.ReasoningConfig(effort=reasoning_effort)
+    )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_input(prompt)
@@ -250,7 +258,11 @@ def build_model(
             return Unavailable()
         try:
             reply = client.responses.send(
-                model=model, instructions=prompt.system, input=request, max_output_tokens=limit
+                model=model,
+                instructions=prompt.system,
+                input=request,
+                max_output_tokens=limit,
+                reasoning=reasoning,
             )
         except FAILURES as caught:
             error = caught
@@ -262,12 +274,20 @@ def build_model(
 
 
 def build_async_model(
-    client: OpenRouter, *, model: str, max_output_tokens: int | None, perceives: MediaTypes
+    client: OpenRouter,
+    *,
+    model: str,
+    max_output_tokens: int | None,
+    reasoning_effort: components.ReasoningEffort | None,
+    perceives: MediaTypes,
 ) -> AsyncGenerativeModel:
     """A model on the Responses API, through the caller's client, awaited."""
     check_name(model)
     check_perceives(perceives, carries=responses.CARRIED_MEDIA)
     limit = UNSET if max_output_tokens is None else max_output_tokens
+    reasoning = (
+        UNSET if reasoning_effort is None else components.ReasoningConfig(effort=reasoning_effort)
+    )
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         request = build_input(prompt)
@@ -275,7 +295,11 @@ def build_async_model(
             return Unavailable()
         try:
             reply = await client.responses.send_async(
-                model=model, instructions=prompt.system, input=request, max_output_tokens=limit
+                model=model,
+                instructions=prompt.system,
+                input=request,
+                max_output_tokens=limit,
+                reasoning=reasoning,
             )
         except FAILURES as caught:
             error = caught
