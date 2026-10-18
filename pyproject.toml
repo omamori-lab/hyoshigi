@@ -83,7 +83,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C90", "ANN", "PT", "RUF", "COM"]
-ignore = ["COM812"]
 
 [tool.ruff.lint.mccabe]
 # The highest complexity lanorme's complexity_error allows, so tests, which lanorme skips,
@@ -142,8 +141,12 @@ exclude = [
 "src/hyoshigi/models/model.py" = ["IMPORT-001"]
 
 [tool.lanorme.file_limits]
-func_warn_lines = 40
-func_error_lines = 60
+# Code with two or more items in a call or collection takes one item per line, so the line
+# limits count those spread lines.
+file_warn_lines = 450
+file_error_lines = 750
+func_warn_lines = 60
+func_error_lines = 90
 complexity_warn = 6
 complexity_error = 7
 param_warn = 5

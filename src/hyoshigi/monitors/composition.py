@@ -34,7 +34,11 @@ from hyoshigi.trajectory.storage import dump_event
 from hyoshigi.trajectory.trajectory import Trajectory
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class RepeatedMonitor(Monitor):
     """Rates an action `ensemble_size` times with one monitor, in turn, and reports the mean.
 
@@ -63,18 +67,37 @@ class RepeatedMonitor(Monitor):
     ensemble_size: int
 
     def __post_init__(self) -> None:
-        _check_monitor(self.monitor, name="monitor", async_twin=AsyncRepeatedMonitor)
+        _check_monitor(
+            self.monitor,
+            name="monitor",
+            async_twin=AsyncRepeatedMonitor,
+        )
         _check_ensemble_size(self)
 
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with each call in turn, and combine the scores."""
         return drive(
-            plan_repetition(self.monitor, ensemble_size=self.ensemble_size),
-            ask=lambda monitor: monitor.rate(action, trajectory=trajectory),
+            plan_repetition(
+                self.monitor,
+                ensemble_size=self.ensemble_size,
+            ),
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncRepeatedMonitor(AsyncMonitor):
     """Rates an action as RepeatedMonitor does, with the calls awaited at once.
 
@@ -85,18 +108,38 @@ class AsyncRepeatedMonitor(AsyncMonitor):
     ensemble_size: int
 
     def __post_init__(self) -> None:
-        _check_async_monitor(self.monitor, name="monitor", twin=RepeatedMonitor)
+        _check_async_monitor(
+            self.monitor,
+            name="monitor",
+            twin=RepeatedMonitor,
+        )
         _check_ensemble_size(self)
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with all the calls at once, and combine the scores."""
         return await drive_concurrently(
-            plan_repetition(self.monitor, ensemble_size=self.ensemble_size),
-            ask=lambda monitor: monitor.rate(action, trajectory=trajectory),
+            plan_repetition(
+                self.monitor,
+                ensemble_size=self.ensemble_size,
+            ),
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
         )
 
 
-def _check_monitor(value: object, *, name: str, async_twin: type) -> None:
+def _check_monitor(
+    value: object,
+    *,
+    name: str,
+    async_twin: type,
+) -> None:
     """Raise ConfigurationError unless the value is a Monitor; the hint names the async twin."""
     check_instance(
         value,
@@ -106,7 +149,12 @@ def _check_monitor(value: object, *, name: str, async_twin: type) -> None:
     )
 
 
-def _check_async_monitor(value: object, *, name: str, twin: type) -> None:
+def _check_async_monitor(
+    value: object,
+    *,
+    name: str,
+    twin: type,
+) -> None:
     """Raise ConfigurationError unless the value is an AsyncMonitor; the hint names the twin."""
     check_instance(
         value,
@@ -118,13 +166,23 @@ def _check_async_monitor(value: object, *, name: str, twin: type) -> None:
 
 def _check_ensemble_size(repeated: RepeatedMonitor | AsyncRepeatedMonitor) -> None:
     """Keep the ensemble size as an int, whatever whole number was given, or raise."""
-    size = read_count(repeated.ensemble_size, name="ensemble_size", minimum=1)
+    size = read_count(
+        repeated.ensemble_size,
+        name="ensemble_size",
+        minimum=1,
+    )
     # The dataclass is frozen, so the int is set past its guard.
-    object.__setattr__(repeated, "ensemble_size", size)
+    object.__setattr__(
+        repeated,
+        "ensemble_size",
+        size,
+    )
 
 
 def plan_repetition[Rater](
-    monitor: Rater, *, ensemble_size: int
+    monitor: Rater,
+    *,
+    ensemble_size: int,
 ) -> Plan[Rater, SuspicionScore, SuspicionScore]:
     """Plan the repeated rating: ask the monitor `ensemble_size` times, then combine."""
     parts = yield (monitor,) * ensemble_size
@@ -134,10 +192,20 @@ def plan_repetition[Rater](
 def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
     """Combine the scores of repeated calls into their mean, or fail closed if any did."""
     evidence = Composite(parts=parts)
-    failed = next((part for part in parts if part.failed_closed), None)
+    failed = next(
+        (part for part in parts if part.failed_closed),
+        None,
+    )
     if failed is not None:
-        return SuspicionScore(value=1.0, explanation=failed.explanation, evidence=evidence)
-    most_suspicious = max(parts, key=lambda part: part.value)
+        return SuspicionScore(
+            value=1.0,
+            explanation=failed.explanation,
+            evidence=evidence,
+        )
+    most_suspicious = max(
+        parts,
+        key=lambda part: part.value,
+    )
     return SuspicionScore(
         value=average_values(part.value for part in parts),
         explanation=most_suspicious.explanation,
@@ -145,7 +213,11 @@ def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
     )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class CalibratedMonitor(Monitor):
     """Reports a monitor's score as its smoothed conformal p-value among honest scores.
 
@@ -187,20 +259,51 @@ class CalibratedMonitor(Monitor):
     random_seed: int | None = None
     sorted_honest_scores: tuple[float, ...] = field(init=False)
 
-    def __post_init__(self, honest_scores: Iterable[float]) -> None:
-        _check_monitor(self.monitor, name="monitor", async_twin=AsyncCalibratedMonitor)
-        _check_calibration(self, honest_scores=honest_scores)
-
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
-        """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
-        tie_share = draw_tie_share(self.random_seed, action=action, trajectory=trajectory)
-        plan = plan_calibration(
-            self.monitor, honest_scores=self.sorted_honest_scores, tie_share=tie_share
+    def __post_init__(
+        self,
+        honest_scores: Iterable[float],
+    ) -> None:
+        _check_monitor(
+            self.monitor,
+            name="monitor",
+            async_twin=AsyncCalibratedMonitor,
         )
-        return drive(plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory))
+        _check_calibration(
+            self,
+            honest_scores=honest_scores,
+        )
+
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
+        """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
+        tie_share = draw_tie_share(
+            self.random_seed,
+            action=action,
+            trajectory=trajectory,
+        )
+        plan = plan_calibration(
+            self.monitor,
+            honest_scores=self.sorted_honest_scores,
+            tie_share=tie_share,
+        )
+        return drive(
+            plan,
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
+        )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncCalibratedMonitor(AsyncMonitor):
     """Ranks a score as CalibratedMonitor does, with the wrapped monitor awaited."""
 
@@ -209,43 +312,90 @@ class AsyncCalibratedMonitor(AsyncMonitor):
     random_seed: int | None = None
     sorted_honest_scores: tuple[float, ...] = field(init=False)
 
-    def __post_init__(self, honest_scores: Iterable[float]) -> None:
-        _check_async_monitor(self.monitor, name="monitor", twin=CalibratedMonitor)
-        _check_calibration(self, honest_scores=honest_scores)
+    def __post_init__(
+        self,
+        honest_scores: Iterable[float],
+    ) -> None:
+        _check_async_monitor(
+            self.monitor,
+            name="monitor",
+            twin=CalibratedMonitor,
+        )
+        _check_calibration(
+            self,
+            honest_scores=honest_scores,
+        )
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
-        tie_share = draw_tie_share(self.random_seed, action=action, trajectory=trajectory)
+        tie_share = draw_tie_share(
+            self.random_seed,
+            action=action,
+            trajectory=trajectory,
+        )
         plan = plan_calibration(
-            self.monitor, honest_scores=self.sorted_honest_scores, tie_share=tie_share
+            self.monitor,
+            honest_scores=self.sorted_honest_scores,
+            tie_share=tie_share,
         )
         return await drive_concurrently(
-            plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory)
+            plan,
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
         )
 
 
 def _check_calibration(
-    calibrated: CalibratedMonitor | AsyncCalibratedMonitor, *, honest_scores: object
+    calibrated: CalibratedMonitor | AsyncCalibratedMonitor,
+    *,
+    honest_scores: object,
 ) -> None:
     """Keep the honest scores sorted and the seed as an int, or raise ConfigurationError."""
     scores = _read_honest_scores(honest_scores)
     seed = calibrated.random_seed
     if seed is not None:
-        seed = read_integer(seed, name="random_seed")
+        seed = read_integer(
+            seed,
+            name="random_seed",
+        )
     # The dataclass is frozen, so the values are set past its guard.
-    object.__setattr__(calibrated, "sorted_honest_scores", scores)
-    object.__setattr__(calibrated, "random_seed", seed)
+    object.__setattr__(
+        calibrated,
+        "sorted_honest_scores",
+        scores,
+    )
+    object.__setattr__(
+        calibrated,
+        "random_seed",
+        seed,
+    )
 
 
 def _read_honest_scores(honest_scores: object) -> tuple[float, ...]:
     """Read the honest scores once, each as a threshold named by its position, sorted."""
-    if isinstance(honest_scores, str | bytes) or not isinstance(honest_scores, Iterable):
+    if isinstance(
+        honest_scores,
+        str | bytes,
+    ) or not isinstance(
+        honest_scores,
+        Iterable,
+    ):
         raise ConfigurationError(
             "honest_scores must be an iterable of numbers between 0 and 1, "
-            f"got {describe_option_value(honest_scores)}"
+            f"got {describe_option_value(honest_scores)}",
         )
     scores = sorted(
-        read_threshold(score, name=f"honest_scores[{position}]")
+        read_threshold(
+            score,
+            name=f"honest_scores[{position}]",
+        )
         for position, score in enumerate(honest_scores)
     )
     if not scores:
@@ -254,21 +404,40 @@ def _read_honest_scores(honest_scores: object) -> tuple[float, ...]:
 
 
 def plan_calibration[Rater](
-    monitor: Rater, *, honest_scores: tuple[float, ...], tie_share: float
+    monitor: Rater,
+    *,
+    honest_scores: tuple[float, ...],
+    tie_share: float,
 ) -> Plan[Rater, SuspicionScore, SuspicionScore]:
     """Plan the calibrated rating: ask the monitor once, then rank its score unless it failed."""
     (wrapped,) = yield (monitor,)
     if wrapped.failed_closed:
         return wrapped
-    return build_calibrated_score(wrapped, honest_scores=honest_scores, tie_share=tie_share)
+    return build_calibrated_score(
+        wrapped,
+        honest_scores=honest_scores,
+        tie_share=tie_share,
+    )
 
 
 def build_calibrated_score(
-    wrapped: SuspicionScore, *, honest_scores: tuple[float, ...], tie_share: float
+    wrapped: SuspicionScore,
+    *,
+    honest_scores: tuple[float, ...],
+    tie_share: float,
 ) -> SuspicionScore:
     """Rank a score among the sorted honest scores: its smoothed conformal p-value."""
-    below = bisect_left(honest_scores, wrapped.value)
-    tied = bisect_right(honest_scores, wrapped.value) - below
+    below = bisect_left(
+        honest_scores,
+        wrapped.value,
+    )
+    tied = (
+        bisect_right(
+            honest_scores,
+            wrapped.value,
+        )
+        - below
+    )
     return SuspicionScore(
         value=(below + tie_share * (tied + 1)) / (len(honest_scores) + 1),
         explanation=wrapped.explanation,
@@ -276,7 +445,12 @@ def build_calibrated_score(
     )
 
 
-def draw_tie_share(random_seed: int | None, *, action: Action, trajectory: Trajectory) -> float:
+def draw_tie_share(
+    random_seed: int | None,
+    *,
+    action: Action,
+    trajectory: Trajectory,
+) -> float:
     """Draw the tie share u, uniform on [0, 1): from the seed and the content when seeded.
 
     A string seed goes through SHA-512 in Python's `random`, so the draw is the same in
@@ -284,31 +458,48 @@ def draw_tie_share(random_seed: int | None, *, action: Action, trajectory: Traje
     """
     if random_seed is None:
         return random.random()
-    key = render_tie_break_key(action, trajectory=trajectory)
+    key = render_tie_break_key(
+        action,
+        trajectory=trajectory,
+    )
     return random.Random(f"{random_seed}\n{key}").random()
 
 
-def render_tie_break_key(action: Action, *, trajectory: Trajectory) -> str:
+def render_tie_break_key(
+    action: Action,
+    *,
+    trajectory: Trajectory,
+) -> str:
     """Render the history and the action as JSON, without the ids and ratings.
 
     Action ids are blanked because they are generated at random: the same action has a
     different id in every run.
     """
-    events = (*trajectory.history, action)
+    events = (
+        *trajectory.history,
+        action,
+    )
     return json.dumps([dump_event(_blank_action_id(event)) for event in events])
 
 
 def _blank_action_id(event: Event) -> Event:
     match event:
         case Action():
-            return replace(event, id="")
+            return replace(
+                event,
+                id="",
+            )
         case Observation():
             return event
         case unreachable:
             assert_never(unreachable)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class CascadeMonitor(Monitor):
     """Rates with a fast monitor, and with a careful one only when the fast score is high.
 
@@ -328,19 +519,44 @@ class CascadeMonitor(Monitor):
     escalation_threshold: float
 
     def __post_init__(self) -> None:
-        _check_monitor(self.fast, name="fast", async_twin=AsyncCascadeMonitor)
-        _check_monitor(self.careful, name="careful", async_twin=AsyncCascadeMonitor)
+        _check_monitor(
+            self.fast,
+            name="fast",
+            async_twin=AsyncCascadeMonitor,
+        )
+        _check_monitor(
+            self.careful,
+            name="careful",
+            async_twin=AsyncCascadeMonitor,
+        )
         _check_escalation_threshold(self)
 
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the fast monitor, and with the careful one if that escalates."""
         plan = plan_cascade(
-            self.fast, careful=self.careful, escalation_threshold=self.escalation_threshold
+            self.fast,
+            careful=self.careful,
+            escalation_threshold=self.escalation_threshold,
         )
-        return drive(plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory))
+        return drive(
+            plan,
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
+        )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncCascadeMonitor(AsyncMonitor):
     """Rates an action as CascadeMonitor does, with the monitors awaited."""
 
@@ -349,29 +565,58 @@ class AsyncCascadeMonitor(AsyncMonitor):
     escalation_threshold: float
 
     def __post_init__(self) -> None:
-        _check_async_monitor(self.fast, name="fast", twin=CascadeMonitor)
-        _check_async_monitor(self.careful, name="careful", twin=CascadeMonitor)
+        _check_async_monitor(
+            self.fast,
+            name="fast",
+            twin=CascadeMonitor,
+        )
+        _check_async_monitor(
+            self.careful,
+            name="careful",
+            twin=CascadeMonitor,
+        )
         _check_escalation_threshold(self)
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the fast monitor, and with the careful one if that escalates."""
         plan = plan_cascade(
-            self.fast, careful=self.careful, escalation_threshold=self.escalation_threshold
+            self.fast,
+            careful=self.careful,
+            escalation_threshold=self.escalation_threshold,
         )
         return await drive_concurrently(
-            plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory)
+            plan,
+            ask=lambda monitor: monitor.rate(
+                action,
+                trajectory=trajectory,
+            ),
         )
 
 
 def _check_escalation_threshold(cascade: CascadeMonitor | AsyncCascadeMonitor) -> None:
     """Keep the escalation threshold as a float, whatever real number was given, or raise."""
-    threshold = read_threshold(cascade.escalation_threshold, name="escalation_threshold")
+    threshold = read_threshold(
+        cascade.escalation_threshold,
+        name="escalation_threshold",
+    )
     # The dataclass is frozen, so the float is set past its guard.
-    object.__setattr__(cascade, "escalation_threshold", threshold)
+    object.__setattr__(
+        cascade,
+        "escalation_threshold",
+        threshold,
+    )
 
 
 def plan_cascade[Rater](
-    fast: Rater, *, careful: Rater, escalation_threshold: float
+    fast: Rater,
+    *,
+    careful: Rater,
+    escalation_threshold: float,
 ) -> Plan[Rater, SuspicionScore, SuspicionScore]:
     """Plan the cascade: ask the fast monitor, then the careful one if the fast score escalates."""
     (fast_score,) = yield (fast,)

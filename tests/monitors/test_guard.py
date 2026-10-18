@@ -39,9 +39,16 @@ from hyoshigi.trajectory.trajectory import Trajectory
 
 MODEL_NAME = "a-guard"
 # Labels written first, then category codes, as Llama Guard writes them.
-LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}))
+LABELS = GuardLabels(
+    suspicious=frozenset({"unsafe"}),
+    safe=frozenset({"safe"}),
+)
 TASK = "Summarise q3.md"
-READ = ToolCall(id="c1", name="read", arguments='{"path": "q3.md"}')
+READ = ToolCall(
+    id="c1",
+    name="read",
+    arguments='{"path": "q3.md"}',
+)
 ACTION = Action(tool_calls=(READ,))
 # A policy that shows exactly what the monitor puts in the prompt.
 POLICY = MonitorPrompt(
@@ -49,7 +56,10 @@ POLICY = MonitorPrompt(
     request="{trajectory}|{proposed_action}",
 )
 # The eight bytes every PNG file starts with (RFC 2083, section 3.1).
-PNG = MediaPart(media_type="image/png", data=b"\x89PNG\r\n\x1a\n")
+PNG = MediaPart(
+    media_type="image/png",
+    data=b"\x89PNG\r\n\x1a\n",
+)
 SAFE = Generation(text="safe")
 UNSAFE = Generation(text="unsafe\nS7")
 REFUSAL = Refused(explanation="I cannot assess this.")
@@ -57,23 +67,35 @@ UNREADABLE_SCORE = SuspicionScore(
     value=1.0,
     explanation="The monitor could not read its model's reply, so the action is treated as "
     "suspicious.",
-    evidence=FailedClosed(model=MODEL_NAME, cause=Unreadable()),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Unreadable(),
+    ),
 )
 TRUNCATED_SCORE = SuspicionScore(
     value=1.0,
     explanation="The monitor's model stopped before it gave a score, so the action is treated "
     "as suspicious.",
-    evidence=FailedClosed(model=MODEL_NAME, cause=Truncated(text="safe")),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Truncated(text="safe"),
+    ),
 )
 REFUSED_SCORE = SuspicionScore(
     value=1.0,
     explanation="The monitor's model refused to rate the action, so it is treated as suspicious.",
-    evidence=FailedClosed(model=MODEL_NAME, cause=REFUSAL),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=REFUSAL,
+    ),
 )
 UNAVAILABLE_SCORE = SuspicionScore(
     value=1.0,
     explanation="The monitor's model was unavailable, so the action is treated as suspicious.",
-    evidence=FailedClosed(model=MODEL_NAME, cause=Unavailable(status=503)),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Unavailable(status=503),
+    ),
 )
 IGNORE_HARD_LABELS = pytest.mark.filterwarnings("ignore::hyoshigi.monitors.guard.HardLabelWarning")
 
@@ -81,20 +103,33 @@ IGNORE_HARD_LABELS = pytest.mark.filterwarnings("ignore::hyoshigi.monitors.guard
 class Script:
     """The outcomes a scripted guard returns in order, and the prompts it received."""
 
-    def __init__(self, *outcomes: GenerationOutcome, perceives: MediaTypes = TEXT_ONLY) -> None:
+    def __init__(
+        self,
+        *outcomes: GenerationOutcome,
+        perceives: MediaTypes = TEXT_ONLY,
+    ) -> None:
         self.outcomes = list(outcomes)
         self.perceives = perceives
         self.received: list[Prompt] = []
 
-    def generate(self, prompt: Prompt) -> GenerationOutcome:
+    def generate(
+        self,
+        prompt: Prompt,
+    ) -> GenerationOutcome:
         self.received.append(prompt)
         return self.outcomes.pop(0)
 
-    async def generate_asynchronously(self, prompt: Prompt) -> GenerationOutcome:
+    async def generate_asynchronously(
+        self,
+        prompt: Prompt,
+    ) -> GenerationOutcome:
         return self.generate(prompt)
 
 
-class Options(TypedDict, total=False):
+class Options(
+    TypedDict,
+    total=False,
+):
     samples: int
     view: View
 
@@ -111,7 +146,10 @@ class Rate(Protocol):
 
 
 def build_trajectory() -> Trajectory:
-    return Trajectory.from_run(TASK, answer="Done.").trajectory
+    return Trajectory.from_run(
+        TASK,
+        answer="Done.",
+    ).trajectory
 
 
 def rate_synchronously(
@@ -121,9 +159,21 @@ def rate_synchronously(
     labels: GuardLabels = LABELS,
     **options: Unpack[Options],
 ) -> SuspicionScore:
-    model = GenerativeModel(name=MODEL_NAME, generate=script.generate, perceives=script.perceives)
-    monitor = GuardMonitor(model=model, prompt=POLICY, labels=labels, **options)
-    return monitor.rate(action, trajectory=build_trajectory())
+    model = GenerativeModel(
+        name=MODEL_NAME,
+        generate=script.generate,
+        perceives=script.perceives,
+    )
+    monitor = GuardMonitor(
+        model=model,
+        prompt=POLICY,
+        labels=labels,
+        **options,
+    )
+    return monitor.rate(
+        action,
+        trajectory=build_trajectory(),
+    )
 
 
 def rate_asynchronously(
@@ -134,13 +184,31 @@ def rate_asynchronously(
     **options: Unpack[Options],
 ) -> SuspicionScore:
     model = AsyncGenerativeModel(
-        name=MODEL_NAME, generate=script.generate_asynchronously, perceives=script.perceives
+        name=MODEL_NAME,
+        generate=script.generate_asynchronously,
+        perceives=script.perceives,
     )
-    monitor = AsyncGuardMonitor(model=model, prompt=POLICY, labels=labels, **options)
-    return asyncio.run(monitor.rate(action, trajectory=build_trajectory()))
+    monitor = AsyncGuardMonitor(
+        model=model,
+        prompt=POLICY,
+        labels=labels,
+        **options,
+    )
+    return asyncio.run(
+        monitor.rate(
+            action,
+            trajectory=build_trajectory(),
+        ),
+    )
 
 
-@pytest.fixture(params=[rate_synchronously, rate_asynchronously], ids=["sync", "async"])
+@pytest.fixture(
+    params=[
+        rate_synchronously,
+        rate_asynchronously,
+    ],
+    ids=["sync", "async"],
+)
 def rate(request: pytest.FixtureRequest) -> Rate:
     return request.param
 
@@ -148,30 +216,81 @@ def rate(request: pytest.FixtureRequest) -> Rate:
 @pytest.mark.parametrize(
     ("outcomes", "value"),
     [
-        ((SAFE, SAFE, SAFE, SAFE, SAFE), 0.0),
-        ((SAFE, UNSAFE, SAFE, SAFE, SAFE), 0.2),
-        ((UNSAFE, SAFE, UNSAFE, SAFE, UNSAFE), 0.6),
-        ((UNSAFE, UNSAFE, UNSAFE, UNSAFE, UNSAFE), 1.0),
+        (
+            (
+                SAFE,
+                SAFE,
+                SAFE,
+                SAFE,
+                SAFE,
+            ),
+            0.0,
+        ),
+        (
+            (
+                SAFE,
+                UNSAFE,
+                SAFE,
+                SAFE,
+                SAFE,
+            ),
+            0.2,
+        ),
+        (
+            (
+                UNSAFE,
+                SAFE,
+                UNSAFE,
+                SAFE,
+                UNSAFE,
+            ),
+            0.6,
+        ),
+        (
+            (
+                UNSAFE,
+                UNSAFE,
+                UNSAFE,
+                UNSAFE,
+                UNSAFE,
+            ),
+            1.0,
+        ),
     ],
     ids=["none-suspicious", "one-of-five", "three-of-five", "all-suspicious"],
 )
 def test_the_value_is_the_share_of_replies_labelled_suspicious_and_no_failure(
-    rate: Rate, outcomes: tuple[GenerationOutcome, ...], value: float
+    rate: Rate,
+    outcomes: tuple[GenerationOutcome, ...],
+    value: float,
 ) -> None:
     script = Script(*outcomes)
 
     score = rate(script)
 
-    assert (score.value, score.failed_closed) == (value, False)
+    assert (
+        score.value,
+        score.failed_closed,
+    ) == (
+        value,
+        False,
+    )
 
 
 def test_the_evidence_holds_the_label_of_each_sample_in_order(rate: Rate) -> None:
-    script = Script(UNSAFE, SAFE, UNSAFE, SAFE, SAFE)
+    script = Script(
+        UNSAFE,
+        SAFE,
+        UNSAFE,
+        SAFE,
+        SAFE,
+    )
 
     score = rate(script)
 
     assert score.evidence == Labels(
-        model=MODEL_NAME, labels=("unsafe", "safe", "unsafe", "safe", "safe")
+        model=MODEL_NAME,
+        labels=("unsafe", "safe", "unsafe", "safe", "safe"),
     )
 
 
@@ -190,12 +309,18 @@ def test_the_evidence_holds_the_label_of_each_sample_in_order(rate: Rate) -> Non
             "The guard model labelled the action 'unsafe', finding that it breaks the policy.",
         ),
         (
-            GuardLabels(suspicious=frozenset({"violation"}), safe=frozenset({"allowed", "fine"})),
+            GuardLabels(
+                suspicious=frozenset({"violation"}),
+                safe=frozenset({"allowed", "fine"}),
+            ),
             ("fine", "allowed", "fine", "allowed"),
             "The guard model labelled the action 'fine', finding that it follows the policy.",
         ),
         (
-            GuardLabels(suspicious=frozenset({"violation"}), safe=frozenset({"allowed", "fine"})),
+            GuardLabels(
+                suspicious=frozenset({"violation"}),
+                safe=frozenset({"allowed", "fine"}),
+            ),
             ("allowed", "fine", "fine", "fine"),
             "The guard model labelled the action 'allowed', finding that it follows the policy.",
         ),
@@ -208,11 +333,18 @@ def test_the_evidence_holds_the_label_of_each_sample_in_order(rate: Rate) -> Non
     ],
 )
 def test_the_explanation_names_the_most_severe_finding_without_a_count(
-    rate: Rate, labels: GuardLabels, replies: tuple[str, ...], explanation: str
+    rate: Rate,
+    labels: GuardLabels,
+    replies: tuple[str, ...],
+    explanation: str,
 ) -> None:
     script = Script(*[Generation(text=reply) for reply in replies])
 
-    score = rate(script, labels=labels, samples=len(replies))
+    score = rate(
+        script,
+        labels=labels,
+        samples=len(replies),
+    )
 
     assert score.explanation == explanation
 
@@ -220,21 +352,47 @@ def test_the_explanation_names_the_most_severe_finding_without_a_count(
 @IGNORE_HARD_LABELS
 @pytest.mark.parametrize(
     ("outcome", "value"),
-    [(SAFE, 0.0), (UNSAFE, 1.0)],
+    [
+        (
+            SAFE,
+            0.0,
+        ),
+        (
+            UNSAFE,
+            1.0,
+        ),
+    ],
     ids=["safe", "unsafe"],
 )
 def test_one_sample_scores_its_label_as_zero_or_one(
-    rate: Rate, outcome: GenerationOutcome, value: float
+    rate: Rate,
+    outcome: GenerationOutcome,
+    value: float,
 ) -> None:
     script = Script(outcome)
 
-    score = rate(script, samples=1)
+    score = rate(
+        script,
+        samples=1,
+    )
 
-    assert (score.value, len(script.received)) == (value, 1)
+    assert (
+        score.value,
+        len(script.received),
+    ) == (
+        value,
+        1,
+    )
 
 
 def test_five_samples_are_asked_by_default(rate: Rate) -> None:
-    script = Script(SAFE, SAFE, SAFE, SAFE, SAFE)
+    script = Script(
+        SAFE,
+        SAFE,
+        SAFE,
+        SAFE,
+        SAFE,
+    )
 
     rate(script)
 
@@ -244,9 +402,16 @@ def test_five_samples_are_asked_by_default(rate: Rate) -> None:
 def test_each_sample_is_asked_the_policy_built_from_the_rendering_with_bounds_zero_and_one(
     rate: Rate,
 ) -> None:
-    script = Script(SAFE, SAFE, SAFE)
+    script = Script(
+        SAFE,
+        SAFE,
+        SAFE,
+    )
 
-    rate(script, samples=3)
+    rate(
+        script,
+        samples=3,
+    )
 
     assert (
         script.received
@@ -256,30 +421,48 @@ def test_each_sample_is_asked_the_policy_built_from_the_rendering_with_bounds_ze
                 content=(
                     TextPart(
                         text="<user>Summarise q3.md</user>|"
-                        '<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>'
+                        '<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>',
                     ),
                 ),
-            )
+            ),
         ]
         * 3
     )
 
 
 def test_the_view_chooses_what_of_the_trajectory_the_guard_reads(rate: Rate) -> None:
-    script = Script(SAFE, SAFE)
+    script = Script(
+        SAFE,
+        SAFE,
+    )
 
-    rate(script, samples=2, view=View(channels=Channel.TOOL_CALLS))
+    rate(
+        script,
+        samples=2,
+        view=View(channels=Channel.TOOL_CALLS),
+    )
 
     assert [prompt.content for prompt in script.received] == [
-        (TextPart(text='|<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>'),)
+        (TextPart(text='|<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>'),),
     ] * 2
 
 
 def test_media_the_guard_perceives_reaches_it_in_place(rate: Rate) -> None:
-    script = Script(SAFE, SAFE, perceives=MediaTypes("image/*"))
-    action = Action(parts=(PNG,), tool_calls=(READ,))
+    script = Script(
+        SAFE,
+        SAFE,
+        perceives=MediaTypes("image/*"),
+    )
+    action = Action(
+        parts=(PNG,),
+        tool_calls=(READ,),
+    )
 
-    rate(script, action=action, samples=2)
+    rate(
+        script,
+        action=action,
+        samples=2,
+    )
 
     assert [prompt.content for prompt in script.received] == [
         (
@@ -287,22 +470,33 @@ def test_media_the_guard_perceives_reaches_it_in_place(rate: Rate) -> None:
             PNG,
             TextPart(
                 text="</media></agent>\n"
-                '<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>'
+                '<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>',
             ),
-        )
+        ),
     ] * 2
 
 
 def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Rate) -> None:
-    script = Script(SAFE, SAFE)
-    action = Action(thought=(OpaquePart(kind="reasoning.encrypted"),), tool_calls=(READ,))
+    script = Script(
+        SAFE,
+        SAFE,
+    )
+    action = Action(
+        thought=(OpaquePart(kind="reasoning.encrypted"),),
+        tool_calls=(READ,),
+    )
 
     score = rate(
-        script, action=action, samples=2, view=View(channels=Channel.DEFAULT | Channel.THOUGHTS)
+        script,
+        action=action,
+        samples=2,
+        view=View(channels=Channel.DEFAULT | Channel.THOUGHTS),
     )
 
     assert score.evidence == Labels(
-        model=MODEL_NAME, labels=("safe", "safe"), hidden_reasoning=("reasoning.encrypted",)
+        model=MODEL_NAME,
+        labels=("safe", "safe"),
+        hidden_reasoning=("reasoning.encrypted",),
     )
 
 
@@ -310,7 +504,12 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
     ("outcomes", "expected"),
     [
         pytest.param(
-            (SAFE, Generation(text="I cannot decide."), SAFE, SAFE),
+            (
+                SAFE,
+                Generation(text="I cannot decide."),
+                SAFE,
+                SAFE,
+            ),
             UNREADABLE_SCORE,
             id="a-reply-with-no-label",
         ),
@@ -325,38 +524,68 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             id="an-ambiguous-reply",
         ),
         pytest.param(
-            (SAFE, Truncated(text="safe"), SAFE, SAFE),
+            (
+                SAFE,
+                Truncated(text="safe"),
+                SAFE,
+                SAFE,
+            ),
             TRUNCATED_SCORE,
             id="a-reply-cut-off",
         ),
         pytest.param(
-            (SAFE, Unavailable(status=503), REFUSAL, SAFE),
+            (
+                SAFE,
+                Unavailable(status=503),
+                REFUSAL,
+                SAFE,
+            ),
             UNAVAILABLE_SCORE,
             id="unavailable-before-a-refusal",
         ),
         pytest.param(
-            (Truncated(text="safe"), REFUSAL, SAFE, SAFE),
+            (
+                Truncated(text="safe"),
+                REFUSAL,
+                SAFE,
+                SAFE,
+            ),
             TRUNCATED_SCORE,
             id="a-cut-off-reply-before-a-refusal",
         ),
         pytest.param(
-            (Generation(text="I cannot decide."), REFUSAL, SAFE, SAFE),
+            (
+                Generation(text="I cannot decide."),
+                REFUSAL,
+                SAFE,
+                SAFE,
+            ),
             UNREADABLE_SCORE,
             id="a-reply-with-no-label-before-a-refusal",
         ),
         pytest.param(
-            (SAFE, REFUSAL, Generation(text="I cannot decide."), Truncated(text="safe")),
+            (
+                SAFE,
+                REFUSAL,
+                Generation(text="I cannot decide."),
+                Truncated(text="safe"),
+            ),
             REFUSED_SCORE,
             id="a-refusal-before-a-reply-with-no-label",
         ),
     ],
 )
 def test_the_first_sample_that_fails_closes_the_whole_score_with_its_cause(
-    rate: Rate, outcomes: tuple[GenerationOutcome, ...], expected: SuspicionScore
+    rate: Rate,
+    outcomes: tuple[GenerationOutcome, ...],
+    expected: SuspicionScore,
 ) -> None:
     script = Script(*outcomes)
 
-    score = rate(script, samples=4)
+    score = rate(
+        script,
+        samples=4,
+    )
 
     assert score == expected
 
@@ -364,16 +593,29 @@ def test_the_first_sample_that_fails_closes_the_whole_score_with_its_cause(
 def test_an_action_with_content_the_guard_cannot_perceive_fails_closed_without_asking(
     rate: Rate,
 ) -> None:
-    script = Script(SAFE, SAFE)
-    action = Action(parts=(OpaquePart(kind="server_tool_use"),), tool_calls=(READ,))
+    script = Script(
+        SAFE,
+        SAFE,
+    )
+    action = Action(
+        parts=(OpaquePart(kind="server_tool_use"),),
+        tool_calls=(READ,),
+    )
 
-    score = rate(script, action=action, samples=2)
+    score = rate(
+        script,
+        action=action,
+        samples=2,
+    )
 
     assert score == SuspicionScore(
         value=1.0,
         explanation="The action holds content the monitor cannot perceive, so it is treated as "
         "suspicious.",
-        evidence=FailedClosed(model=MODEL_NAME, cause=Unperceivable(content=("server_tool_use",))),
+        evidence=FailedClosed(
+            model=MODEL_NAME,
+            cause=Unperceivable(content=("server_tool_use",)),
+        ),
     )
     assert script.received == []
 
@@ -384,24 +626,41 @@ def test_the_async_monitor_asks_every_sample_at_once() -> None:
 
     async def generate_together(prompt: Prompt) -> GenerationOutcome:
         asked.append(prompt)
-        await asyncio.wait_for(barrier.wait(), timeout=5)
+        await asyncio.wait_for(
+            barrier.wait(),
+            timeout=5,
+        )
         return UNSAFE
 
     monitor = AsyncGuardMonitor(
-        model=AsyncGenerativeModel(name=MODEL_NAME, generate=generate_together),
+        model=AsyncGenerativeModel(
+            name=MODEL_NAME,
+            generate=generate_together,
+        ),
         prompt=POLICY,
         labels=LABELS,
     )
 
-    score = asyncio.run(monitor.rate(ACTION, trajectory=build_trajectory()))
+    score = asyncio.run(
+        monitor.rate(
+            ACTION,
+            trajectory=build_trajectory(),
+        ),
+    )
 
-    assert (len(asked), score.value) == (5, 1.0)
+    assert (
+        len(asked),
+        score.value,
+    ) == (5, 1.0)
 
 
 class ArrayInteger:
     """Stands in for numpy's integers: registered as integral, but not a subclass of int."""
 
-    def __init__(self, value: int) -> None:
+    def __init__(
+        self,
+        value: int,
+    ) -> None:
         self.value = value
 
     def __index__(self) -> int:
@@ -419,24 +678,53 @@ async def build_refusal_asynchronously(prompt: Prompt) -> GenerationOutcome:
     return Refused()
 
 
-SYNC_MODEL = GenerativeModel(name=MODEL_NAME, generate=build_refusal)
-ASYNC_MODEL = AsyncGenerativeModel(name=MODEL_NAME, generate=build_refusal_asynchronously)
+SYNC_MODEL = GenerativeModel(
+    name=MODEL_NAME,
+    generate=build_refusal,
+)
+ASYNC_MODEL = AsyncGenerativeModel(
+    name=MODEL_NAME,
+    generate=build_refusal_asynchronously,
+)
 
 
 def build_with(
-    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object, **options: object
+    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor],
+    model: object,
+    **options: object,
 ) -> GuardMonitor | AsyncGuardMonitor:
     """Build a monitor from arguments of any type, which the constructor must check."""
-    arguments = {"prompt": POLICY, "labels": LABELS, **options}
-    return monitor_class(model=model, **arguments)  # ty: ignore[invalid-argument-type]
+    arguments = {
+        "prompt": POLICY,
+        "labels": LABELS,
+        **options,
+    }
+    return monitor_class(
+        model=model,  # ty: ignore[invalid-argument-type]
+        **arguments,  # ty: ignore[invalid-argument-type]
+    )
 
 
 @pytest.fixture(
-    params=[(GuardMonitor, SYNC_MODEL), (AsyncGuardMonitor, ASYNC_MODEL)], ids=["sync", "async"]
+    params=[
+        (
+            GuardMonitor,
+            SYNC_MODEL,
+        ),
+        (
+            AsyncGuardMonitor,
+            ASYNC_MODEL,
+        ),
+    ],
+    ids=["sync", "async"],
 )
 def build(request: pytest.FixtureRequest) -> Callable[..., GuardMonitor | AsyncGuardMonitor]:
     monitor_class, model = request.param
-    return partial(build_with, monitor_class, model)
+    return partial(
+        build_with,
+        monitor_class,
+        model,
+    )
 
 
 HARD_LABEL_WARNING = (
@@ -445,9 +733,17 @@ HARD_LABEL_WARNING = (
 )
 
 
-@pytest.mark.parametrize("samples", [1, ArrayInteger(1)], ids=["int", "integral"])
+@pytest.mark.parametrize(
+    "samples",
+    [
+        1,
+        ArrayInteger(1),
+    ],
+    ids=["int", "integral"],
+)
 def test_one_sample_warns_that_every_threshold_flags_the_same_actions(
-    build: Callable[..., GuardMonitor | AsyncGuardMonitor], samples: object
+    build: Callable[..., GuardMonitor | AsyncGuardMonitor],
+    samples: object,
 ) -> None:
     with pytest.warns(HardLabelWarning) as record:
         build(samples=samples)
@@ -460,21 +756,44 @@ def test_one_sample_warns_that_every_threshold_flags_the_same_actions(
 # one frame too far lands outside this file.
 @pytest.mark.parametrize(
     ("monitor_class", "model"),
-    [(GuardMonitor, SYNC_MODEL), (AsyncGuardMonitor, ASYNC_MODEL)],
+    [
+        (
+            GuardMonitor,
+            SYNC_MODEL,
+        ),
+        (
+            AsyncGuardMonitor,
+            ASYNC_MODEL,
+        ),
+    ],
     ids=["sync", "async"],
 )
 def test_the_one_sample_warning_points_at_the_line_that_builds_the_monitor(
-    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object
+    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor],
+    model: object,
 ) -> None:
     with pytest.warns(HardLabelWarning) as record:
-        monitor_class(model=model, prompt=POLICY, labels=LABELS, samples=1)  # ty: ignore[invalid-argument-type]
+        monitor_class(
+            model=model,  # ty: ignore[invalid-argument-type]
+            prompt=POLICY,
+            labels=LABELS,
+            samples=1,
+        )
 
     assert [warning.filename for warning in record] == [__file__]
 
 
-@pytest.mark.parametrize("options", [{}, {"samples": 2}], ids=["default", "two"])
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"samples": 2},
+    ],
+    ids=["default", "two"],
+)
 def test_more_than_one_sample_builds_without_a_warning(
-    build: Callable[..., GuardMonitor | AsyncGuardMonitor], options: dict[str, object]
+    build: Callable[..., GuardMonitor | AsyncGuardMonitor],
+    options: dict[str, object],
 ) -> None:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -502,10 +821,15 @@ def test_more_than_one_sample_builds_without_a_warning(
     ids=["async-model-for-the-sync-monitor", "sync-model-for-the-async-monitor"],
 )
 def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to(
-    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object, message: str
+    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor],
+    model: object,
+    message: str,
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
-        build_with(monitor_class, model)
+        build_with(
+            monitor_class,
+            model,
+        )
 
     assert str(raised.value) == message
 
@@ -513,15 +837,30 @@ def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to
 @pytest.mark.parametrize(
     ("options", "message"),
     [
-        ({"prompt": "Flag it."}, "prompt must be a MonitorPrompt, got an instance of str"),
+        (
+            {"prompt": "Flag it."},
+            "prompt must be a MonitorPrompt, got an instance of str",
+        ),
         (
             {"labels": frozenset({"unsafe"})},
             "labels must be a GuardLabels, got an instance of frozenset",
         ),
-        ({"view": View}, "view must be a View, got the class View; pass an instance"),
-        ({"samples": 0}, "samples must be at least 1, got 0"),
-        ({"samples": 1.5}, "samples must be a whole number of at least 1, got 1.5"),
-        ({"samples": True}, "samples must be a whole number of at least 1, got True"),
+        (
+            {"view": View},
+            "view must be a View, got the class View; pass an instance",
+        ),
+        (
+            {"samples": 0},
+            "samples must be at least 1, got 0",
+        ),
+        (
+            {"samples": 1.5},
+            "samples must be a whole number of at least 1, got 1.5",
+        ),
+        (
+            {"samples": True},
+            "samples must be a whole number of at least 1, got True",
+        ),
     ],
     ids=[
         "prompt-string",
@@ -533,7 +872,9 @@ def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to
     ],
 )
 def test_an_option_that_cannot_work_is_refused_naming_it(
-    build: Callable[..., GuardMonitor | AsyncGuardMonitor], options: dict[str, object], message: str
+    build: Callable[..., GuardMonitor | AsyncGuardMonitor],
+    options: dict[str, object],
+    message: str,
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
         build(**options)
@@ -546,4 +887,10 @@ def test_a_whole_number_of_samples_that_is_not_an_int_is_kept_as_an_int(
 ) -> None:
     monitor = build(samples=ArrayInteger(3))
 
-    assert (type(monitor.samples), monitor.samples) == (int, 3)
+    assert (
+        type(monitor.samples),
+        monitor.samples,
+    ) == (
+        int,
+        3,
+    )

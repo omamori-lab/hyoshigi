@@ -4,7 +4,10 @@ from hyoshigi import Action, Author, TextPart, ToolObservation
 
 
 def test_a_tool_observation_is_authored_by_the_tool() -> None:
-    observation = ToolObservation(call_id="call_1", parts=(TextPart(text="Revenue: 4.2M"),))
+    observation = ToolObservation(
+        call_id="call_1",
+        parts=(TextPart(text="Revenue: 4.2M"),),
+    )
 
     assert observation.author is Author.TOOL
 

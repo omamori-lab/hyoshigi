@@ -13,7 +13,7 @@ try:
     from openrouter.types import UNSET
 except ModuleNotFoundError as error:
     raise ModuleNotFoundError(
-        "OpenRouter models need the extra: pip install 'hyoshigi[openrouter]'"
+        "OpenRouter models need the extra: pip install 'hyoshigi[openrouter]'",
     ) from error
 
 from hyoshigi.errors import ConfigurationError
@@ -75,12 +75,16 @@ REJECTED_INPUT = frozenset(
         "empty_image_file",
         "failed_to_download_image",
         "image_file_not_found",
-    }
+    },
 )
 
 # Every failure the SDK raises: the HTTP library's request errors (connection, timeout, decoding),
 # the SDK's errors for a status or an unreadable reply, and its error for no response.
-FAILURES = (httpx.RequestError, errors.OpenRouterError, errors.NoResponseError)
+FAILURES = (
+    httpx.RequestError,
+    errors.OpenRouterError,
+    errors.NoResponseError,
+)
 type Failure = httpx.RequestError | errors.OpenRouterError | errors.NoResponseError
 
 
@@ -100,7 +104,17 @@ def build_input(prompt: Prompt) -> components.InputsUnionTypedDict | None:
     is in a form the API cannot take.
     """
     content = responses.build_content(prompt)
-    return None if content is None else [{"type": "message", "role": "user", "content": content}]
+    return (
+        None
+        if content is None
+        else [
+            {
+                "type": "message",
+                "role": "user",
+                "content": content,
+            },
+        ]
+    )
 
 
 def build_image(part: MediaPart) -> ImageObject | None:
@@ -108,7 +122,14 @@ def build_image(part: MediaPart) -> ImageObject | None:
     Decisions API reads data URLs and does not fetch a URL, even one that is a data URL.
     """
     data_url = responses.encode(part)
-    return None if data_url is None else {"type": "image_url", "image_url": {"url": data_url}}
+    return (
+        None
+        if data_url is None
+        else {
+            "type": "image_url",
+            "image_url": {"url": data_url},
+        }
+    )
 
 
 def build_state_item(part: PromptPart) -> str | ImageObject | None:
@@ -124,7 +145,7 @@ def build_state_item(part: PromptPart) -> str | ImageObject | None:
             return build_image(part)
         case MediaPart(media_type=media_type):
             raise ConfigurationError(
-                f"OpenRouter's Decisions API reads png, jpeg and webp images, not {media_type}"
+                f"OpenRouter's Decisions API reads png, jpeg and webp images, not {media_type}",
             )
         case _:
             assert_never(part)
@@ -158,14 +179,23 @@ def read_codes(body: str) -> tuple[str, ...]:
     return tuple(codes)
 
 
-def read_failure(status: int, *, codes: tuple[str, ...]) -> Refused | Unavailable:
+def read_failure(
+    status: int,
+    *,
+    codes: tuple[str, ...],
+) -> Refused | Unavailable:
     """The outcome of an HTTP failure with this status and these error codes.
 
     A refusal is refused. No answer now (a status below 400, above 499 or one to ask again
     later), or input the provider rejects, is unavailable. Any other rejection is misuse: it
     raises ConfigurationError naming only the status.
     """
-    if any(map(responses.names_refusal, codes)):
+    if any(
+        map(
+            responses.names_refusal,
+            codes,
+        ),
+    ):
         return Refused()
     if (
         not 400 <= status < 500
@@ -188,8 +218,14 @@ def read_error(error: Failure) -> Refused | Unavailable:
             return Unavailable()
         case errors.OpenRouterError(status_code=status) if 200 <= status < 300:
             return Unavailable()
-        case errors.OpenRouterError(status_code=status, body=body):
-            return read_failure(status, codes=read_codes(body))
+        case errors.OpenRouterError(
+            status_code=status,
+            body=body,
+        ):
+            return read_failure(
+                status,
+                codes=read_codes(body),
+            )
         case _:
             assert_never(error)
 
@@ -212,7 +248,10 @@ def restore(value: JSON) -> JSON:
     validate, put back as the payload it kept.
     """
     match value:
-        case {"is_unknown": True, "raw": dict() as raw}:
+        case {
+            "is_unknown": True,
+            "raw": dict() as raw,
+        }:
             return raw
         case dict():
             return {key: restore(item) for key, item in value.items()}
@@ -246,7 +285,10 @@ def build_model(
     ConfigurationError if the model id is empty or perceives names media the API cannot carry.
     """
     check_name(model)
-    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=responses.CARRIED_MEDIA,
+    )
     limit = UNSET if max_output_tokens is None else max_output_tokens
     reasoning = (
         UNSET if reasoning_effort is None else components.ReasoningConfig(effort=reasoning_effort)
@@ -270,7 +312,11 @@ def build_model(
             return read_reply(reply)
         return read_error(error)
 
-    return GenerativeModel(name=f"openrouter:{model}", generate=generate, perceives=perceives)
+    return GenerativeModel(
+        name=f"openrouter:{model}",
+        generate=generate,
+        perceives=perceives,
+    )
 
 
 def build_async_model(
@@ -283,7 +329,10 @@ def build_async_model(
 ) -> AsyncGenerativeModel:
     """A model on the Responses API, through the caller's client, awaited."""
     check_name(model)
-    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=responses.CARRIED_MEDIA,
+    )
     limit = UNSET if max_output_tokens is None else max_output_tokens
     reasoning = (
         UNSET if reasoning_effort is None else components.ReasoningConfig(effort=reasoning_effort)
@@ -307,10 +356,19 @@ def build_async_model(
             return read_reply(reply)
         return read_error(error)
 
-    return AsyncGenerativeModel(name=f"openrouter:{model}", generate=generate, perceives=perceives)
+    return AsyncGenerativeModel(
+        name=f"openrouter:{model}",
+        generate=generate,
+        perceives=perceives,
+    )
 
 
-def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaTypes) -> DecisionModel:
+def build_decision_model(
+    client: OpenRouter,
+    *,
+    model: str,
+    perceives: MediaTypes,
+) -> DecisionModel:
     """A decision model on the Decisions API, through the caller's client.
 
     The question is one noul question, whose instructions are the statement; the probability
@@ -318,7 +376,10 @@ def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaType
     perceives names media the API cannot read.
     """
     check_name(model)
-    check_perceives(perceives, carries=DECISION_IMAGES)
+    check_perceives(
+        perceives,
+        carries=DECISION_IMAGES,
+    )
 
     def decide(question: Question) -> DecisionOutcome:
         state = collect([build_state_item(part) for part in question.state])
@@ -328,7 +389,12 @@ def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaType
             reply = client.alpha.decisions.create(
                 model=model,
                 state=state,
-                questions={QUESTION_NAME: {"type": "noul", "instructions": question.statement}},
+                questions={
+                    QUESTION_NAME: {
+                        "type": "noul",
+                        "instructions": question.statement,
+                    },
+                },
             )
         except FAILURES as caught:
             error = caught
@@ -336,15 +402,25 @@ def build_decision_model(client: OpenRouter, *, model: str, perceives: MediaType
             return read_decision(reply)
         return read_error(error)
 
-    return DecisionModel(name=f"openrouter:{model}", decide=decide, perceives=perceives)
+    return DecisionModel(
+        name=f"openrouter:{model}",
+        decide=decide,
+        perceives=perceives,
+    )
 
 
 def build_async_decision_model(
-    client: OpenRouter, *, model: str, perceives: MediaTypes
+    client: OpenRouter,
+    *,
+    model: str,
+    perceives: MediaTypes,
 ) -> AsyncDecisionModel:
     """A decision model on the Decisions API, through the caller's client, awaited."""
     check_name(model)
-    check_perceives(perceives, carries=DECISION_IMAGES)
+    check_perceives(
+        perceives,
+        carries=DECISION_IMAGES,
+    )
 
     async def decide(question: Question) -> DecisionOutcome:
         state = collect([build_state_item(part) for part in question.state])
@@ -354,7 +430,12 @@ def build_async_decision_model(
             reply = await client.alpha.decisions.create_async(
                 model=model,
                 state=state,
-                questions={QUESTION_NAME: {"type": "noul", "instructions": question.statement}},
+                questions={
+                    QUESTION_NAME: {
+                        "type": "noul",
+                        "instructions": question.statement,
+                    },
+                },
             )
         except FAILURES as caught:
             error = caught
@@ -362,4 +443,8 @@ def build_async_decision_model(
             return read_decision(reply)
         return read_error(error)
 
-    return AsyncDecisionModel(name=f"openrouter:{model}", decide=decide, perceives=perceives)
+    return AsyncDecisionModel(
+        name=f"openrouter:{model}",
+        decide=decide,
+        perceives=perceives,
+    )

@@ -26,15 +26,26 @@ def average_values(values: Iterable[float]) -> float:
     0.10000000000000002, where the mean of 0.1 alone is 0.1. Rounding makes equal means equal
     values, which a CalibratedMonitor ranks alike.
     """
-    return round(statistics.fmean(values), MEAN_DECIMAL_PLACES)
+    return round(
+        statistics.fmean(values),
+        MEAN_DECIMAL_PLACES,
+    )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Unreadable:
     """The model's replies held no readable score or label, after any retries."""
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Unperceivable:
     """The kinds and media types of the content in the rated action that the monitor cannot
     perceive: at least one.
@@ -50,7 +61,11 @@ class Unperceivable:
 type Cause = Unreadable | Unperceivable | Truncated | Refused | Unavailable
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class FailedClosed:
     """The monitor could not rate the action, so it scored 1.0; the cause says why."""
 
@@ -58,7 +73,11 @@ class FailedClosed:
     cause: Cause
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Rationale:
     """The model that wrote the reasons for a score, and its hidden reasoning if it gave any."""
 
@@ -66,7 +85,11 @@ class Rationale:
     hidden_reasoning: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class StatementDecision:
     """The decision a model gave on one statement about the state."""
 
@@ -74,7 +97,11 @@ class StatementDecision:
     decision: Decision
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Decisions:
     """The decisions a model gave on the monitor's statements, and its hidden reasoning."""
 
@@ -83,7 +110,11 @@ class Decisions:
     hidden_reasoning: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Labels:
     """The label a guard model gave in each sampled reply, in order, and its hidden reasoning."""
 
@@ -92,16 +123,28 @@ class Labels:
     hidden_reasoning: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Composite:
     """The scores a monitor combined into its own: a tuple of at least one."""
 
     parts: tuple[SuspicionScore, ...]
 
     def __post_init__(self) -> None:
-        check_instance(self.parts, expected=tuple, name="parts")
+        check_instance(
+            self.parts,
+            expected=tuple,
+            name="parts",
+        )
         for position, part in enumerate(self.parts):
-            check_instance(part, expected=SuspicionScore, name=f"parts[{position}]")
+            check_instance(
+                part,
+                expected=SuspicionScore,
+                name=f"parts[{position}]",
+            )
         if not self.parts:
             raise ConfigurationError("a composite holds at least one score")
 
@@ -109,7 +152,11 @@ class Composite:
 type Evidence = Rationale | Decisions | Labels | Composite | FailedClosed
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class SuspicionScore:
     """How suspicious an action is, from 0 to 1, with an explanation and the evidence.
 
@@ -125,12 +172,26 @@ class SuspicionScore:
 
     def __post_init__(self) -> None:
         # The dataclass is frozen, so the float is set past its guard.
-        object.__setattr__(self, "value", read_threshold(self.value, name="value"))
-        check_instance(self.explanation, expected=str, name="explanation")
-        if not isinstance(self.evidence, Rationale | Decisions | Labels | Composite | FailedClosed):
+        object.__setattr__(
+            self,
+            "value",
+            read_threshold(
+                self.value,
+                name="value",
+            ),
+        )
+        check_instance(
+            self.explanation,
+            expected=str,
+            name="explanation",
+        )
+        if not isinstance(
+            self.evidence,
+            Rationale | Decisions | Labels | Composite | FailedClosed,
+        ):
             raise ConfigurationError(
                 "evidence must be a Rationale, Decisions, Labels, Composite or FailedClosed, "
-                f"got {describe_type(self.evidence)}"
+                f"got {describe_type(self.evidence)}",
             )
         if self.failed_closed and self.value != 1.0:
             raise ConfigurationError("a score that failed closed has the value 1.0")
@@ -149,7 +210,11 @@ class SuspicionScore:
                 assert_never(unreachable)
 
 
-def fail_closed(cause: Cause, *, model: str) -> SuspicionScore:
+def fail_closed(
+    cause: Cause,
+    *,
+    model: str,
+) -> SuspicionScore:
     """The score of an action the monitor could not rate: 1.0, with the cause as evidence.
 
     The explanation names the failure without its content, since the agent may read it.
@@ -157,7 +222,10 @@ def fail_closed(cause: Cause, *, model: str) -> SuspicionScore:
     return SuspicionScore(
         value=1.0,
         explanation=explain_failure(cause),
-        evidence=FailedClosed(model=model, cause=cause),
+        evidence=FailedClosed(
+            model=model,
+            cause=cause,
+        ),
     )
 
 

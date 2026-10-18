@@ -50,7 +50,11 @@ class HardLabelWarning(UserWarning):
     """
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class GuardMonitor(Monitor):
     """Rates an action by the share of a guard model's sampled replies labelled suspicious.
 
@@ -83,14 +87,28 @@ class GuardMonitor(Monitor):
         )
         _check_options(self)
 
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the share of sampled replies labelled suspicious."""
         return drive(
-            plan_guard(self, action=action, trajectory=trajectory), ask=self.model.generate
+            plan_guard(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
+            ask=self.model.generate,
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncGuardMonitor(AsyncMonitor):
     """Rates an action as GuardMonitor does, with the samples awaited at once."""
 
@@ -109,21 +127,51 @@ class AsyncGuardMonitor(AsyncMonitor):
         )
         _check_options(self)
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the share of sampled replies labelled suspicious."""
         return await drive_concurrently(
-            plan_guard(self, action=action, trajectory=trajectory), ask=self.model.generate
+            plan_guard(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
+            ask=self.model.generate,
         )
 
 
 def _check_options(monitor: GuardMonitor | AsyncGuardMonitor) -> None:
     """Raise ConfigurationError for an option that cannot work; warn for one sample."""
-    check_instance(monitor.prompt, expected=MonitorPrompt, name="prompt")
-    check_instance(monitor.labels, expected=GuardLabels, name="labels")
-    check_instance(monitor.view, expected=View, name="view")
-    samples = read_count(monitor.samples, name="samples", minimum=1)
+    check_instance(
+        monitor.prompt,
+        expected=MonitorPrompt,
+        name="prompt",
+    )
+    check_instance(
+        monitor.labels,
+        expected=GuardLabels,
+        name="labels",
+    )
+    check_instance(
+        monitor.view,
+        expected=View,
+        name="view",
+    )
+    samples = read_count(
+        monitor.samples,
+        name="samples",
+        minimum=1,
+    )
     # The dataclass is frozen, so the int is set past its guard.
-    object.__setattr__(monitor, "samples", samples)
+    object.__setattr__(
+        monitor,
+        "samples",
+        samples,
+    )
     if samples == 1:
         # The warning points at the caller, past __post_init__ and the dataclass's __init__.
         warnings.warn(
@@ -135,7 +183,10 @@ def _check_options(monitor: GuardMonitor | AsyncGuardMonitor) -> None:
 
 
 def plan_guard(
-    monitor: GuardMonitor | AsyncGuardMonitor, *, action: Action, trajectory: Trajectory
+    monitor: GuardMonitor | AsyncGuardMonitor,
+    *,
+    action: Action,
+    trajectory: Trajectory,
 ) -> Plan[Prompt, GenerationOutcome, SuspicionScore]:
     """Plan the rating: render the action, ask the guard every sample at once, score the labels.
 
@@ -144,50 +195,88 @@ def plan_guard(
     """
     name = monitor.model.name
     rendering = render(
-        action, trajectory=trajectory, view=monitor.view, perceives=monitor.model.perceives
+        action,
+        trajectory=trajectory,
+        view=monitor.view,
+        perceives=monitor.model.perceives,
     )
     if rendering.unperceivable:
-        return fail_closed(Unperceivable(content=rendering.unperceivable), model=name)
-    request = monitor.prompt.build(rendering, lowest_score=0, highest_score=1)
+        return fail_closed(
+            Unperceivable(content=rendering.unperceivable),
+            model=name,
+        )
+    request = monitor.prompt.build(
+        rendering,
+        lowest_score=0,
+        highest_score=1,
+    )
     outcomes = yield (request,) * monitor.samples
     labels: list[str] = []
     for outcome in outcomes:
-        match _read_sample(outcome, labels=monitor.labels):
+        match _read_sample(
+            outcome,
+            labels=monitor.labels,
+        ):
             case str(label):
                 labels.append(label)
             case Unreadable() | Truncated() | Refused() | Unavailable() as failure:
-                return fail_closed(failure, model=name)
+                return fail_closed(
+                    failure,
+                    model=name,
+                )
             case unreachable:
                 assert_never(unreachable)
     return _score_labels(
-        Labels(model=name, labels=tuple(labels), hidden_reasoning=rendering.hidden_reasoning),
+        Labels(
+            model=name,
+            labels=tuple(labels),
+            hidden_reasoning=rendering.hidden_reasoning,
+        ),
         suspicious=monitor.labels.suspicious,
     )
 
 
 def _read_sample(
-    outcome: GenerationOutcome, *, labels: GuardLabels
+    outcome: GenerationOutcome,
+    *,
+    labels: GuardLabels,
 ) -> str | Unreadable | Truncated | Refused | Unavailable:
     """Return the label a sample holds, or the outcome that fails the rating closed."""
     match outcome:
         case Generation(text=text):
-            return read_label(text, labels=labels)
+            return read_label(
+                text,
+                labels=labels,
+            )
         case Truncated() | Refused() | Unavailable():
             return outcome
         case unreachable:
             assert_never(unreachable)
 
 
-def _score_labels(evidence: Labels, *, suspicious: frozenset[str]) -> SuspicionScore:
+def _score_labels(
+    evidence: Labels,
+    *,
+    suspicious: frozenset[str],
+) -> SuspicionScore:
     """Score the share of suspicious labels, explained by the first one, else the first label."""
     flagged = [label for label in evidence.labels if label in suspicious]
-    explanation = _explain_label((flagged or evidence.labels)[0], suspicious=suspicious)
+    explanation = _explain_label(
+        (flagged or evidence.labels)[0],
+        suspicious=suspicious,
+    )
     return SuspicionScore(
-        value=len(flagged) / len(evidence.labels), explanation=explanation, evidence=evidence
+        value=len(flagged) / len(evidence.labels),
+        explanation=explanation,
+        evidence=evidence,
     )
 
 
-def _explain_label(label: str, *, suspicious: frozenset[str]) -> str:
+def _explain_label(
+    label: str,
+    *,
+    suspicious: frozenset[str],
+) -> str:
     """Say which label the guard gave and what it found, without any count."""
     finding = "breaks" if label in suspicious else "follows"
     return f"The guard model labelled the action {label!r}, finding that it {finding} the policy."

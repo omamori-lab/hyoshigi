@@ -36,23 +36,40 @@ type Respond = Callable[[httpx.Request], httpx.Response]
 
 MODEL = "openai/gpt-4o"
 JEV = "typesafe/jev-1.14"
-PROMPT = Prompt(system="Rate the action.", content=(TextPart(text="Run: ls"),))
-QUESTION = Question(statement="The action is safe.", state=(TextPart(text="Run: ls"),))
+PROMPT = Prompt(
+    system="Rate the action.",
+    content=(TextPart(text="Run: ls"),),
+)
+QUESTION = Question(
+    statement="The action is safe.",
+    state=(TextPart(text="Run: ls"),),
+)
 
 # https://openrouter.ai/docs/api/api-reference/responses/create-a-response: the 200 example, the
 # examples of its schemas OpenAIResponsesRefusalContent, IncompleteDetails, OutputReasoningItem
 # and OpenResponsesErrorField, and the error examples of each status.
 JOKE = "Why did the chicken cross the road? To get to the other side!"
 REFUSAL = "I'm sorry, I cannot assist with that request"
-REFUSAL_PART: JSON = {"refusal": REFUSAL, "type": "refusal"}
+REFUSAL_PART: JSON = {
+    "refusal": REFUSAL,
+    "type": "refusal",
+}
 REASONING: JSON = {
-    "content": [{"text": "First, we analyze the problem...", "type": "reasoning_text"}],
+    "content": [
+        {
+            "text": "First, we analyze the problem...",
+            "type": "reasoning_text",
+        },
+    ],
     "format": "anthropic-claude-v1",
     "id": "reasoning-123",
     "signature": "EvcBCkgIChABGAIqQKkSDbRuVEQUk9qN1odC098l9SEj...",
     "status": "completed",
     "summary": [
-        {"text": "Analyzed the problem and found the optimal solution.", "type": "summary_text"}
+        {
+            "text": "Analyzed the problem and found the optimal solution.",
+            "type": "summary_text",
+        },
     ],
     "type": "reasoning",
 }
@@ -62,7 +79,11 @@ UNLISTED_PART: JSON = {"type": "unlisted"}
 
 
 def build_text(text: str) -> JSON:
-    return {"annotations": [], "text": text, "type": "output_text"}
+    return {
+        "annotations": [],
+        "text": text,
+        "type": "output_text",
+    }
 
 
 def build_message(*content: JSON) -> JSON:
@@ -106,36 +127,59 @@ COMPLETED: dict[str, JSON] = {
 
 
 def build_response(**changes: JSON) -> dict[str, JSON]:
-    return {**COMPLETED, **changes}
+    return {
+        **COMPLETED,
+        **changes,
+    }
 
 
 # https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request: the 200
 # example's envelope and answers, the noul answer put under the question's key.
-IS_BUG: JSON = {"noul": 0.96, "type": "noul"}
+IS_BUG: JSON = {
+    "noul": 0.96,
+    "type": "noul",
+}
 TEAM: JSON = {
     "choice": "payments",
     "confidence": 0.75,
-    "probabilities": {"account": 0, "frontend": 0.16, "payments": 0.84},
+    "probabilities": {
+        "account": 0,
+        "frontend": 0.16,
+        "payments": 0.84,
+    },
     "type": "choice",
 }
 ENVELOPE: dict[str, JSON] = {
     "id": "gen-dec-1789738314-X5e5eKGQdvR9rblyX250",
     "model": "typesafe/jev-1.13-20260917",
     "provider": "TypeSafe",
-    "usage": {"cost": 0.000019992, "input_tokens": 476, "output_tokens": 70},
+    "usage": {
+        "cost": 0.000019992,
+        "input_tokens": 476,
+        "output_tokens": 70,
+    },
 }
 
 
 def build_decisions(answers: JSON) -> dict[str, JSON]:
-    return {**ENVELOPE, "answers": answers}
+    return {
+        **ENVELOPE,
+        "answers": answers,
+    }
 
 
 # https://openrouter.ai/docs/guides/community/multimodal-decisions: the quickstart's request, a
 # title and a PNG with a noul question, and its answer.
 STICKER_TITLE = "Listing title: Red square sticker"
 STICKER_STATEMENT = "The photo shows the item in the title."
-MATCHES_TITLE: JSON = {"noul": 0.8607, "type": "noul"}
-PNG = MediaPart(media_type="image/png", data=b"\x89PNG")
+MATCHES_TITLE: JSON = {
+    "noul": 0.8607,
+    "type": "noul",
+}
+PNG = MediaPart(
+    media_type="image/png",
+    data=b"\x89PNG",
+)
 PNG_URL = "data:image/png;base64,iVBORw=="
 
 # The error examples of create-a-response (the Responses API reference), which has all of these
@@ -160,38 +204,76 @@ ERROR_MESSAGES = {
 }
 
 
-def build_error(status: int, **fields: JSON) -> JSON:
-    return {"error": {"code": status, "message": ERROR_MESSAGES[status]}, **fields}
+def build_error(
+    status: int,
+    **fields: JSON,
+) -> JSON:
+    return {
+        "error": {
+            "code": status,
+            "message": ERROR_MESSAGES[status],
+        },
+        **fields,
+    }
 
 
 # https://openrouter.ai/docs/api_reference/errors-and-debugging, "Provider errors": the error type
 # is in error.metadata, beside the integer code and the message of the published envelope.
-def build_typed_error(status: int, error_type: str) -> JSON:
+def build_typed_error(
+    status: int,
+    error_type: str,
+) -> JSON:
     metadata: JSON = {"error_type": error_type}
-    return {"error": {"code": status, "message": ERROR_MESSAGES[status], "metadata": metadata}}
+    return {
+        "error": {
+            "code": status,
+            "message": ERROR_MESSAGES[status],
+            "metadata": metadata,
+        },
+    }
 
 
 # The same page, "Anthropic Messages": the error type is in the error object, beside its type and
 # message, in an envelope that has a type and a request id.
 def build_skin_error(error_type: str) -> JSON:
-    error: JSON = {"type": "invalid_request_error", "message": "Blocked", "error_type": error_type}
-    return {"type": "error", "error": error, "request_id": None}
+    error: JSON = {
+        "type": "invalid_request_error",
+        "message": "Blocked",
+        "error_type": error_type,
+    }
+    return {
+        "type": "error",
+        "error": error,
+        "request_id": None,
+    }
 
 
 # https://openrouter.ai/docs/api_reference/responses/error-handling: an error body is
 # {"error": {"code", "message"}, "metadata"} and its code is a string.
 def build_coded_error(code: str) -> JSON:
-    return {"error": {"code": code, "message": "Detailed error description"}, "metadata": None}
+    return {
+        "error": {
+            "code": code,
+            "message": "Detailed error description",
+        },
+        "metadata": None,
+    }
 
 
 class Wire:
     """The stand-in for OpenRouter on the wire: it records each request and answers as told."""
 
-    def __init__(self, respond: Respond) -> None:
+    def __init__(
+        self,
+        respond: Respond,
+    ) -> None:
         self.requests: list[httpx.Request] = []
         self.respond = respond
 
-    def handle(self, request: httpx.Request) -> httpx.Response:
+    def handle(
+        self,
+        request: httpx.Request,
+    ) -> httpx.Response:
         self.requests.append(request)
         return self.respond(request)
 
@@ -203,7 +285,10 @@ class Wire:
             retry_config=None,
         )
 
-    def read_bodies(self, *keys: str) -> list[JSON]:
+    def read_bodies(
+        self,
+        *keys: str,
+    ) -> list[JSON]:
         bodies = [json.loads(request.content) for request in self.requests]
         return [{key: body[key] for key in keys if key in body} for body in bodies]
 
@@ -211,13 +296,22 @@ class Wire:
         return [request.url.path for request in self.requests]
 
 
-def build_reply(status: int, body: JSON) -> Respond:
-    return lambda request: httpx.Response(status, json=body)
+def build_reply(
+    status: int,
+    body: JSON,
+) -> Respond:
+    return lambda request: httpx.Response(
+        status,
+        json=body,
+    )
 
 
 # Constructed replies, not published ones: a gateway page, and a JSON body cut off mid-array.
 def build_page(status: int) -> Respond:
-    return lambda request: httpx.Response(status, text="<html>Gateway page</html>")
+    return lambda request: httpx.Response(
+        status,
+        text="<html>Gateway page</html>",
+    )
 
 
 def build_truncation() -> Respond:
@@ -231,7 +325,9 @@ def build_truncation() -> Respond:
 # Constructed too: a 200 labelled as an event stream, and one whose body is not the gzip it says.
 def build_event_stream() -> Respond:
     return lambda request: httpx.Response(
-        200, text="data: [DONE]\n\n", headers={"content-type": "text/event-stream"}
+        200,
+        text="data: [DONE]\n\n",
+        headers={"content-type": "text/event-stream"},
     )
 
 
@@ -239,7 +335,10 @@ def build_bad_encoding() -> Respond:
     return lambda request: httpx.Response(
         200,
         content=b"not-gzip",
-        headers={"content-type": "application/json", "content-encoding": "gzip"},
+        headers={
+            "content-type": "application/json",
+            "content-encoding": "gzip",
+        },
     )
 
 
@@ -253,15 +352,29 @@ def build_failure(error: Exception) -> Respond:
 class SilentClient(httpx.Client):
     """A client that returns no response, the case the SDK reports as NoResponseError."""
 
-    def send(self, request: httpx.Request, **options: object) -> httpx.Response:
-        return cast(httpx.Response, None)
+    def send(
+        self,
+        request: httpx.Request,
+        **options: object,
+    ) -> httpx.Response:
+        return cast(
+            httpx.Response,
+            None,
+        )
 
 
 class SilentAsyncClient(httpx.AsyncClient):
     """The async client that returns no response."""
 
-    async def send(self, request: httpx.Request, **options: object) -> httpx.Response:
-        return cast(httpx.Response, None)
+    async def send(
+        self,
+        request: httpx.Request,
+        **options: object,
+    ) -> httpx.Response:
+        return cast(
+            httpx.Response,
+            None,
+        )
 
 
 def build_silent_client() -> OpenRouter:
@@ -307,24 +420,48 @@ def generate_asynchronously(
     return asyncio.run(await_outcome(model.generate(prompt)))
 
 
-def decide_synchronously(client: OpenRouter, question: Question = QUESTION) -> DecisionOutcome:
-    return DecisionModel.from_openrouter(client, model=JEV).decide(question)
+def decide_synchronously(
+    client: OpenRouter,
+    question: Question = QUESTION,
+) -> DecisionOutcome:
+    return DecisionModel.from_openrouter(
+        client,
+        model=JEV,
+    ).decide(question)
 
 
-def decide_asynchronously(client: OpenRouter, question: Question = QUESTION) -> DecisionOutcome:
-    model = AsyncDecisionModel.from_openrouter(client, model=JEV)
+def decide_asynchronously(
+    client: OpenRouter,
+    question: Question = QUESTION,
+) -> DecisionOutcome:
+    model = AsyncDecisionModel.from_openrouter(
+        client,
+        model=JEV,
+    )
     return asyncio.run(await_outcome(model.decide(question)))
 
 
 type Ask = Callable[[OpenRouter], GenerationOutcome | DecisionOutcome]
 
 
-@pytest.fixture(params=[generate_synchronously, generate_asynchronously], ids=["sync", "async"])
+@pytest.fixture(
+    params=[
+        generate_synchronously,
+        generate_asynchronously,
+    ],
+    ids=["sync", "async"],
+)
 def generate(request: pytest.FixtureRequest) -> Callable[..., GenerationOutcome]:
     return request.param
 
 
-@pytest.fixture(params=[decide_synchronously, decide_asynchronously], ids=["sync", "async"])
+@pytest.fixture(
+    params=[
+        decide_synchronously,
+        decide_asynchronously,
+    ],
+    ids=["sync", "async"],
+)
 def decide(request: pytest.FixtureRequest) -> Callable[..., DecisionOutcome]:
     return request.param
 
@@ -347,28 +484,36 @@ def ask(request: pytest.FixtureRequest) -> Ask:
     [
         (
             lambda client, perceives: GenerativeModel.from_openrouter(
-                client, model=MODEL, perceives=perceives
+                client,
+                model=MODEL,
+                perceives=perceives,
             ),
             f"openrouter:{MODEL}",
             MediaTypes("image/*", "application/pdf", "text/plain"),
         ),
         (
             lambda client, perceives: AsyncGenerativeModel.from_openrouter(
-                client, model=MODEL, perceives=perceives
+                client,
+                model=MODEL,
+                perceives=perceives,
             ),
             f"openrouter:{MODEL}",
             MediaTypes("image/*", "application/pdf", "text/plain"),
         ),
         (
             lambda client, perceives: DecisionModel.from_openrouter(
-                client, model=JEV, perceives=perceives
+                client,
+                model=JEV,
+                perceives=perceives,
             ),
             f"openrouter:{JEV}",
             MediaTypes("image/png", "image/jpeg", "image/webp"),
         ),
         (
             lambda client, perceives: AsyncDecisionModel.from_openrouter(
-                client, model=JEV, perceives=perceives
+                client,
+                model=JEV,
+                perceives=perceives,
             ),
             f"openrouter:{JEV}",
             MediaTypes("image/png", "image/jpeg", "image/webp"),
@@ -377,23 +522,49 @@ def ask(request: pytest.FixtureRequest) -> Ask:
     ids=["generative", "async-generative", "decision", "async-decision"],
 )
 def test_a_model_is_named_for_the_provider_and_the_model_id(
-    build: Callable[[OpenRouter, MediaTypes], Model], name: str, perceives: MediaTypes
+    build: Callable[
+        [
+            OpenRouter,
+            MediaTypes,
+        ],
+        Model,
+    ],
+    name: str,
+    perceives: MediaTypes,
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
 
-    model = build(client, perceives)
+    model = build(
+        client,
+        perceives,
+    )
 
-    assert (model.name, model.perceives) == (name, perceives)
+    assert (
+        model.name,
+        model.perceives,
+    ) == (
+        name,
+        perceives,
+    )
 
 
 @pytest.mark.parametrize(
     "build",
     [
         lambda client, perceives: GenerativeModel.from_openrouter(
-            client, model=MODEL, perceives=perceives
+            client,
+            model=MODEL,
+            perceives=perceives,
         ),
         lambda client, perceives: AsyncGenerativeModel.from_openrouter(
-            client, model=MODEL, perceives=perceives
+            client,
+            model=MODEL,
+            perceives=perceives,
         ),
     ],
     ids=["generative", "async-generative"],
@@ -401,19 +572,47 @@ def test_a_model_is_named_for_the_provider_and_the_model_id(
 @pytest.mark.parametrize(
     ("patterns", "named"),
     [
-        (("audio/*",), "audio/*"),
-        (("video/mp4",), "video/mp4"),
-        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+        (
+            ("audio/*",),
+            "audio/*",
+        ),
+        (
+            ("video/mp4",),
+            "video/mp4",
+        ),
+        (
+            ("video/mp4", "image/png", "audio/wav"),
+            "audio/wav",
+        ),
     ],
     ids=["range-of-another-type", "another-type", "the-first-of-those-it-cannot-carry"],
 )
 def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
-    build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
+    build: Callable[
+        [
+            OpenRouter,
+            MediaTypes,
+        ],
+        Model,
+    ],
+    patterns: tuple[str, ...],
+    named: str,
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
 
-    with pytest.raises(ConfigurationError, match=re.escape(named)):
-        build(client, MediaTypes(*patterns))
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(named),
+    ):
+        build(
+            client,
+            MediaTypes(*patterns),
+        )
 
 
 # https://openrouter.ai/docs/guides/community/multimodal-decisions: the Decisions API reads png,
@@ -422,10 +621,14 @@ def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_nami
     "build",
     [
         lambda client, perceives: DecisionModel.from_openrouter(
-            client, model=JEV, perceives=perceives
+            client,
+            model=JEV,
+            perceives=perceives,
         ),
         lambda client, perceives: AsyncDecisionModel.from_openrouter(
-            client, model=JEV, perceives=perceives
+            client,
+            model=JEV,
+            perceives=perceives,
         ),
     ],
     ids=["decision", "async-decision"],
@@ -433,10 +636,22 @@ def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_nami
 @pytest.mark.parametrize(
     ("patterns", "named"),
     [
-        (("image/*",), "image/*"),
-        (("image/gif",), "image/gif"),
-        (("application/pdf",), "application/pdf"),
-        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+        (
+            ("image/*",),
+            "image/*",
+        ),
+        (
+            ("image/gif",),
+            "image/gif",
+        ),
+        (
+            ("application/pdf",),
+            "application/pdf",
+        ),
+        (
+            ("video/mp4", "image/png", "audio/wav"),
+            "audio/wav",
+        ),
     ],
     ids=[
         "image-range",
@@ -446,26 +661,62 @@ def test_a_responses_model_that_perceives_media_the_api_cannot_carry_raises_nami
     ],
 )
 def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming_it_when_built(
-    build: Callable[[OpenRouter, MediaTypes], Model], patterns: tuple[str, ...], named: str
+    build: Callable[
+        [
+            OpenRouter,
+            MediaTypes,
+        ],
+        Model,
+    ],
+    patterns: tuple[str, ...],
+    named: str,
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
 
-    with pytest.raises(ConfigurationError, match=re.escape(named)):
-        build(client, MediaTypes(*patterns))
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(named),
+    ):
+        build(
+            client,
+            MediaTypes(*patterns),
+        )
 
 
 @pytest.mark.parametrize(
     "build",
     [
-        lambda client: GenerativeModel.from_openrouter(client, model=""),
-        lambda client: AsyncGenerativeModel.from_openrouter(client, model=""),
-        lambda client: DecisionModel.from_openrouter(client, model=""),
-        lambda client: AsyncDecisionModel.from_openrouter(client, model=""),
+        lambda client: GenerativeModel.from_openrouter(
+            client,
+            model="",
+        ),
+        lambda client: AsyncGenerativeModel.from_openrouter(
+            client,
+            model="",
+        ),
+        lambda client: DecisionModel.from_openrouter(
+            client,
+            model="",
+        ),
+        lambda client: AsyncDecisionModel.from_openrouter(
+            client,
+            model="",
+        ),
     ],
     ids=["generative", "async-generative", "decision", "async-decision"],
 )
 def test_a_model_without_a_model_id_raises(build: Callable[[OpenRouter], Model]) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
 
     with pytest.raises(ConfigurationError):
         build(client)
@@ -474,7 +725,12 @@ def test_a_model_without_a_model_id_raises(build: Callable[[OpenRouter], Model])
 def test_the_published_completed_response_is_a_generation(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
 
     outcome = generate(client)
 
@@ -484,13 +740,21 @@ def test_the_published_completed_response_is_a_generation(
 def test_the_prompt_becomes_instructions_and_one_user_message(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
 
     generate(wire.build_client())
 
     # The user message is the structured input of https://openrouter.ai/docs/api_reference/responses/basic-usage
     # and the endpoint is its /api/v1/responses; the API is stateless, so store is always false.
-    assert (wire.read_paths(), wire.read_bodies("model", "instructions", "input", "store")) == (
+    assert (
+        wire.read_paths(),
+        wire.read_bodies("model", "instructions", "input", "store"),
+    ) == (
         ["/api/v1/responses"],
         [
             {
@@ -500,24 +764,49 @@ def test_the_prompt_becomes_instructions_and_one_user_message(
                     {
                         "type": "message",
                         "role": "user",
-                        "content": [{"type": "input_text", "text": "Run: ls"}],
-                    }
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": "Run: ls",
+                            },
+                        ],
+                    },
                 ],
                 "store": False,
-            }
+            },
         ],
     )
 
 
 @pytest.mark.parametrize(
-    ("max_output_tokens", "sent"), [(None, [{}]), (256, [{"max_output_tokens": 256}])]
+    ("max_output_tokens", "sent"),
+    [
+        (
+            None,
+            [{}],
+        ),
+        (
+            256,
+            [{"max_output_tokens": 256}],
+        ),
+    ],
 )
 def test_the_output_limit_is_sent_only_when_given(
-    generate: Callable[..., GenerationOutcome], max_output_tokens: int | None, sent: list[JSON]
+    generate: Callable[..., GenerationOutcome],
+    max_output_tokens: int | None,
+    sent: list[JSON],
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
 
-    generate(wire.build_client(), max_output_tokens=max_output_tokens)
+    generate(
+        wire.build_client(),
+        max_output_tokens=max_output_tokens,
+    )
 
     assert wire.read_bodies("max_output_tokens") == sent
 
@@ -526,7 +815,16 @@ def test_the_output_limit_is_sent_only_when_given(
 # {"effort": "high"}; "Reasoning Effort Levels" lists minimal, low, medium and high.
 @pytest.mark.parametrize(
     ("reasoning_effort", "sent"),
-    [(None, [{}]), ("high", [{"reasoning": {"effort": "high"}}])],
+    [
+        (
+            None,
+            [{}],
+        ),
+        (
+            "high",
+            [{"reasoning": {"effort": "high"}}],
+        ),
+    ],
     ids=["no-effort-sends-no-field", "effort-is-sent"],
 )
 def test_the_reasoning_effort_is_sent_only_when_given(
@@ -534,9 +832,17 @@ def test_the_reasoning_effort_is_sent_only_when_given(
     reasoning_effort: components.ReasoningEffort | None,
     sent: list[JSON],
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
 
-    generate(wire.build_client(), reasoning_effort=reasoning_effort)
+    generate(
+        wire.build_client(),
+        reasoning_effort=reasoning_effort,
+    )
 
     assert wire.read_bodies("reasoning") == sent
 
@@ -545,28 +851,64 @@ def test_the_reasoning_effort_is_sent_only_when_given(
 def test_a_lone_surrogate_in_the_prompt_reaches_the_wire_and_the_reply_is_read(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
-    prompt = Prompt(system="Rate the action.", content=(TextPart(text="a\ud800b"),))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
+    prompt = Prompt(
+        system="Rate the action.",
+        content=(TextPart(text="a\ud800b"),),
+    )
 
-    outcome = generate(wire.build_client(), prompt)
+    outcome = generate(
+        wire.build_client(),
+        prompt,
+    )
 
     message: JSON = {
         "type": "message",
         "role": "user",
-        "content": [{"type": "input_text", "text": "a\ud800b"}],
+        "content": [
+            {
+                "type": "input_text",
+                "text": "a\ud800b",
+            },
+        ],
     }
-    assert (outcome, wire.read_bodies("input")) == (Generation(text=JOKE), [{"input": [message]}])
+    assert (
+        outcome,
+        wire.read_bodies("input"),
+    ) == (
+        Generation(text=JOKE),
+        [{"input": [message]}],
+    )
 
 
 def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
     decide: Callable[..., DecisionOutcome],
 ) -> None:
-    wire = Wire(build_reply(200, build_decisions({"statement": IS_BUG})))
-    question = Question(statement="The action is safe.", state=(TextPart(text="a\ud800b"),))
+    wire = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": IS_BUG}),
+        ),
+    )
+    question = Question(
+        statement="The action is safe.",
+        state=(TextPart(text="a\ud800b"),),
+    )
 
-    outcome = decide(wire.build_client(), question)
+    outcome = decide(
+        wire.build_client(),
+        question,
+    )
 
-    assert (outcome, wire.read_bodies("state")) == (
+    assert (
+        outcome,
+        wire.read_bodies("state"),
+    ) == (
         Decision(probability=0.96),
         [{"state": ["a\ud800b"]}],
     )
@@ -581,16 +923,29 @@ def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
     ("part", "content"),
     [
         (
-            MediaPart(media_type="image/*", url="https://example.com/image.jpg"),
+            MediaPart(
+                media_type="image/*",
+                url="https://example.com/image.jpg",
+            ),
             {
                 "type": "input_image",
                 "detail": "auto",
                 "image_url": "https://example.com/image.jpg",
             },
         ),
-        (PNG, {"type": "input_image", "detail": "auto", "image_url": PNG_URL}),
         (
-            MediaPart(media_type="IMAGE/PNG", url="https://example.com/image.png"),
+            PNG,
+            {
+                "type": "input_image",
+                "detail": "auto",
+                "image_url": PNG_URL,
+            },
+        ),
+        (
+            MediaPart(
+                media_type="IMAGE/PNG",
+                url="https://example.com/image.png",
+            ),
             {
                 "type": "input_image",
                 "detail": "auto",
@@ -598,11 +953,20 @@ def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
             },
         ),
         (
-            MediaPart(media_type="application/pdf", url="https://bitcoin.org/bitcoin.pdf"),
-            {"type": "input_file", "file_url": "https://bitcoin.org/bitcoin.pdf"},
+            MediaPart(
+                media_type="application/pdf",
+                url="https://bitcoin.org/bitcoin.pdf",
+            ),
+            {
+                "type": "input_file",
+                "file_url": "https://bitcoin.org/bitcoin.pdf",
+            },
         ),
         (
-            MediaPart(media_type="application/pdf", data=b"%PDF-1.7"),
+            MediaPart(
+                media_type="application/pdf",
+                data=b"%PDF-1.7",
+            ),
             {
                 "type": "input_file",
                 "file_data": "data:application/pdf;base64,JVBERi0xLjc=",
@@ -610,7 +974,10 @@ def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
             },
         ),
         (
-            MediaPart(media_type="text/plain", data=b"ls"),
+            MediaPart(
+                media_type="text/plain",
+                data=b"ls",
+            ),
             {
                 "type": "input_file",
                 "file_data": "data:text/plain;base64,bHM=",
@@ -618,7 +985,10 @@ def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
             },
         ),
         (
-            MediaPart(media_type="application/x-unlisted", data=b"ls"),
+            MediaPart(
+                media_type="application/x-unlisted",
+                data=b"ls",
+            ),
             {
                 "type": "input_file",
                 "file_data": "data:application/x-unlisted;base64,bHM=",
@@ -637,12 +1007,28 @@ def test_a_lone_surrogate_in_the_state_reaches_the_wire_and_the_reply_is_read(
     ],
 )
 def test_media_becomes_the_responses_api_s_image_and_file_content(
-    generate: Callable[..., GenerationOutcome], part: MediaPart, content: JSON
+    generate: Callable[..., GenerationOutcome],
+    part: MediaPart,
+    content: JSON,
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
-    prompt = Prompt(system="Rate the action.", content=(TextPart(text="See:"), part))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
+    prompt = Prompt(
+        system="Rate the action.",
+        content=(
+            TextPart(text="See:"),
+            part,
+        ),
+    )
 
-    generate(wire.build_client(), prompt)
+    generate(
+        wire.build_client(),
+        prompt,
+    )
 
     assert wire.read_bodies("input") == [
         {
@@ -650,67 +1036,151 @@ def test_media_becomes_the_responses_api_s_image_and_file_content(
                 {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": "See:"}, content],
-                }
-            ]
-        }
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": "See:",
+                        },
+                        content,
+                    ],
+                },
+            ],
+        },
     ]
 
 
 @pytest.mark.parametrize(
     "part",
     [
-        MediaPart(media_type="audio/mpeg", data=b"ID3"),
-        MediaPart(media_type="video/mp4", url="https://example.com/clip.mp4"),
+        MediaPart(
+            media_type="audio/mpeg",
+            data=b"ID3",
+        ),
+        MediaPart(
+            media_type="video/mp4",
+            url="https://example.com/clip.mp4",
+        ),
     ],
     ids=["audio", "video"],
 )
 def test_media_the_responses_api_cannot_carry_raises_naming_its_type(
-    generate: Callable[..., GenerationOutcome], part: MediaPart
+    generate: Callable[..., GenerationOutcome],
+    part: MediaPart,
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
-    prompt = Prompt(system="Rate the action.", content=(part,))
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
+    prompt = Prompt(
+        system="Rate the action.",
+        content=(part,),
+    )
 
-    with pytest.raises(ConfigurationError, match=re.escape(part.media_type)):
-        generate(client, prompt)
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(part.media_type),
+    ):
+        generate(
+            client,
+            prompt,
+        )
 
 
 # A range such as image/* is a type the API carries, but its bytes have no type for a data URL.
-RANGE_BYTES = MediaPart(media_type="image/*", data=b"\x89PNG")
-AUDIO = MediaPart(media_type="audio/mpeg", data=b"ID3")
+RANGE_BYTES = MediaPart(
+    media_type="image/*",
+    data=b"\x89PNG",
+)
+AUDIO = MediaPart(
+    media_type="audio/mpeg",
+    data=b"ID3",
+)
 
 
 @pytest.mark.parametrize(
     "part",
-    [RANGE_BYTES, MediaPart(media_type="application/*", data=b"%PDF-1.7")],
+    [
+        RANGE_BYTES,
+        MediaPart(
+            media_type="application/*",
+            data=b"%PDF-1.7",
+        ),
+    ],
     ids=["image-range", "file-range"],
 )
 def test_bytes_of_a_media_range_are_unavailable_without_a_status(
-    generate: Callable[..., GenerationOutcome], part: MediaPart
+    generate: Callable[..., GenerationOutcome],
+    part: MediaPart,
 ) -> None:
-    wire = Wire(build_reply(200, COMPLETED))
-    prompt = Prompt(system="Rate the action.", content=(part,))
+    wire = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    )
+    prompt = Prompt(
+        system="Rate the action.",
+        content=(part,),
+    )
 
-    outcome = generate(wire.build_client(), prompt)
+    outcome = generate(
+        wire.build_client(),
+        prompt,
+    )
 
-    assert (outcome, wire.requests) == (Unavailable(), [])
+    assert (
+        outcome,
+        wire.requests,
+    ) == (
+        Unavailable(),
+        [],
+    )
 
 
 @pytest.mark.parametrize(
     "content",
     [
-        pytest.param((RANGE_BYTES, AUDIO), id="range-first"),
-        pytest.param((AUDIO, RANGE_BYTES), id="range-last"),
+        pytest.param(
+            (
+                RANGE_BYTES,
+                AUDIO,
+            ),
+            id="range-first",
+        ),
+        pytest.param(
+            (
+                AUDIO,
+                RANGE_BYTES,
+            ),
+            id="range-last",
+        ),
     ],
 )
 def test_a_type_the_responses_api_cannot_carry_raises_whatever_the_order(
-    generate: Callable[..., GenerationOutcome], content: tuple[MediaPart, ...]
+    generate: Callable[..., GenerationOutcome],
+    content: tuple[MediaPart, ...],
 ) -> None:
-    client = Wire(build_reply(200, COMPLETED)).build_client()
-    prompt = Prompt(system="Rate the action.", content=content)
+    client = Wire(
+        build_reply(
+            200,
+            COMPLETED,
+        ),
+    ).build_client()
+    prompt = Prompt(
+        system="Rate the action.",
+        content=content,
+    )
 
-    with pytest.raises(ConfigurationError, match="audio/mpeg"):
-        generate(client, prompt)
+    with pytest.raises(
+        ConfigurationError,
+        match="audio/mpeg",
+    ):
+        generate(
+            client,
+            prompt,
+        )
 
 
 @pytest.mark.parametrize(
@@ -724,30 +1194,54 @@ def test_a_type_the_responses_api_cannot_carry_raises_whatever_the_order(
             build_response(
                 output=[
                     build_message(
-                        build_text("Why did the chicken "), build_text("cross the road? ")
+                        build_text("Why did the chicken "),
+                        build_text("cross the road? "),
                     ),
                     build_message(build_text("To get to the other side!")),
-                ]
+                ],
             ),
             Generation(text=JOKE),
         ),
         (
-            build_response(output=[REASONING, build_message(build_text(JOKE))]),
+            build_response(
+                output=[
+                    REASONING,
+                    build_message(build_text(JOKE)),
+                ],
+            ),
             Generation(text=JOKE),
         ),
         (
-            build_response(output=[{"type": "unlisted"}, build_message(build_text(JOKE))]),
+            build_response(
+                output=[
+                    {"type": "unlisted"},
+                    build_message(build_text(JOKE)),
+                ],
+            ),
             Generation(text=JOKE),
         ),
         (
-            build_response(output=[build_message(build_text(JOKE), {"type": "unlisted"})]),
+            build_response(
+                output=[
+                    build_message(
+                        build_text(JOKE),
+                        {"type": "unlisted"},
+                    ),
+                ],
+            ),
             Truncated(text=JOKE),
         ),
         (
-            build_response(status="incomplete", incomplete_details={"reason": "max_output_tokens"}),
+            build_response(
+                status="incomplete",
+                incomplete_details={"reason": "max_output_tokens"},
+            ),
             Truncated(text=JOKE),
         ),
-        (build_response(status="incomplete"), Truncated(text=JOKE)),
+        (
+            build_response(status="incomplete"),
+            Truncated(text=JOKE),
+        ),
         (
             build_response(
                 status="incomplete",
@@ -756,11 +1250,21 @@ def test_a_type_the_responses_api_cannot_carry_raises_whatever_the_order(
             ),
             Truncated(text=""),
         ),
-        (build_response(status="cancelled"), Truncated(text=JOKE)),
-        (build_response(status="in_progress"), Truncated(text=JOKE)),
+        (
+            build_response(status="cancelled"),
+            Truncated(text=JOKE),
+        ),
+        (
+            build_response(status="in_progress"),
+            Truncated(text=JOKE),
+        ),
         (
             build_response(
-                status="failed", error={"code": "server_error", "message": EVALUATOR_FAILED}
+                status="failed",
+                error={
+                    "code": "server_error",
+                    "message": EVALUATOR_FAILED,
+                },
             ),
             Unavailable(),
         ),
@@ -780,9 +1284,16 @@ def test_a_type_the_responses_api_cannot_carry_raises_whatever_the_order(
     ],
 )
 def test_a_response_becomes_the_outcome_its_status_gives(
-    generate: Callable[..., GenerationOutcome], response: JSON, outcome: GenerationOutcome
+    generate: Callable[..., GenerationOutcome],
+    response: JSON,
+    outcome: GenerationOutcome,
 ) -> None:
-    client = Wire(build_reply(200, response)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            response,
+        ),
+    ).build_client()
 
     generated = generate(client)
 
@@ -805,7 +1316,16 @@ CRACKED_MESSAGE: JSON = {
     [
         build_response(output=[CRACKED_MESSAGE]),
         build_response(output=[build_message({"refusal": "I refuse"})]),
-        build_response(output=[build_message({"type": "output_text", "text": 123})]),
+        build_response(
+            output=[
+                build_message(
+                    {
+                        "type": "output_text",
+                        "text": 123,
+                    },
+                ),
+            ],
+        ),
         build_response(output=[build_message({"type": "refusal"})]),
         build_response(output=[]),
         build_response(output=[REASONING]),
@@ -826,9 +1346,15 @@ CRACKED_MESSAGE: JSON = {
     ],
 )
 def test_a_response_with_an_item_or_part_the_sdk_could_not_read_is_unavailable(
-    generate: Callable[..., GenerationOutcome], response: JSON
+    generate: Callable[..., GenerationOutcome],
+    response: JSON,
 ) -> None:
-    client = Wire(build_reply(200, response)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            response,
+        ),
+    ).build_client()
 
     outcome = generate(client)
 
@@ -841,28 +1367,46 @@ def test_a_response_with_an_item_or_part_the_sdk_could_not_read_is_unavailable(
 @pytest.mark.parametrize(
     "response",
     [
-        build_response(status="incomplete", incomplete_details={"reason": "content_filter"}),
         build_response(
-            status="failed",
-            error={"code": "image_content_policy_violation", "message": EVALUATOR_FAILED},
+            status="incomplete",
+            incomplete_details={"reason": "content_filter"},
         ),
         build_response(
             status="failed",
-            error={"code": "server_error", "message": EVALUATOR_FAILED},
+            error={
+                "code": "image_content_policy_violation",
+                "message": EVALUATOR_FAILED,
+            },
+        ),
+        build_response(
+            status="failed",
+            error={
+                "code": "server_error",
+                "message": EVALUATOR_FAILED,
+            },
             error_type="content_policy_violation",
         ),
         build_response(
             status="failed",
-            error={"code": "invalid_prompt", "message": EVALUATOR_FAILED},
+            error={
+                "code": "invalid_prompt",
+                "message": EVALUATOR_FAILED,
+            },
             error_type="refusal",
         ),
     ],
     ids=["content-filter", "policy-code", "policy-error-type", "refusal-error-type"],
 )
 def test_a_response_the_provider_blocks_is_refused(
-    generate: Callable[..., GenerationOutcome], response: JSON
+    generate: Callable[..., GenerationOutcome],
+    response: JSON,
 ) -> None:
-    client = Wire(build_reply(200, response)).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            response,
+        ),
+    ).build_client()
 
     outcome = generate(client)
 
@@ -872,40 +1416,81 @@ def test_a_response_the_provider_blocks_is_refused(
 @pytest.mark.parametrize(
     ("answer", "probability"),
     [
-        (IS_BUG, 0.96),
-        (MATCHES_TITLE, 0.8607),
-        ({"noul": 0.0, "type": "noul"}, 0.0),
-        ({"noul": 1.0, "type": "noul"}, 1.0),
+        (
+            IS_BUG,
+            0.96,
+        ),
+        (
+            MATCHES_TITLE,
+            0.8607,
+        ),
+        (
+            {
+                "noul": 0.0,
+                "type": "noul",
+            },
+            0.0,
+        ),
+        (
+            {
+                "noul": 1.0,
+                "type": "noul",
+            },
+            1.0,
+        ),
     ],
     ids=["published", "published-with-an-image", "lower-bound", "upper-bound"],
 )
 def test_the_noul_answer_is_the_probability_the_statement_holds(
-    decide: Callable[..., DecisionOutcome], answer: JSON, probability: float
+    decide: Callable[..., DecisionOutcome],
+    answer: JSON,
+    probability: float,
 ) -> None:
-    client = Wire(build_reply(200, build_decisions({"statement": answer}))).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": answer}),
+        ),
+    ).build_client()
 
     outcome = decide(client)
 
-    assert outcome == Decision(probability=probability, confidence=None)
+    assert outcome == Decision(
+        probability=probability,
+        confidence=None,
+    )
 
 
 def test_the_question_becomes_one_noul_question_about_the_state(
     decide: Callable[..., DecisionOutcome],
 ) -> None:
-    wire = Wire(build_reply(200, build_decisions({"statement": IS_BUG})))
+    wire = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": IS_BUG}),
+        ),
+    )
 
     decide(wire.build_client())
 
     # A noul question is {"type", "instructions"} and the state an array of strings, in the
     # Decisions reference's request example and the multimodal guide; the path is the reference's.
-    assert (wire.read_paths(), wire.read_bodies("model", "state", "questions")) == (
+    assert (
+        wire.read_paths(),
+        wire.read_bodies("model", "state", "questions"),
+    ) == (
         ["/api/alpha/decisions"],
         [
             {
                 "model": JEV,
                 "state": ["Run: ls"],
-                "questions": {"statement": {"type": "noul", "instructions": "The action is safe."}},
-            }
+                "questions": {
+                    "statement": {
+                        "type": "noul",
+                        "instructions": "The action is safe.",
+                    },
+                },
+            },
         ],
     )
 
@@ -913,50 +1498,113 @@ def test_the_question_becomes_one_noul_question_about_the_state(
 @pytest.mark.parametrize(
     ("part", "item"),
     [
-        (PNG, {"type": "image_url", "image_url": {"url": PNG_URL}}),
         (
-            MediaPart(media_type="image/jpeg", data=b"\x89PNG"),
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,iVBORw=="}},
+            PNG,
+            {
+                "type": "image_url",
+                "image_url": {"url": PNG_URL},
+            },
         ),
         (
-            MediaPart(media_type="image/webp", data=b"\x89PNG"),
-            {"type": "image_url", "image_url": {"url": "data:image/webp;base64,iVBORw=="}},
+            MediaPart(
+                media_type="image/jpeg",
+                data=b"\x89PNG",
+            ),
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/jpeg;base64,iVBORw=="},
+            },
+        ),
+        (
+            MediaPart(
+                media_type="image/webp",
+                data=b"\x89PNG",
+            ),
+            {
+                "type": "image_url",
+                "image_url": {"url": "data:image/webp;base64,iVBORw=="},
+            },
         ),
     ],
     ids=["png-bytes", "jpeg-bytes", "webp-bytes"],
 )
 def test_an_image_becomes_an_image_url_object_in_the_state(
-    decide: Callable[..., DecisionOutcome], part: MediaPart, item: JSON
+    decide: Callable[..., DecisionOutcome],
+    part: MediaPart,
+    item: JSON,
 ) -> None:
-    wire = Wire(build_reply(200, build_decisions({"statement": MATCHES_TITLE})))
-    question = Question(statement=STICKER_STATEMENT, state=(TextPart(text=STICKER_TITLE), part))
+    wire = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": MATCHES_TITLE}),
+        ),
+    )
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=(
+            TextPart(text=STICKER_TITLE),
+            part,
+        ),
+    )
 
-    decide(wire.build_client(), question)
+    decide(
+        wire.build_client(),
+        question,
+    )
 
     assert wire.read_bodies("state", "questions") == [
         {
-            "state": [STICKER_TITLE, item],
-            "questions": {"statement": {"type": "noul", "instructions": STICKER_STATEMENT}},
-        }
+            "state": [
+                STICKER_TITLE,
+                item,
+            ],
+            "questions": {
+                "statement": {
+                    "type": "noul",
+                    "instructions": STICKER_STATEMENT,
+                },
+            },
+        },
     ]
 
 
 @pytest.mark.parametrize(
     "part",
     [
-        MediaPart(media_type="audio/wav", data=b"RIFF"),
-        MediaPart(media_type="image/gif", data=b"GIF8"),
+        MediaPart(
+            media_type="audio/wav",
+            data=b"RIFF",
+        ),
+        MediaPart(
+            media_type="image/gif",
+            data=b"GIF8",
+        ),
     ],
     ids=["audio", "image-type-outside-the-three"],
 )
 def test_media_the_decisions_api_cannot_carry_raises_naming_its_type(
-    decide: Callable[..., DecisionOutcome], part: MediaPart
+    decide: Callable[..., DecisionOutcome],
+    part: MediaPart,
 ) -> None:
-    client = Wire(build_reply(200, build_decisions({"statement": IS_BUG}))).build_client()
-    question = Question(statement=STICKER_STATEMENT, state=(part,))
+    client = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": IS_BUG}),
+        ),
+    ).build_client()
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=(part,),
+    )
 
-    with pytest.raises(ConfigurationError, match=re.escape(part.media_type)):
-        decide(client, question)
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(part.media_type),
+    ):
+        decide(
+            client,
+            question,
+        )
 
 
 # https://openrouter.ai/docs/guides/community/multimodal-decisions: an image is a base64 data URL
@@ -965,45 +1613,102 @@ def test_media_the_decisions_api_cannot_carry_raises_naming_its_type(
 @pytest.mark.parametrize(
     "part",
     [
-        MediaPart(media_type="image/png", url="https://example.com/image.png"),
-        MediaPart(media_type="image/png", url=PNG_URL),
-        MediaPart(media_type="image/*", url="https://example.com/image.png"),
+        MediaPart(
+            media_type="image/png",
+            url="https://example.com/image.png",
+        ),
+        MediaPart(
+            media_type="image/png",
+            url=PNG_URL,
+        ),
+        MediaPart(
+            media_type="image/*",
+            url="https://example.com/image.png",
+        ),
         RANGE_BYTES,
     ],
     ids=["image-by-url", "image-by-data-url", "range-by-url", "range-bytes"],
 )
 def test_an_image_in_a_form_the_decisions_api_cannot_take_is_unavailable_without_a_status(
-    decide: Callable[..., DecisionOutcome], part: MediaPart
+    decide: Callable[..., DecisionOutcome],
+    part: MediaPart,
 ) -> None:
-    wire = Wire(build_reply(200, build_decisions({"statement": IS_BUG})))
-    question = Question(statement=STICKER_STATEMENT, state=(TextPart(text=STICKER_TITLE), part))
+    wire = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": IS_BUG}),
+        ),
+    )
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=(
+            TextPart(text=STICKER_TITLE),
+            part,
+        ),
+    )
 
-    outcome = decide(wire.build_client(), question)
+    outcome = decide(
+        wire.build_client(),
+        question,
+    )
 
-    assert (outcome, wire.requests) == (Unavailable(), [])
+    assert (
+        outcome,
+        wire.requests,
+    ) == (
+        Unavailable(),
+        [],
+    )
 
 
 @pytest.mark.parametrize(
     "state",
     [
         pytest.param(
-            (MediaPart(media_type="image/png", url="https://example.com/image.png"), AUDIO),
+            (
+                MediaPart(
+                    media_type="image/png",
+                    url="https://example.com/image.png",
+                ),
+                AUDIO,
+            ),
             id="image-by-url-first",
         ),
         pytest.param(
-            (AUDIO, MediaPart(media_type="image/png", url="https://example.com/image.png")),
+            (
+                AUDIO,
+                MediaPart(
+                    media_type="image/png",
+                    url="https://example.com/image.png",
+                ),
+            ),
             id="image-by-url-last",
         ),
     ],
 )
 def test_a_type_the_decisions_api_cannot_carry_raises_whatever_the_order(
-    decide: Callable[..., DecisionOutcome], state: tuple[MediaPart, ...]
+    decide: Callable[..., DecisionOutcome],
+    state: tuple[MediaPart, ...],
 ) -> None:
-    client = Wire(build_reply(200, build_decisions({"statement": IS_BUG}))).build_client()
-    question = Question(statement=STICKER_STATEMENT, state=state)
+    client = Wire(
+        build_reply(
+            200,
+            build_decisions({"statement": IS_BUG}),
+        ),
+    ).build_client()
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=state,
+    )
 
-    with pytest.raises(ConfigurationError, match="audio/mpeg"):
-        decide(client, question)
+    with pytest.raises(
+        ConfigurationError,
+        match="audio/mpeg",
+    ):
+        decide(
+            client,
+            question,
+        )
 
 
 # The published answers of another question and of another type (TEAM, a choice answer), and
@@ -1014,9 +1719,24 @@ def test_a_type_the_decisions_api_cannot_carry_raises_whatever_the_order(
         {"is_bug": IS_BUG},
         {"statement": TEAM},
         {"statement": {"type": "unlisted"}},
-        {"statement": {"noul": 1.2, "type": "noul"}},
-        {"statement": {"noul": -0.1, "type": "noul"}},
-        {"statement": {"noul": "high", "type": "noul"}},
+        {
+            "statement": {
+                "noul": 1.2,
+                "type": "noul",
+            },
+        },
+        {
+            "statement": {
+                "noul": -0.1,
+                "type": "noul",
+            },
+        },
+        {
+            "statement": {
+                "noul": "high",
+                "type": "noul",
+            },
+        },
     ],
     ids=[
         "no-answer-to-the-question",
@@ -1028,20 +1748,35 @@ def test_a_type_the_decisions_api_cannot_carry_raises_whatever_the_order(
     ],
 )
 def test_an_answer_that_is_not_a_probability_is_unavailable_without_a_status(
-    decide: Callable[..., DecisionOutcome], answers: JSON
+    decide: Callable[..., DecisionOutcome],
+    answers: JSON,
 ) -> None:
-    client = Wire(build_reply(200, build_decisions(answers))).build_client()
+    client = Wire(
+        build_reply(
+            200,
+            build_decisions(answers),
+        ),
+    ).build_client()
 
     outcome = decide(client)
 
     assert outcome == Unavailable()
 
 
-@pytest.mark.parametrize("status", [408, 409, 413, 429, 500, 502, 503, 524, 529])
+@pytest.mark.parametrize(
+    "status",
+    [408, 409, 413, 429, 500, 502, 503, 524, 529],
+)
 def test_a_status_that_means_try_later_is_unavailable_with_that_status(
-    ask: Ask, status: int
+    ask: Ask,
+    status: int,
 ) -> None:
-    client = Wire(build_reply(status, build_error(status))).build_client()
+    client = Wire(
+        build_reply(
+            status,
+            build_error(status),
+        ),
+    ).build_client()
 
     outcome = ask(client)
 
@@ -1062,21 +1797,55 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
 @pytest.mark.parametrize(
     ("status", "fields"),
     [
-        (400, {}),
-        (401, {}),
-        (402, {}),
-        (403, {}),
-        (404, {}),
-        (422, {}),
-        (400, {"error_type": "invalid_request"}),
-        (403, {"error_type": "permission_denied"}),
+        (
+            400,
+            {},
+        ),
+        (
+            401,
+            {},
+        ),
+        (
+            402,
+            {},
+        ),
+        (
+            403,
+            {},
+        ),
+        (
+            404,
+            {},
+        ),
+        (
+            422,
+            {},
+        ),
+        (
+            400,
+            {"error_type": "invalid_request"},
+        ),
+        (
+            403,
+            {"error_type": "permission_denied"},
+        ),
     ],
     ids=["400", "401", "402", "403", "404", "422", "invalid-request", "permission-denied"],
 )
 def test_any_other_rejection_raises_naming_only_the_status(
-    ask: Ask, status: int, fields: dict[str, JSON]
+    ask: Ask,
+    status: int,
+    fields: dict[str, JSON],
 ) -> None:
-    client = Wire(build_reply(status, build_error(status, **fields))).build_client()
+    client = Wire(
+        build_reply(
+            status,
+            build_error(
+                status,
+                **fields,
+            ),
+        ),
+    ).build_client()
 
     with pytest.raises(ConfigurationError) as raised:
         ask(client)
@@ -1095,7 +1864,10 @@ def test_any_other_rejection_raises_naming_only_the_status(
 def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask) -> None:
     client = Wire(build_page(403)).build_client()
 
-    with pytest.raises(ConfigurationError, match="403"):
+    with pytest.raises(
+        ConfigurationError,
+        match="403",
+    ):
         ask(client)
 
 
@@ -1109,21 +1881,48 @@ def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask)
 @pytest.mark.parametrize(
     "body",
     [
-        pytest.param(build_coded_error("image_content_policy_violation"), id="policy-code"),
-        pytest.param(build_error(403, error_type="content_policy_violation"), id="top-policy"),
-        pytest.param(build_error(403, error_type="refusal"), id="top-refusal"),
+        pytest.param(
+            build_coded_error("image_content_policy_violation"),
+            id="policy-code",
+        ),
+        pytest.param(
+            build_error(
+                403,
+                error_type="content_policy_violation",
+            ),
+            id="top-policy",
+        ),
+        pytest.param(
+            build_error(
+                403,
+                error_type="refusal",
+            ),
+            id="top-refusal",
+        ),
         pytest.param(
             build_typed_error(403, "content_policy_violation"),
             id="metadata-policy",
         ),
-        pytest.param(build_typed_error(403, "refusal"), id="metadata-refusal"),
-        pytest.param(build_skin_error("content_policy_violation"), id="skin-policy"),
+        pytest.param(
+            build_typed_error(403, "refusal"),
+            id="metadata-refusal",
+        ),
+        pytest.param(
+            build_skin_error("content_policy_violation"),
+            id="skin-policy",
+        ),
     ],
 )
 def test_a_request_the_provider_blocks_is_refused_without_an_explanation(
-    ask: Ask, body: JSON
+    ask: Ask,
+    body: JSON,
 ) -> None:
-    client = Wire(build_reply(403, body)).build_client()
+    client = Wire(
+        build_reply(
+            403,
+            body,
+        ),
+    ).build_client()
 
     outcome = ask(client)
 
@@ -1164,19 +1963,55 @@ CODED_REJECTIONS = [
     ("status", "body"),
     [
         *(
-            pytest.param(status, build_typed_error(status, error_type), id=error_type)
+            pytest.param(
+                status,
+                build_typed_error(
+                    status,
+                    error_type,
+                ),
+                id=error_type,
+            )
             for status, error_type in TYPED_REJECTIONS
         ),
-        *(pytest.param(400, build_coded_error(code), id=code) for code in CODED_REJECTIONS),
-        pytest.param(400, build_skin_error("context_length_exceeded"), id="skin"),
-        pytest.param(413, build_typed_error(413, "payload_too_large"), id="payload_too_large"),
-        pytest.param(400, build_error(400, error_type="context_length_exceeded"), id="top-level"),
+        *(
+            pytest.param(
+                400,
+                build_coded_error(code),
+                id=code,
+            )
+            for code in CODED_REJECTIONS
+        ),
+        pytest.param(
+            400,
+            build_skin_error("context_length_exceeded"),
+            id="skin",
+        ),
+        pytest.param(
+            413,
+            build_typed_error(413, "payload_too_large"),
+            id="payload_too_large",
+        ),
+        pytest.param(
+            400,
+            build_error(
+                400,
+                error_type="context_length_exceeded",
+            ),
+            id="top-level",
+        ),
     ],
 )
 def test_input_the_provider_rejects_is_unavailable_with_the_status(
-    ask: Ask, status: int, body: JSON
+    ask: Ask,
+    status: int,
+    body: JSON,
 ) -> None:
-    client = Wire(build_reply(status, body)).build_client()
+    client = Wire(
+        build_reply(
+            status,
+            body,
+        ),
+    ).build_client()
 
     outcome = ask(client)
 
@@ -1192,7 +2027,10 @@ def test_input_the_provider_rejects_is_unavailable_with_the_status(
     ],
     ids=["connection", "timeout", "disconnect"],
 )
-def test_a_connection_failure_is_unavailable_without_a_status(ask: Ask, error: Exception) -> None:
+def test_a_connection_failure_is_unavailable_without_a_status(
+    ask: Ask,
+    error: Exception,
+) -> None:
     client = Wire(build_failure(error)).build_client()
 
     outcome = ask(client)
@@ -1214,16 +2052,41 @@ def test_no_response_is_unavailable_without_a_status(ask: Ask) -> None:
 @pytest.mark.parametrize(
     "respond",
     [
-        pytest.param(build_reply(200, {}), id="json-of-no-known-shape"),
-        pytest.param(build_reply(200, {"error_type": "refusal"}), id="refusal-in-no-reply"),
-        pytest.param(build_page(200), id="gateway-page"),
-        pytest.param(build_truncation(), id="truncated-json"),
-        pytest.param(build_bad_encoding(), id="bad-content-encoding"),
-        pytest.param(lambda request: httpx.Response(204), id="no-content"),
+        pytest.param(
+            build_reply(
+                200,
+                {},
+            ),
+            id="json-of-no-known-shape",
+        ),
+        pytest.param(
+            build_reply(
+                200,
+                {"error_type": "refusal"},
+            ),
+            id="refusal-in-no-reply",
+        ),
+        pytest.param(
+            build_page(200),
+            id="gateway-page",
+        ),
+        pytest.param(
+            build_truncation(),
+            id="truncated-json",
+        ),
+        pytest.param(
+            build_bad_encoding(),
+            id="bad-content-encoding",
+        ),
+        pytest.param(
+            lambda request: httpx.Response(204),
+            id="no-content",
+        ),
     ],
 )
 def test_a_reply_that_cannot_be_read_is_unavailable_without_a_status(
-    ask: Ask, respond: Respond
+    ask: Ask,
+    respond: Respond,
 ) -> None:
     client = Wire(respond).build_client()
 
@@ -1242,12 +2105,19 @@ def test_an_event_stream_is_unavailable_without_a_status(
     assert outcome == Unavailable()
 
 
-@pytest.mark.parametrize("status", [300, 302])
+@pytest.mark.parametrize(
+    "status",
+    [300, 302],
+)
 def test_a_status_between_success_and_error_is_unavailable_with_that_status(
-    ask: Ask, status: int
+    ask: Ask,
+    status: int,
 ) -> None:
     client = Wire(
-        lambda request: httpx.Response(status, headers={"location": "https://openrouter.ai/"})
+        lambda request: httpx.Response(
+            status,
+            headers={"location": "https://openrouter.ai/"},
+        ),
     ).build_client()
 
     outcome = ask(client)

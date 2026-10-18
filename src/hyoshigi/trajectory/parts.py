@@ -29,14 +29,22 @@ class Author(StrEnum):
     UNKNOWN = "unknown"
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class TextPart:
     """A piece of text."""
 
     text: str
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Description:
     """A text account of a media part, and who wrote it."""
 
@@ -44,7 +52,11 @@ class Description:
     author: Author
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class MediaPart:
     """An image, audio, video or file, by URL or as bytes, with its IANA media type.
 
@@ -63,7 +75,11 @@ class MediaPart:
             raise ConfigurationError("a media part takes exactly one of url and data")
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class OpaquePart:
     """Content recorded but not read, named by its kind in the provider's format.
 

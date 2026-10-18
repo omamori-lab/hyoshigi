@@ -10,12 +10,21 @@ from hyoshigi.trajectory.parts import Author
 class Authorship(Protocol):
     """Says who wrote the user-role message at an index of a provider's message list."""
 
-    def __call__(self, index: int, *, message: JSON) -> Author:
+    def __call__(
+        self,
+        index: int,
+        *,
+        message: JSON,
+    ) -> Author:
         """Return the author of the user-role message at this index."""
         ...
 
 
-def by_role(index: int, *, message: JSON) -> Author:
+def by_role(
+    index: int,
+    *,
+    message: JSON,
+) -> Author:
     """Say that every user-role message is the user's, as harnesses assume."""
     return Author.USER
 
@@ -25,7 +34,11 @@ def marked(indices: Collection[int]) -> Authorship:
 
     chosen = frozenset(indices)
 
-    def author_of(index: int, *, message: JSON) -> Author:
+    def author_of(
+        index: int,
+        *,
+        message: JSON,
+    ) -> Author:
         return Author.USER if index in chosen else Author.UNKNOWN
 
     return author_of

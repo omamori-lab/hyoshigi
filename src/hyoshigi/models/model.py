@@ -26,18 +26,37 @@ if TYPE_CHECKING:
 type PromptPart = TextPart | MediaPart
 
 
-@dataclass(frozen=True, slots=True, init=False)
+@dataclass(
+    frozen=True,
+    slots=True,
+    init=False,
+)
 class MediaTypes:
     """The media a model perceives, as IANA media types or ranges such as image/*."""
 
     patterns: frozenset[str]
 
-    def __init__(self, *patterns: str) -> None:
+    def __init__(
+        self,
+        *patterns: str,
+    ) -> None:
         if any(MEDIA_TYPE.fullmatch(pattern) is None for pattern in patterns):
             raise ConfigurationError("each pattern must be an IANA media type, such as image/*")
-        object.__setattr__(self, "patterns", frozenset(map(str.lower, patterns)))
+        object.__setattr__(
+            self,
+            "patterns",
+            frozenset(
+                map(
+                    str.lower,
+                    patterns,
+                ),
+            ),
+        )
 
-    def covers(self, media_type: str) -> bool:
+    def covers(
+        self,
+        media_type: str,
+    ) -> bool:
         """Whether these patterns cover media of this type; a range only through its range."""
         media_type = media_type.lower()
         top_level = media_type.partition("/")[0]
@@ -50,7 +69,13 @@ TEXT_ONLY = MediaTypes()
 
 def check_parts(parts: tuple[PromptPart, ...]) -> None:
     """Raise ConfigurationError unless every part is text or media."""
-    if not all(isinstance(part, TextPart | MediaPart) for part in parts):
+    if not all(
+        isinstance(
+            part,
+            TextPart | MediaPart,
+        )
+        for part in parts
+    ):
         raise ConfigurationError("a model is given text and media only")
 
 
@@ -60,7 +85,11 @@ def collect[Item](items: list[Item | None]) -> list[Item] | None:
     return kept if len(kept) == len(items) else None
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Prompt:
     """What a generative model is asked: the monitor's instructions, and the content."""
 
@@ -71,7 +100,11 @@ class Prompt:
         check_parts(self.content)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Question:
     """What a decision model is asked: whether the statement holds of the state."""
 
@@ -82,35 +115,55 @@ class Question:
         check_parts(self.state)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Generation:
     """A complete reply."""
 
     text: str
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Truncated:
     """A reply cut off at the model's output limit, with the text written so far."""
 
     text: str
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Refused:
     """The model or its provider declined, with the provider's explanation if it gave one."""
 
     explanation: str | None = None
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Unavailable:
     """No answer after the caller's retries, with the HTTP status if there was one."""
 
     status: int | None = None
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Decision:
     """The probability that the statement holds, and the model's confidence if it gave one.
 
@@ -124,11 +177,23 @@ class Decision:
     def __post_init__(self) -> None:
         # The dataclass is frozen, so the floats are set past its guard.
         object.__setattr__(
-            self, "probability", read_threshold(self.probability, name="probability")
+            self,
+            "probability",
+            read_threshold(
+                self.probability,
+                name="probability",
+            ),
         )
         if self.confidence is not None:
-            confidence = read_threshold(self.confidence, name="confidence")
-            object.__setattr__(self, "confidence", confidence)
+            confidence = read_threshold(
+                self.confidence,
+                name="confidence",
+            )
+            object.__setattr__(
+                self,
+                "confidence",
+                confidence,
+            )
 
 
 type GenerationOutcome = Generation | Truncated | Refused | Unavailable
@@ -141,7 +206,11 @@ def check_name(name: str) -> None:
         raise ConfigurationError("a model needs a name, such as the provider's model id")
 
 
-def check_perceives(perceives: MediaTypes, *, carries: MediaTypes) -> None:
+def check_perceives(
+    perceives: MediaTypes,
+    *,
+    carries: MediaTypes,
+) -> None:
     """Raise ConfigurationError naming the first pattern, in sorted order, that the media an
     API carries do not cover; a range such as image/* is covered only by a carried range.
     """
@@ -150,7 +219,11 @@ def check_perceives(perceives: MediaTypes, *, carries: MediaTypes) -> None:
             raise ConfigurationError(f"the API cannot carry {pattern} media")
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class GenerativeModel:
     """A model that writes a reply to a prompt, through the caller's function.
 
@@ -210,7 +283,11 @@ class GenerativeModel:
         from hyoshigi.models import anthropic as provider
 
         return provider.build_model(
-            client, model=model, max_tokens=max_tokens, thinking=thinking, perceives=perceives
+            client,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            perceives=perceives,
         )
 
     @classmethod
@@ -240,7 +317,11 @@ class GenerativeModel:
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncGenerativeModel:
     """A model that writes a reply to a prompt, through the caller's async function.
 
@@ -300,7 +381,11 @@ class AsyncGenerativeModel:
         from hyoshigi.models import anthropic as provider
 
         return provider.build_async_model(
-            client, model=model, max_tokens=max_tokens, thinking=thinking, perceives=perceives
+            client,
+            model=model,
+            max_tokens=max_tokens,
+            thinking=thinking,
+            perceives=perceives,
         )
 
     @classmethod
@@ -330,7 +415,11 @@ class AsyncGenerativeModel:
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class DecisionModel:
     """A model that gives the probability a statement holds, through the caller's function.
 
@@ -347,7 +436,11 @@ class DecisionModel:
 
     @classmethod
     def from_openai(
-        cls, client: OpenAI, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: OpenAI,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> DecisionModel:
         """A decision model on OpenAI's Decisions API, such as gpt-6-luna, through the caller's
         client.
@@ -355,30 +448,54 @@ class DecisionModel:
         # Imported here because the SDK is the optional extra hyoshigi[openai].
         from hyoshigi.models import openai as provider
 
-        return provider.build_decision_model(client, model=model, perceives=perceives)
+        return provider.build_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )
 
     @classmethod
     def from_openrouter(
-        cls, client: OpenRouter, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: OpenRouter,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> DecisionModel:
         """A decision model on OpenRouter's Decisions API, such as typesafe/jev-1.14."""
         # Imported here because the SDK is the optional extra hyoshigi[openrouter].
         from hyoshigi.models import openrouter as provider
 
-        return provider.build_decision_model(client, model=model, perceives=perceives)
+        return provider.build_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )
 
     @classmethod
     def from_typesafe(
-        cls, client: TypeSafeClient, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: TypeSafeClient,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> DecisionModel:
         """A decision model on TypeSafe's API, such as jev-1.14, through the caller's client."""
         # Imported here because the SDK is the optional extra hyoshigi[typesafe].
         from hyoshigi.models import typesafe as provider
 
-        return provider.build_decision_model(client, model=model, perceives=perceives)
+        return provider.build_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncDecisionModel:
     """A model that gives the probability a statement holds, through the caller's async
     function.
@@ -396,17 +513,29 @@ class AsyncDecisionModel:
 
     @classmethod
     def from_openai(
-        cls, client: AsyncOpenAI, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: AsyncOpenAI,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncDecisionModel:
         """A decision model on OpenAI's Decisions API, through the caller's async client."""
         # Imported here because the SDK is the optional extra hyoshigi[openai].
         from hyoshigi.models import openai as provider
 
-        return provider.build_async_decision_model(client, model=model, perceives=perceives)
+        return provider.build_async_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )
 
     @classmethod
     def from_openrouter(
-        cls, client: OpenRouter, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: OpenRouter,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncDecisionModel:
         """A decision model on OpenRouter's Decisions API, through the caller's client,
         awaited.
@@ -414,14 +543,26 @@ class AsyncDecisionModel:
         # Imported here because the SDK is the optional extra hyoshigi[openrouter].
         from hyoshigi.models import openrouter as provider
 
-        return provider.build_async_decision_model(client, model=model, perceives=perceives)
+        return provider.build_async_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )
 
     @classmethod
     def from_typesafe(
-        cls, client: AsyncTypeSafeClient, *, model: str, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: AsyncTypeSafeClient,
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncDecisionModel:
         """A decision model on TypeSafe's API, through the caller's async client."""
         # Imported here because the SDK is the optional extra hyoshigi[typesafe].
         from hyoshigi.models import typesafe as provider
 
-        return provider.build_async_decision_model(client, model=model, perceives=perceives)
+        return provider.build_async_decision_model(
+            client,
+            model=model,
+            perceives=perceives,
+        )

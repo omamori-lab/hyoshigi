@@ -20,7 +20,7 @@ try:
     )
 except ModuleNotFoundError as error:
     raise ModuleNotFoundError(
-        "TypeSafe models need the extra: pip install 'hyoshigi[typesafe]'"
+        "TypeSafe models need the extra: pip install 'hyoshigi[typesafe]'",
     ) from error
 
 from hyoshigi.errors import ConfigurationError
@@ -82,7 +82,13 @@ def translate_part(part: PromptPart) -> StateItem | None:
 
 def build_headers(state: list[StateItem]) -> dict[str, str] | None:
     """Return the opt-in header required by TypeSafe when the state contains an image."""
-    if any(isinstance(item, Image) for item in state):
+    if any(
+        isinstance(
+            item,
+            Image,
+        )
+        for item in state
+    ):
         return IMAGE_HEADERS
     return None
 
@@ -111,7 +117,10 @@ def is_unavailable_error(error: TypeSafeAPIError) -> bool:
             return True
         case _:
             return (
-                isinstance(error, TypeSafeInternalServerError)
+                isinstance(
+                    error,
+                    TypeSafeInternalServerError,
+                )
                 or error.status < 400
                 or error.status in UNAVAILABLE_STATUSES
             )
@@ -119,8 +128,12 @@ def is_unavailable_error(error: TypeSafeAPIError) -> bool:
 
 def translate_error(error: TypeSafeError) -> Unavailable:
     """Translate a TypeSafe SDK error to Unavailable, or raise ConfigurationError on 4xx."""
-    if not isinstance(error, TypeSafeAPIError) or isinstance(
-        error, TypeSafeAPIResponseValidationError
+    if not isinstance(
+        error,
+        TypeSafeAPIError,
+    ) or isinstance(
+        error,
+        TypeSafeAPIResponseValidationError,
     ):
         return Unavailable()
     if is_unavailable_error(error):
@@ -129,7 +142,10 @@ def translate_error(error: TypeSafeError) -> Unavailable:
 
 
 def build_decision_model(
-    client: TypeSafeClient, *, model: str, perceives: MediaTypes
+    client: TypeSafeClient,
+    *,
+    model: str,
+    perceives: MediaTypes,
 ) -> DecisionModel:
     """A decision model on TypeSafe's API, through the caller's client.
 
@@ -138,7 +154,10 @@ def build_decision_model(
     perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
-    check_perceives(perceives, carries=CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=CARRIED_MEDIA,
+    )
 
     def decide(question: Question) -> DecisionOutcome:
         state = collect([translate_part(part) for part in question.state])
@@ -157,11 +176,18 @@ def build_decision_model(
             return read_decision(response)
         return translate_error(error)
 
-    return DecisionModel(name=name, decide=decide, perceives=perceives)
+    return DecisionModel(
+        name=name,
+        decide=decide,
+        perceives=perceives,
+    )
 
 
 def build_async_decision_model(
-    client: AsyncTypeSafeClient, *, model: str, perceives: MediaTypes
+    client: AsyncTypeSafeClient,
+    *,
+    model: str,
+    perceives: MediaTypes,
 ) -> AsyncDecisionModel:
     """A decision model on TypeSafe's API, through the caller's async client.
 
@@ -170,7 +196,10 @@ def build_async_decision_model(
     perceives names media TypeSafe cannot carry.
     """
     name = format_model_name(model)
-    check_perceives(perceives, carries=CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=CARRIED_MEDIA,
+    )
 
     async def decide(question: Question) -> DecisionOutcome:
         state = collect([translate_part(part) for part in question.state])
@@ -189,4 +218,8 @@ def build_async_decision_model(
             return read_decision(response)
         return translate_error(error)
 
-    return AsyncDecisionModel(name=name, decide=decide, perceives=perceives)
+    return AsyncDecisionModel(
+        name=name,
+        decide=decide,
+        perceives=perceives,
+    )

@@ -48,12 +48,25 @@ from hyoshigi.trajectory.trajectory import Trajectory
 
 # A plain integer in ASCII digits; int() alone also takes forms such as 1_0 and fullwidth digits.
 _INTEGER = re.compile(r"[+-]?[0-9]+")
-_REASONING_START = re.compile(r"<reasoning>", flags=re.IGNORECASE)
-_REASONING_END = re.compile(r"</reasoning>", flags=re.IGNORECASE)
-_FINAL_SCORE = re.compile(r"\s*<score>(?P<score>[^<]*)</score>\s*", flags=re.IGNORECASE)
+_REASONING_START = re.compile(
+    r"<reasoning>",
+    flags=re.IGNORECASE,
+)
+_REASONING_END = re.compile(
+    r"</reasoning>",
+    flags=re.IGNORECASE,
+)
+_FINAL_SCORE = re.compile(
+    r"\s*<score>(?P<score>[^<]*)</score>\s*",
+    flags=re.IGNORECASE,
+)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class LLMMonitor(Monitor):
     """Rates an action with a generative model that reasons, then scores on an integer scale.
 
@@ -80,14 +93,28 @@ class LLMMonitor(Monitor):
         )
         _check_options(self)
 
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
         return drive(
-            plan_rating(self, action=action, trajectory=trajectory), ask=self.model.generate
+            plan_rating(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
+            ask=self.model.generate,
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncLLMMonitor(AsyncMonitor):
     """Rates an action as LLMMonitor does, with a generative model that is awaited."""
 
@@ -107,10 +134,20 @@ class AsyncLLMMonitor(AsyncMonitor):
         )
         _check_options(self)
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
         return await drive_concurrently(
-            plan_rating(self, action=action, trajectory=trajectory), ask=self.model.generate
+            plan_rating(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
+            ask=self.model.generate,
         )
 
 
@@ -119,17 +156,47 @@ def _check_options(monitor: LLMMonitor | AsyncLLMMonitor) -> None:
 
     The scale's ends and the retry count are kept as ints, whatever whole numbers were given.
     """
-    check_instance(monitor.view, expected=View, name="view")
-    check_instance(monitor.prompt, expected=MonitorPrompt, name="prompt")
-    lowest = read_integer(monitor.lowest_score, name="lowest_score")
-    highest = read_integer(monitor.highest_score, name="highest_score")
+    check_instance(
+        monitor.view,
+        expected=View,
+        name="view",
+    )
+    check_instance(
+        monitor.prompt,
+        expected=MonitorPrompt,
+        name="prompt",
+    )
+    lowest = read_integer(
+        monitor.lowest_score,
+        name="lowest_score",
+    )
+    highest = read_integer(
+        monitor.highest_score,
+        name="highest_score",
+    )
     if lowest >= highest:
         raise ConfigurationError(f"lowest_score ({lowest}) must be below highest_score ({highest})")
-    retries = read_count(monitor.max_parse_retries, name="max_parse_retries", minimum=0)
+    retries = read_count(
+        monitor.max_parse_retries,
+        name="max_parse_retries",
+        minimum=0,
+    )
     # The dataclass is frozen, so the ints are set past its guard.
-    object.__setattr__(monitor, "lowest_score", lowest)
-    object.__setattr__(monitor, "highest_score", highest)
-    object.__setattr__(monitor, "max_parse_retries", retries)
+    object.__setattr__(
+        monitor,
+        "lowest_score",
+        lowest,
+    )
+    object.__setattr__(
+        monitor,
+        "highest_score",
+        highest,
+    )
+    object.__setattr__(
+        monitor,
+        "max_parse_retries",
+        retries,
+    )
 
 
 # The cause of an attempt that is asked again.
@@ -137,7 +204,10 @@ type _Retry = Unreadable | Truncated
 
 
 def plan_rating(
-    monitor: LLMMonitor | AsyncLLMMonitor, *, action: Action, trajectory: Trajectory
+    monitor: LLMMonitor | AsyncLLMMonitor,
+    *,
+    action: Action,
+    trajectory: Trajectory,
 ) -> Plan[Prompt, GenerationOutcome, SuspicionScore]:
     """Plan the rating of an action: render it, ask the monitor's model, read the score.
 
@@ -148,50 +218,89 @@ def plan_rating(
     """
     name = monitor.model.name
     rendering = render(
-        action, trajectory=trajectory, view=monitor.view, perceives=monitor.model.perceives
+        action,
+        trajectory=trajectory,
+        view=monitor.view,
+        perceives=monitor.model.perceives,
     )
     if rendering.unperceivable:
-        return fail_closed(Unperceivable(content=rendering.unperceivable), model=name)
+        return fail_closed(
+            Unperceivable(content=rendering.unperceivable),
+            model=name,
+        )
     request = monitor.prompt.build(
-        rendering, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score
+        rendering,
+        lowest_score=monitor.lowest_score,
+        highest_score=monitor.highest_score,
     )
     cause: _Retry = Unreadable()
     for _ in range(monitor.max_parse_retries + 1):
         (outcome,) = yield (request,)
-        settled = _settle(outcome, monitor=monitor, rendering=rendering)
-        if isinstance(settled, SuspicionScore):
+        settled = _settle(
+            outcome,
+            monitor=monitor,
+            rendering=rendering,
+        )
+        if isinstance(
+            settled,
+            SuspicionScore,
+        ):
             return settled
         cause = settled
-    return fail_closed(cause, model=name)
+    return fail_closed(
+        cause,
+        model=name,
+    )
 
 
 def _settle(
-    outcome: GenerationOutcome, *, monitor: LLMMonitor | AsyncLLMMonitor, rendering: Rendering
+    outcome: GenerationOutcome,
+    *,
+    monitor: LLMMonitor | AsyncLLMMonitor,
+    rendering: Rendering,
 ) -> SuspicionScore | _Retry:
     """The score an outcome ends the rating with, or the cause that earns another ask."""
     match outcome:
         case Generation(text=text):
-            return _score_reply(text, monitor=monitor, rendering=rendering)
+            return _score_reply(
+                text,
+                monitor=monitor,
+                rendering=rendering,
+            )
         case Truncated():
             return outcome
         case Refused() | Unavailable():
-            return fail_closed(outcome, model=monitor.model.name)
+            return fail_closed(
+                outcome,
+                model=monitor.model.name,
+            )
         case unreachable:
             assert_never(unreachable)
 
 
 def _score_reply(
-    text: str, *, monitor: LLMMonitor | AsyncLLMMonitor, rendering: Rendering
+    text: str,
+    *,
+    monitor: LLMMonitor | AsyncLLMMonitor,
+    rendering: Rendering,
 ) -> SuspicionScore | Unreadable:
     """Score a reply on the monitor's scale, mapped onto 0 to 1, or return Unreadable."""
-    match _read_reply(text, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score):
-        case _Reply(reasoning=reasoning, score=score):
+    match _read_reply(
+        text,
+        lowest_score=monitor.lowest_score,
+        highest_score=monitor.highest_score,
+    ):
+        case _Reply(
+            reasoning=reasoning,
+            score=score,
+        ):
             span = monitor.highest_score - monitor.lowest_score
             return SuspicionScore(
                 value=(score - monitor.lowest_score) / span,
                 explanation=reasoning,
                 evidence=Rationale(
-                    model=monitor.model.name, hidden_reasoning=rendering.hidden_reasoning
+                    model=monitor.model.name,
+                    hidden_reasoning=rendering.hidden_reasoning,
                 ),
             )
         case Unreadable() as unreadable:
@@ -200,7 +309,11 @@ def _score_reply(
             assert_never(unreachable)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class _Reply:
     """A readable reply: its reasoning, stripped, and its score."""
 
@@ -208,7 +321,11 @@ class _Reply:
     score: int
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class _ReasoningBlock:
     """The text of a reply's first reasoning block, and the offset where the block ends."""
 
@@ -216,14 +333,22 @@ class _ReasoningBlock:
     end: int
 
 
-def _read_reply(text: str, *, lowest_score: int, highest_score: int) -> _Reply | Unreadable:
+def _read_reply(
+    text: str,
+    *,
+    lowest_score: int,
+    highest_score: int,
+) -> _Reply | Unreadable:
     """Read a reply's reasoning and score, or return Unreadable.
 
     The reasoning must hold some text, and the score tag, alone after it, an integer in the
     scale. A score tag quoted inside the reasoning is part of it and never read.
     """
     match _find_reasoning(text):
-        case _ReasoningBlock(text=reasoning, end=end) if reasoning.strip():
+        case _ReasoningBlock(
+            text=reasoning,
+            end=end,
+        ) if reasoning.strip():
             return _read_score(
                 text,
                 start=end,
@@ -238,19 +363,32 @@ def _read_reply(text: str, *, lowest_score: int, highest_score: int) -> _Reply |
 
 
 def _read_score(
-    text: str, *, start: int, reasoning: str, lowest_score: int, highest_score: int
+    text: str,
+    *,
+    start: int,
+    reasoning: str,
+    lowest_score: int,
+    highest_score: int,
 ) -> _Reply | Unreadable:
     """Read the score tag that follows the reasoning, alone to the text's end, as an integer
     in the scale; matched from there, so a score tag elsewhere never counts.
     """
-    final = _FINAL_SCORE.fullmatch(text, start)
+    final = _FINAL_SCORE.fullmatch(
+        text,
+        start,
+    )
     if final is None:
         return Unreadable()
     match _parse_score(
-        final["score"].strip(), lowest_score=lowest_score, highest_score=highest_score
+        final["score"].strip(),
+        lowest_score=lowest_score,
+        highest_score=highest_score,
     ):
         case int(score):
-            return _Reply(reasoning=reasoning, score=score)
+            return _Reply(
+                reasoning=reasoning,
+                score=score,
+            )
         case Unreadable() as unreadable:
             return unreadable
         case unreachable:
@@ -268,13 +406,24 @@ def _find_reasoning(text: str) -> _ReasoningBlock | Unreadable:
     start = _REASONING_START.search(text)
     if start is None:
         return Unreadable()
-    end = _REASONING_END.search(text, start.end())
+    end = _REASONING_END.search(
+        text,
+        start.end(),
+    )
     if end is None:
         return Unreadable()
-    return _ReasoningBlock(text=text[start.end() : end.start()], end=end.end())
+    return _ReasoningBlock(
+        text=text[start.end() : end.start()],
+        end=end.end(),
+    )
 
 
-def _parse_score(score_text: str, *, lowest_score: int, highest_score: int) -> int | Unreadable:
+def _parse_score(
+    score_text: str,
+    *,
+    lowest_score: int,
+    highest_score: int,
+) -> int | Unreadable:
     """Read the score as an integer in the scale, or return Unreadable.
 
     Python refuses to convert an integer of more than 4,300 digits, by default; such a score

@@ -13,6 +13,11 @@ class FormatError(ValueError):
     agent's private content.
     """
 
-    def __init__(self, *, path: str, expected: str) -> None:
+    def __init__(
+        self,
+        *,
+        path: str,
+        expected: str,
+    ) -> None:
         super().__init__(f"{path}: expected {expected}")
         self.path = path
