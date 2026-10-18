@@ -35,7 +35,7 @@ class View:
 
     `channels` is a Channel. `most_recent` keeps only that many of the last entries shown,
     or every entry when it is None; the task's entries are kept in addition. It is a whole
-    number of at least 1, kept as an int. `delegation_tools` names the tools whose
+    number from 1 to sys.maxsize, kept as an int. `delegation_tools` names the tools whose
     observations are subagent reports: any iterable of strings but a string, kept as a
     frozenset. Anything else raises ConfigurationError when the view is built.
     """

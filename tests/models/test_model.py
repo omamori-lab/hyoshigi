@@ -76,8 +76,10 @@ def test_a_model_does_not_perceive_media_its_patterns_miss(
 
 
 def test_a_pattern_that_is_not_a_media_type_raises() -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         MediaTypes("image/*", "png")
+
+    assert str(raised.value) == "each pattern must be an IANA media type, such as image/*"
 
 
 @pytest.mark.parametrize(
@@ -89,8 +91,10 @@ def test_a_pattern_that_is_not_a_media_type_raises() -> None:
     ids=["prompt", "question"],
 )
 def test_content_a_model_cannot_be_given_raises(kind: type, arguments: dict[str, object]) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         kind(**arguments)
+
+    assert str(raised.value) == "a model is given text and media only"
 
 
 @pytest.mark.parametrize(
@@ -171,5 +175,7 @@ def test_a_decision_holds_probabilities_at_the_bounds(
     ids=["generative", "async-generative", "decision", "async-decision"],
 )
 def test_a_model_without_a_name_raises(kind: type, function: dict[str, object]) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         kind(name="", **function)
+
+    assert str(raised.value) == "a model needs a name, such as the provider's model id"
