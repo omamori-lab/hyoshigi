@@ -89,3 +89,13 @@ minor version.
   `gen_ai.evaluation.score.value` and `gen_ai.evaluation.explanation`, with
   `hyoshigi.failed_closed` and, for a score that failed closed,
   `hyoshigi.cause`.
+- `ReportedMonitor` and `AsyncReportedMonitor`, which rate with a monitor
+  inside a span of their own and then send the score for that span to each of
+  their reports: `LangfuseScores` (`hyoshigi[langfuse]`), a numeric score on
+  the span's trace and observation, queued by the client, and
+  `LangSmithFeedback` or `AsyncLangSmithFeedback` (`hyoshigi[langsmith]`),
+  model feedback on the run LangSmith ingests the span as. Each score carries
+  its explanation as the comment and, as metadata, whether it failed closed,
+  its cause's class and its models. Nothing is sent when the span is not
+  sampled or no tracer provider records it; a report that fails is logged by
+  its class and error type, and the score is returned either way.

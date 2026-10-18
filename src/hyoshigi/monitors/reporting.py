@@ -1,85 +1,43 @@
-"""Reports of a rating's score to Langfuse and LangSmith, and the monitor that sends them.
+"""The monitor that sends its rating's score to Langfuse and LangSmith, for the rating's span.
 
-The names are in place; what they do is not yet written.
+ReportedMonitor rates with the monitor it wraps inside a span of its own (tracing.py) and,
+once the span has ended, sends the score for that span, so a backend that ingests the span
+from OpenTelemetry shows the score on it. Langfuse takes the span's trace id as 32 lower-case
+hex digits and its span id as 16, the ids its client reads from the current span
+(langfuse 5.0.2, Langfuse.get_current_trace_id and get_current_observation_id). LangSmith
+ingests a span as a run whose id is the span id's 8 bytes right-aligned in a 16-byte UUID
+(langsmith 0.14.11, langsmith.integrations.otel.langsmith_run_id_from_otel_span_id). A score
+may reach either before its span: Langfuse documents it
+(https://langfuse.com/docs/evaluation/evaluation-methods/scores-via-sdk), and LangSmith's
+client retries feedback on a run not yet ingested (Client.create_feedback).
+
+A score is sent only when the span's context is valid and sampled; otherwise no backend holds
+the span, and a log record says nothing was sent. Reporting never changes or loses a score: a
+report that raises is logged, the other reports are sent, and the score is returned. A log
+record names the report's class and the exception's type, never the trajectory, the
+explanation or the exception's message, which can quote them.
 """
 
-# The SDKs' clients are imported only to type, since each SDK is an optional extra.
+# OpenTelemetry's classes are imported only to type, since it is an optional extra.
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 
+from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
+from hyoshigi.monitors.reports import AsyncLangSmithFeedback, LangfuseScores, LangSmithFeedback
 from hyoshigi.monitors.score import SuspicionScore
+from hyoshigi.monitors.tracing import find_tracer, record_rating, trace_rating
+from hyoshigi.options import check_instance, describe_type, name_class
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
 
 if TYPE_CHECKING:
-    from langfuse import Langfuse
-    from langsmith import AsyncClient, Client
+    from opentelemetry.trace import Span, SpanContext
 
-
-@dataclass(
-    frozen=True,
-    slots=True,
-    kw_only=True,
-)
-class LangfuseScores:
-    """Sends a score to Langfuse."""
-
-    client: Langfuse
-    name: str = "suspicion"
-
-    def send(
-        self,
-        score: SuspicionScore,
-        *,
-        trace_id: str,
-        observation_id: str,
-    ) -> None:
-        """Return without sending anything: the request is not built."""
-
-
-@dataclass(
-    frozen=True,
-    slots=True,
-    kw_only=True,
-)
-class LangSmithFeedback:
-    """Sends a score to LangSmith."""
-
-    client: Client
-    project_id: str
-    name: str = "suspicion"
-
-    def send(
-        self,
-        score: SuspicionScore,
-        *,
-        run_id: str,
-    ) -> None:
-        """Return without sending anything: the request is not built."""
-
-
-@dataclass(
-    frozen=True,
-    slots=True,
-    kw_only=True,
-)
-class AsyncLangSmithFeedback:
-    """Sends a score to LangSmith, awaited."""
-
-    client: AsyncClient
-    project_id: str
-    name: str = "suspicion"
-
-    async def send(
-        self,
-        score: SuspicionScore,
-        *,
-        run_id: str,
-    ) -> None:
-        """Return without sending anything: the request is not built."""
+logger = logging.getLogger(__name__)
 
 
 @dataclass(
@@ -88,10 +46,35 @@ class AsyncLangSmithFeedback:
     kw_only=True,
 )
 class ReportedMonitor(Monitor):
-    """Rates with a monitor and reports its score."""
+    """Rates with a monitor inside a span of its own, then sends the score to each report.
+
+    The span is named "rate ReportedMonitor" and holds the wrapped monitor's. Once it ends,
+    the score goes to each report in turn: to Langfuse on the span's trace and observation, to
+    LangSmith on the span's run. The score returned is the wrapped monitor's, whatever the
+    reports do. A `monitor` that is not a Monitor, `reports` that are not a non-empty tuple of
+    LangfuseScores and LangSmithFeedback, and a process without opentelemetry-api raise
+    ConfigurationError when the monitor is built.
+    """
 
     monitor: Monitor
     reports: tuple[LangfuseScores | LangSmithFeedback, ...]
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.monitor,
+            expected=Monitor,
+            name="monitor",
+            hint="Use AsyncReportedMonitor for an AsyncMonitor.",
+        )
+        _check_reports(
+            self.reports,
+            family=(
+                LangfuseScores,
+                LangSmithFeedback,
+            ),
+            hint="Use AsyncReportedMonitor for an AsyncLangSmithFeedback.",
+        )
+        _check_tracing(self)
 
     def rate(
         self,
@@ -99,11 +82,23 @@ class ReportedMonitor(Monitor):
         *,
         trajectory: Trajectory,
     ) -> SuspicionScore:
-        """Rate the action with the wrapped monitor."""
-        return self.monitor.rate(
-            action,
-            trajectory=trajectory,
-        )
+        """Rate the action with the wrapped monitor, then send the score to each report."""
+        with trace_rating(self) as span:
+            score = record_rating(
+                self.monitor.rate(
+                    action,
+                    trajectory=trajectory,
+                ),
+                span=span,
+            )
+        context = read_sendable_context(span)
+        if context is not None:
+            send_reports(
+                score,
+                context=context,
+                reports=self.reports,
+            )
+        return score
 
 
 @dataclass(
@@ -112,10 +107,30 @@ class ReportedMonitor(Monitor):
     kw_only=True,
 )
 class AsyncReportedMonitor(AsyncMonitor):
-    """Rates with a monitor, awaited, and reports its score."""
+    """Rates and reports as ReportedMonitor does, with the monitor and LangSmith awaited.
+
+    `reports` is a non-empty tuple of LangfuseScores and AsyncLangSmithFeedback, sent in turn.
+    """
 
     monitor: AsyncMonitor
     reports: tuple[LangfuseScores | AsyncLangSmithFeedback, ...]
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.monitor,
+            expected=AsyncMonitor,
+            name="monitor",
+            hint="Use ReportedMonitor for a Monitor.",
+        )
+        _check_reports(
+            self.reports,
+            family=(
+                LangfuseScores,
+                AsyncLangSmithFeedback,
+            ),
+            hint="Use ReportedMonitor for a LangSmithFeedback.",
+        )
+        _check_tracing(self)
 
     async def rate(
         self,
@@ -123,8 +138,181 @@ class AsyncReportedMonitor(AsyncMonitor):
         *,
         trajectory: Trajectory,
     ) -> SuspicionScore:
-        """Rate the action with the wrapped monitor."""
-        return await self.monitor.rate(
-            action,
-            trajectory=trajectory,
+        """Rate the action with the wrapped monitor, then send the score to each report."""
+        with trace_rating(self) as span:
+            score = record_rating(
+                await self.monitor.rate(
+                    action,
+                    trajectory=trajectory,
+                ),
+                span=span,
+            )
+        context = read_sendable_context(span)
+        if context is not None:
+            await await_reports(
+                score,
+                context=context,
+                reports=self.reports,
+            )
+        return score
+
+
+def _check_reports(
+    reports: object,
+    *,
+    family: tuple[type, ...],
+    hint: str,
+) -> None:
+    """Raise ConfigurationError unless the reports are a non-empty tuple of the family's
+    reports; the hint names the twin monitor.
+    """
+    if not isinstance(
+        reports,
+        tuple,
+    ):
+        raise ConfigurationError(f"reports must be a tuple, got {describe_type(reports)}")
+    if not reports:
+        raise ConfigurationError("reports must hold at least one report")
+    kinds = " or ".join(name_class(kind) for kind in family)
+    for position, report in enumerate(reports):
+        if not isinstance(
+            report,
+            family,
+        ):
+            raise ConfigurationError(
+                f"reports[{position}] must be {kinds}, got {describe_type(report)}. {hint}",
+            )
+
+
+def _check_tracing(monitor: ReportedMonitor | AsyncReportedMonitor) -> None:
+    """Raise ConfigurationError when opentelemetry-api is not installed, naming the extra."""
+    if find_tracer() is None:
+        raise ConfigurationError(
+            f"{type(monitor).__name__} needs OpenTelemetry: pip install 'hyoshigi[opentelemetry]'",
         )
+
+
+def read_sendable_context(span: Span | None) -> SpanContext | None:
+    """The span's context when a backend can hold the span, valid and sampled; otherwise log
+    that nothing was sent and return None.
+
+    An invalid context means no tracer provider records spans, which is a misconfiguration;
+    an unsampled one is a sampler's decision.
+    """
+    context = None if span is None else span.get_span_context()
+    if context is None or not context.is_valid:
+        logger.warning(
+            "No report was sent: no OpenTelemetry tracer provider recorded the rating's span.",
+        )
+        return None
+    if not context.trace_flags.sampled:
+        logger.debug("No report was sent: the rating's span is not sampled.")
+        return None
+    return context
+
+
+def send_reports(
+    score: SuspicionScore,
+    *,
+    context: SpanContext,
+    reports: tuple[LangfuseScores | LangSmithFeedback, ...],
+) -> None:
+    """Send the score to each report in turn for the span; a report that raises is logged."""
+    for report in reports:
+        # Any error: reporting never loses the score or the reports after it.
+        try:
+            match report:
+                case LangfuseScores():
+                    send_to_langfuse(
+                        report,
+                        score=score,
+                        context=context,
+                    )
+                case LangSmithFeedback():
+                    report.send(
+                        score,
+                        run_id=derive_run_id(context),
+                    )
+                case unreachable:
+                    assert_never(unreachable)
+        except Exception as error:
+            log_failure(
+                report,
+                error=error,
+            )
+
+
+async def await_reports(
+    score: SuspicionScore,
+    *,
+    context: SpanContext,
+    reports: tuple[LangfuseScores | AsyncLangSmithFeedback, ...],
+) -> None:
+    """Send the score to each report in turn for the span, awaiting LangSmith; a report that
+    raises is logged.
+    """
+    for report in reports:
+        # Any error: reporting never loses the score or the reports after it.
+        try:
+            match report:
+                case LangfuseScores():
+                    send_to_langfuse(
+                        report,
+                        score=score,
+                        context=context,
+                    )
+                case AsyncLangSmithFeedback():
+                    await report.send(
+                        score,
+                        run_id=derive_run_id(context),
+                    )
+                case unreachable:
+                    assert_never(unreachable)
+        except Exception as error:
+            log_failure(
+                report,
+                error=error,
+            )
+
+
+def send_to_langfuse(
+    report: LangfuseScores,
+    *,
+    score: SuspicionScore,
+    context: SpanContext,
+) -> None:
+    """Send the score to Langfuse with the span's trace and span ids as lower-case hex."""
+    report.send(
+        score,
+        trace_id=format(
+            context.trace_id,
+            "032x",
+        ),
+        observation_id=format(
+            context.span_id,
+            "016x",
+        ),
+    )
+
+
+def derive_run_id(context: SpanContext) -> str:
+    """The id of the run LangSmith ingests the span as."""
+    # Imported here because langsmith is the optional extra hyoshigi[langsmith].
+    from langsmith.integrations.otel import langsmith_run_id_from_otel_span_id
+
+    return str(langsmith_run_id_from_otel_span_id(context.span_id))
+
+
+def log_failure(
+    report: object,
+    *,
+    error: Exception,
+) -> None:
+    """Log that a report did not send the score, by the report's class and the error's type
+    alone: an error's message can quote the score's explanation or the request.
+    """
+    logger.warning(
+        "%s did not send the score: %s.",
+        type(report).__name__,
+        type(error).__name__,
+    )

@@ -180,6 +180,11 @@ def check_instance(
         expected,
     ):
         return
-    article = "an" if expected.__name__[0] in "AEIOU" else "a"
-    message = f"{name} must be {article} {expected.__name__}, got {describe_type(value)}"
+    message = f"{name} must be {name_class(expected)}, got {describe_type(value)}"
     raise ConfigurationError(f"{message}. {hint}" if hint else message)
+
+
+def name_class(kind: type) -> str:
+    """Name a class after its indefinite article, such as "a Monitor" or "an AsyncMonitor"."""
+    article = "an" if kind.__name__[0] in "AEIOU" else "a"
+    return f"{article} {kind.__name__}"
