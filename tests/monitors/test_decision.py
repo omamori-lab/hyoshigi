@@ -177,30 +177,31 @@ def test_default_options_use_view_default_statement_and_maximum_aggregation(
     )
 
 
-def test_a_sync_monitor_given_an_async_model_raises_with_hint() -> None:
-    async_model = AsyncDecisionModel(name="m", decide=decide_dummy_async)
-    expected_message = (
-        "model must be a DecisionModel, got an instance of "
-        "AsyncDecisionModel. Use AsyncDecisionMonitor for an async model."
-    )
-
+@pytest.mark.parametrize(
+    ("monitor_class", "model", "message"),
+    [
+        (
+            DecisionMonitor,
+            ASYNC_MODEL,
+            "model must be a DecisionModel, got an instance of AsyncDecisionModel. "
+            "Use AsyncDecisionMonitor for an async model.",
+        ),
+        (
+            AsyncDecisionMonitor,
+            SYNC_MODEL,
+            "model must be an AsyncDecisionModel, got an instance of DecisionModel. "
+            "Use DecisionMonitor for a sync model.",
+        ),
+    ],
+    ids=["async-model-for-the-sync-monitor", "sync-model-for-the-async-monitor"],
+)
+def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to(
+    monitor_class: type[DecisionMonitor] | type[AsyncDecisionMonitor], model: object, message: str
+) -> None:
     with pytest.raises(ConfigurationError) as raised:
-        DecisionMonitor(model=async_model)  # ty: ignore[invalid-argument-type]
+        monitor_class(model=model)  # ty: ignore[invalid-argument-type]
 
-    assert str(raised.value) == expected_message
-
-
-def test_an_async_monitor_given_a_sync_model_raises_with_hint() -> None:
-    sync_model = DecisionModel(name="m", decide=decide_dummy)
-    expected_message = (
-        "model must be an AsyncDecisionModel, got an instance of "
-        "DecisionModel. Use DecisionMonitor for a sync model."
-    )
-
-    with pytest.raises(ConfigurationError) as raised:
-        AsyncDecisionMonitor(model=sync_model)  # ty: ignore[invalid-argument-type]
-
-    assert str(raised.value) == expected_message
+    assert str(raised.value) == message
 
 
 @MONITOR_BUILDERS
