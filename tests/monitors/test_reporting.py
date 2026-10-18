@@ -826,6 +826,73 @@ def test_a_rating_with_no_tracer_provider_set_up_warns_that_nothing_was_sent(scr
     )
 
 
+# A server in the rating's process that accepts any request at once, and a sampled span context
+# from another process; no tracer provider is set up, so the rating's span carries that context
+# without recording.
+ACCEPTING_SERVER_AND_REMOTE_PARENT = """
+import http.server, threading
+from opentelemetry import trace
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
+class Accept(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b"{}")
+    def log_message(self, *arguments):
+        pass
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Accept)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+URL = f"http://127.0.0.1:{server.server_port}"
+parent = NonRecordingSpan(
+    SpanContext(
+        trace_id=0x5B8EFFF798038103D269B633813FC60C,
+        span_id=0xEEE19B7EC3C1B174,
+        is_remote=True,
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+    ),
+)
+"""
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "script",
+    [
+        RATE_WITHOUT_A_TRACER_PROVIDER,
+        RATE_ASYNCHRONOUSLY_WITHOUT_A_TRACER_PROVIDER,
+    ],
+    ids=["sync", "async"],
+)
+def test_a_rating_under_a_remote_parent_with_no_tracer_provider_sends_nothing(script: str) -> None:
+    *setup, rating = script.strip().replace('"http://127.0.0.1:9"', "URL").split("\n")
+    command = [
+        sys.executable,
+        "-c",
+        "\n".join(
+            [
+                ACCEPTING_SERVER_AND_REMOTE_PARENT,
+                *setup,
+                "with trace.use_span(parent):",
+                f"    {rating}",
+            ],
+        ),
+    ]
+
+    process = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+
+    assert process.stdout == (
+        "WARNING No report was sent: no OpenTelemetry tracer provider recorded the rating's span.\n"
+    )
+
+
 # Builds a reported monitor of each family in a process where importing opentelemetry fails.
 BUILD_WITHOUT_OPENTELEMETRY = """
 import sys

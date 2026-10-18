@@ -661,7 +661,8 @@ def test_a_span_the_model_function_opens_nests_inside_the_ratings_span(
     ]
 
 
-def test_an_exception_from_the_model_function_is_recorded_on_the_ratings_span(
+@pytest.mark.xfail(strict=True)
+def test_an_exception_from_the_model_function_marks_the_ratings_span_by_its_type_alone(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -680,8 +681,8 @@ def test_an_exception_from_the_model_function_is_recorded_on_the_ratings_span(
     ] == [
         (
             StatusCode.ERROR,
-            "ConnectionError: the provider hung up",
-            ["exception"],
+            "ConnectionError",
+            [],
         ),
     ]
 
