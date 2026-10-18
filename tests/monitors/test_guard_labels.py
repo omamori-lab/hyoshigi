@@ -13,8 +13,6 @@ from hyoshigi.monitors.guard_labels import (
 )
 from hyoshigi.monitors.score import Unreadable
 
-pytestmark = pytest.mark.xfail(strict=True)
-
 # The labels of a policy that asks for violation or no_violation on the last line.
 POLICY_LABELS = GuardLabels(suspicious=frozenset({"violation"}), safe=frozenset({"no_violation"}))
 
