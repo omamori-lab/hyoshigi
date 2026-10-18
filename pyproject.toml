@@ -110,6 +110,12 @@ xfail_strict = true
 # The domain is mutation-tested: no surviving mutant is left unexplained.
 paths_to_mutate = ["src/hyoshigi/"]
 tests_dir = ["tests/"]
+# mutmut runs each function through its trampoline, which adds stack frames, so the line a
+# warning points at cannot be checked in its runs.
+pytest_add_cli_args = [
+    "--deselect",
+    "tests/monitors/test_guard.py::test_the_one_sample_warning_points_at_the_line_that_builds_the_monitor",
+]
 
 # The limits below are a ratchet: lower them as the code allows, and raise one only in a
 # reviewed change that says why.
