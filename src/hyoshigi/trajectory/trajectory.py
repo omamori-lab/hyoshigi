@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
+from hyoshigi.monitors.score import SuspicionScore
 from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
@@ -21,6 +23,14 @@ class BlackBoxRun(NamedTuple):
 
     trajectory: Trajectory
     answer: Action
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Rating:
+    """A monitor's score of an action in the trajectory."""
+
+    action_id: str
+    score: SuspicionScore
 
 
 class Trajectory:
@@ -90,6 +100,14 @@ class Trajectory:
     def subagents(self) -> Mapping[str, Trajectory]:
         """Each subagent's trajectory, by the id of the tool call that delegated it."""
         return MappingProxyType(self._subagents)
+
+    @property
+    def ratings(self) -> tuple[Rating, ...]:
+        """The ratings of the actions in the history, in the order they were attached."""
+        return ()
+
+    def attach(self, score: SuspicionScore, *, to: Action) -> None:
+        """Record a monitor's score of an action in the history."""
 
     def act(self, action: Action) -> None:
         """Record an action the decision allowed.
