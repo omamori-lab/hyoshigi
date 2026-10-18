@@ -6,7 +6,6 @@ from hyoshigi import ConfigurationError
 from hyoshigi.monitors.view import View
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("most_recent", [0, -1, True], ids=["zero", "negative", "bool"])
 def test_a_view_whose_most_recent_is_not_a_count_of_at_least_one_raises(most_recent: int) -> None:
     with pytest.raises(ConfigurationError):
