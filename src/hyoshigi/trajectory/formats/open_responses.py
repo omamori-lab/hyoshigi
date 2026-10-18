@@ -616,8 +616,18 @@ def read_media_url(
 ) -> Part:
     """Read a data URL into media, another URL into media of the given range, and a string
     with no scheme, such as bare base64, as opaque.
+
+    A string urllib cannot split raises FormatError without urllib's message, which can quote
+    the URL.
     """
-    if not urlsplit(url).scheme:
+    try:
+        scheme = urlsplit(url).scheme
+    except ValueError:
+        raise FormatError(
+            path=path,
+            expected="a URL",
+        ) from None
+    if not scheme:
         return OpaquePart(kind=kind)
     return read_data_url(
         url,
