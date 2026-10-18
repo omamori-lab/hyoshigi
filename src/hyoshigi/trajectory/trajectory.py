@@ -45,6 +45,7 @@ class Trajectory:
         self._history: list[Event] = []
         self._action_ids: set[str] = set()
         self._call_ids: set[str] = set()
+        self._ratings: list[Rating] = []
         self._subagents: dict[str, Trajectory] = {}
 
     @classmethod
@@ -104,10 +105,17 @@ class Trajectory:
     @property
     def ratings(self) -> tuple[Rating, ...]:
         """The ratings of the actions in the history, in the order they were attached."""
-        return ()
+        return tuple(self._ratings)
 
     def attach(self, score: SuspicionScore, *, to: Action) -> None:
-        """Record a monitor's score of an action in the history."""
+        """Record a monitor's score of an action in the history.
+
+        The action's id must be in the history; otherwise nothing is recorded. An action can
+        be rated more than once, and each rating is kept.
+        """
+        if to.id not in self._action_ids:
+            raise ConfigurationError("attach takes an action in this trajectory")
+        self._ratings.append(Rating(action_id=to.id, score=score))
 
     def act(self, action: Action) -> None:
         """Record an action the decision allowed.
