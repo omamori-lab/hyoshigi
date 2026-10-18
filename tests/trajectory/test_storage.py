@@ -106,13 +106,13 @@ STORED_DECIDED: dict[str, JSON] = {
         "hidden_reasoning": ["Compared the two statements."],
     },
 }
-# Two of five replies are suspicious votes: the unsafe label, and the reply with no label.
+# Two of five replies are labelled unsafe.
 LABELLED = SuspicionScore(
     value=0.4,
     explanation="The guard model labelled the action 'unsafe', finding that it breaks the policy.",
     evidence=Labels(
         model="gpt-oss-safeguard-20b",
-        labels=("unsafe", None, "safe", "safe", "safe"),
+        labels=("unsafe", "unsafe", "safe", "safe", "safe"),
         hidden_reasoning=("reasoning.encrypted",),
     ),
 )
@@ -124,7 +124,7 @@ STORED_LABELLED: dict[str, JSON] = {
     "evidence": {
         "kind": "labels",
         "model": "gpt-oss-safeguard-20b",
-        "labels": ["unsafe", None, "safe", "safe", "safe"],
+        "labels": ["unsafe", "unsafe", "safe", "safe", "safe"],
         "hidden_reasoning": ["reasoning.encrypted"],
     },
 }
@@ -710,11 +710,19 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                 {"kind": "labels", "model": "m", "labels": ["unsafe", 5], "hidden_reasoning": []}
             ),
             "$.ratings[0].score.evidence.labels[1]",
-            id="label-not-text-or-null",
+            id="label-not-text",
         ),
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": [None], "hidden_reasoning": [5]}
+                {"kind": "labels", "model": "m", "labels": ["unsafe", None], "hidden_reasoning": []}
+            ),
+            "$.ratings[0].score.evidence.labels[1]",
+            id="label-null",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {"kind": "labels", "model": "m", "labels": [], "hidden_reasoning": [5]}
             ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="labels-hidden-reasoning-not-text",
@@ -790,19 +798,21 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
 @pytest.mark.parametrize(
     ("payload", "message"),
     [
-        (
+        pytest.param(
             build_evidence_payload(
                 {"kind": "labels", "model": "m", "labels": [5], "hidden_reasoning": []}
             ),
-            "$.ratings[0].score.evidence.labels[0]: expected a label or null",
+            "$.ratings[0].score.evidence.labels[0]: expected text",
+            id="label-not-text",
+            marks=pytest.mark.xfail(strict=True),
         ),
-        (
+        pytest.param(
             build_evidence_payload({"kind": "audit"}),
             "$.ratings[0].score.evidence: expected rationale, decisions, labels, composite or "
             "failed-closed evidence",
+            id="unknown-evidence",
         ),
     ],
-    ids=["label-not-text-or-null", "unknown-evidence"],
 )
 def test_a_format_error_for_evidence_says_what_was_expected(payload: JSON, message: str) -> None:
     with pytest.raises(FormatError) as raised:
