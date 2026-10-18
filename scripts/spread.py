@@ -27,9 +27,10 @@ from typing import assert_never
 # Formatting can bring a bracket into being, such as the parentheses around a long tuple, and
 # that bracket then lacks its comma; a few passes reach a fixed point.
 MAXIMUM_PASSES = 4
+# A fence is a line of its own: "```python" opens a block, and "```" alone closes it.
 PYTHON_BLOCK = re.compile(
-    r"```python\n(.*?)```",
-    re.DOTALL,
+    r"^```python[ \t]*\n(.*?\n)```[ \t]*$",
+    re.DOTALL | re.MULTILINE,
 )
 IMPORT_KEYWORDS = frozenset({"import", "from"})
 SOFT_KEYWORDS = frozenset({"match", "case"})
@@ -234,7 +235,12 @@ class Scanner:
             self.brackets[-1].plain = False
 
     def follows_value(self) -> bool:
-        """Whether the last token ends a value, so that a `[` after it is a subscript."""
+        """Whether the last token ends a value, so that a `[` after it is a subscript.
+
+        A `[` that begins a statement follows no value, whatever ended the statement before.
+        """
+        if self.beginning_statement:
+            return False
         last = self.last
         if last.type == tokenize.OP:
             return last.string in CLOSING_BRACKETS
