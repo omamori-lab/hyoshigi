@@ -400,15 +400,30 @@ HARD_LABEL_WARNING = (
 
 
 @pytest.mark.parametrize("samples", [1, ArrayInteger(1)], ids=["int", "integral"])
-def test_one_sample_warns_at_the_line_that_builds_the_monitor(
+def test_one_sample_warns_that_every_threshold_flags_the_same_actions(
     build: Callable[..., GuardMonitor | AsyncGuardMonitor], samples: object
 ) -> None:
     with pytest.warns(HardLabelWarning) as record:
         build(samples=samples)
 
-    assert [(str(warning.message), warning.filename) for warning in record] == [
-        (HARD_LABEL_WARNING, __file__)
-    ]
+    assert [str(warning.message) for warning in record] == [HARD_LABEL_WARNING]
+
+
+# mutmut runs each function through a trampoline of its own, which adds frames, so its runs
+# leave this test out. The monitor is built here, not in a helper, so a warning that points
+# one frame too far lands outside this file.
+@pytest.mark.parametrize(
+    ("monitor_class", "model"),
+    [(GuardMonitor, SYNC_MODEL), (AsyncGuardMonitor, ASYNC_MODEL)],
+    ids=["sync", "async"],
+)
+def test_the_one_sample_warning_points_at_the_line_that_builds_the_monitor(
+    monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object
+) -> None:
+    with pytest.warns(HardLabelWarning) as record:
+        monitor_class(model=model, prompt=POLICY, labels=LLAMA_GUARD, samples=1)  # ty: ignore[invalid-argument-type]
+
+    assert [warning.filename for warning in record] == [__file__]
 
 
 @pytest.mark.parametrize("options", [{}, {"samples": 2}], ids=["default", "two"])
