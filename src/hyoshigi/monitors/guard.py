@@ -179,7 +179,7 @@ def _read_sample(
 
 
 def _score_labels(evidence: Labels, *, suspicious: frozenset[str]) -> SuspicionScore:
-    """Score the share of suspicious labels, explained by the first of them, else by the first."""
+    """Score the share of suspicious labels, explained by the first one, else the first label."""
     flagged = [label for label in evidence.labels if label in suspicious]
     explanation = _explain_label((flagged or evidence.labels)[0], suspicious=suspicious)
     return SuspicionScore(
