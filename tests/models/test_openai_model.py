@@ -1410,20 +1410,18 @@ def test_an_image_at_a_url_is_sent_as_that_url(ask_decision: AskDecision, media_
 
 
 # A data URL cannot name the subtype of a range such as image/*.
-def test_image_bytes_of_a_range_are_unavailable_without_a_status(ask_decision: AskDecision) -> None:
-    media = MediaPart(media_type="image/*", data=b"foobar")
-    question = Question(statement=DAMAGE_STATEMENT, state=(media,))
+# A question about image bytes of a range, such as image/*, which no data URL can name.
+RANGE_BYTES_QUESTION = Question(statement=DAMAGE_STATEMENT, state=(RANGE_BYTES,))
 
-    exchange = ask_decision(respond(PHOTO_RESPONSE), question)
+
+def test_image_bytes_of_a_range_are_unavailable_without_a_status(ask_decision: AskDecision) -> None:
+    exchange = ask_decision(respond(PHOTO_RESPONSE), RANGE_BYTES_QUESTION)
 
     assert exchange.outcome == Unavailable(status=None)
 
 
 def test_image_bytes_of_a_range_send_no_request(ask_decision: AskDecision) -> None:
-    media = MediaPart(media_type="image/*", data=b"foobar")
-    question = Question(statement=DAMAGE_STATEMENT, state=(media,))
-
-    exchange = ask_decision(respond(PHOTO_RESPONSE), question)
+    exchange = ask_decision(respond(PHOTO_RESPONSE), RANGE_BYTES_QUESTION)
 
     assert exchange.requests == []
 
