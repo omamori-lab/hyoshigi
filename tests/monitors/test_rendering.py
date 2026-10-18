@@ -830,6 +830,42 @@ def test_the_default_view_shows_the_task_the_tool_calls_and_the_subagent_reports
     )
 
 
+# An item a format does not model, such as a tool the agent's provider ran, is an unknown
+# author's observation.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "parts",
+    [
+        (OpaquePart(kind="openai:web_search_call"),),
+        build_text("Only read files."),
+    ],
+    ids=["opaque-item", "text"],
+)
+def test_the_default_view_shows_an_unknown_author_s_observation_as_opaque(
+    parts: tuple[Part, ...],
+) -> None:
+    trajectory = Trajectory()
+    trajectory.observe(
+        Observation(
+            author=Author.USER,
+            parts=build_text(TASK),
+        ),
+    )
+    trajectory.observe(
+        Observation(
+            author=Author.UNKNOWN,
+            parts=parts,
+        ),
+    )
+
+    rendered = render_history(
+        trajectory,
+        view=View(),
+    )
+
+    assert rendered == build_text("<user>Summarise q3.md</user>\n<opaque/>")
+
+
 def test_a_view_of_the_most_recent_entries_keeps_every_earlier_task_entry() -> None:
     trajectory = Trajectory()
     trajectory.observe(
