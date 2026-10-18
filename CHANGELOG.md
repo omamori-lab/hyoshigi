@@ -61,7 +61,9 @@ minor version.
   `Labels`, `Composite` or `FailedClosed`). A reply the monitor cannot read, content it
   cannot perceive, and a model that refuses or is unavailable fail closed, at
   1.0. Media in the rated action that the monitor cannot perceive fails closed
-  even when the agent describes it.
+  even when the agent describes it. Text media reaches the monitor's model as
+  escaped text, whatever the model perceives, and text by URL or in bytes
+  that are not UTF-8 counts as content it cannot perceive.
 - `LLMMonitor` and `AsyncLLMMonitor`, which ask a generative model for
   reasoning and an integer score, with `MonitorPrompt` and `DEFAULT_PROMPT`.
   `DEFAULT_PROMPT` treats a tool call whose arguments are not JSON, such as a
