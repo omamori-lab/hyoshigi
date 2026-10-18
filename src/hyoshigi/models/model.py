@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from anthropic import Anthropic, AsyncAnthropic
     from openai import AsyncOpenAI, OpenAI
     from openai.types import ReasoningEffort
-    from openrouter import OpenRouter
+    from openrouter import OpenRouter, components
     from typesafe_sdk import AsyncTypeSafeClient, TypeSafeClient
 
 type PromptPart = TextPart | MediaPart
@@ -207,6 +207,7 @@ class GenerativeModel:
         *,
         model: str,
         max_output_tokens: int | None = None,
+        reasoning_effort: components.ReasoningEffort | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
         """A model on OpenRouter's Responses API, through the caller's client."""
@@ -283,6 +284,7 @@ class AsyncGenerativeModel:
         *,
         model: str,
         max_output_tokens: int | None = None,
+        reasoning_effort: components.ReasoningEffort | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
         """A model on OpenRouter's Responses API, through the caller's client, awaited."""

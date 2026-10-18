@@ -8,7 +8,7 @@ from typing import cast
 
 import httpx
 import pytest
-from openrouter import OpenRouter
+from openrouter import OpenRouter, components
 
 from hyoshigi import (
     JSON,
@@ -278,19 +278,31 @@ async def await_outcome[Outcome](awaitable: Awaitable[Outcome]) -> Outcome:
 
 
 def generate_synchronously(
-    client: OpenRouter, prompt: Prompt = PROMPT, max_output_tokens: int | None = None
+    client: OpenRouter,
+    prompt: Prompt = PROMPT,
+    max_output_tokens: int | None = None,
+    reasoning_effort: components.ReasoningEffort | None = None,
 ) -> GenerationOutcome:
     model = GenerativeModel.from_openrouter(
-        client, model=MODEL, max_output_tokens=max_output_tokens
+        client,
+        model=MODEL,
+        max_output_tokens=max_output_tokens,
+        reasoning_effort=reasoning_effort,
     )
     return model.generate(prompt)
 
 
 def generate_asynchronously(
-    client: OpenRouter, prompt: Prompt = PROMPT, max_output_tokens: int | None = None
+    client: OpenRouter,
+    prompt: Prompt = PROMPT,
+    max_output_tokens: int | None = None,
+    reasoning_effort: components.ReasoningEffort | None = None,
 ) -> GenerationOutcome:
     model = AsyncGenerativeModel.from_openrouter(
-        client, model=MODEL, max_output_tokens=max_output_tokens
+        client,
+        model=MODEL,
+        max_output_tokens=max_output_tokens,
+        reasoning_effort=reasoning_effort,
     )
     return asyncio.run(await_outcome(model.generate(prompt)))
 
@@ -508,6 +520,32 @@ def test_the_output_limit_is_sent_only_when_given(
     generate(wire.build_client(), max_output_tokens=max_output_tokens)
 
     assert wire.read_bodies("max_output_tokens") == sent
+
+
+# https://openrouter.ai/docs/api_reference/responses/reasoning: the request carries "reasoning":
+# {"effort": "high"}; "Reasoning Effort Levels" lists minimal, low, medium and high.
+@pytest.mark.parametrize(
+    ("reasoning_effort", "sent"),
+    [
+        (None, [{}]),
+        pytest.param(
+            "high",
+            [{"reasoning": {"effort": "high"}}],
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
+        ),
+    ],
+    ids=["no-effort-sends-no-field", "effort-is-sent"],
+)
+def test_the_reasoning_effort_is_sent_only_when_given(
+    generate: Callable[..., GenerationOutcome],
+    reasoning_effort: components.ReasoningEffort | None,
+    sent: list[JSON],
+) -> None:
+    wire = Wire(build_reply(200, COMPLETED))
+
+    generate(wire.build_client(), reasoning_effort=reasoning_effort)
+
+    assert wire.read_bodies("reasoning") == sent
 
 
 # A lone surrogate is what json.loads makes of "\ud800", as in a tool's output.
