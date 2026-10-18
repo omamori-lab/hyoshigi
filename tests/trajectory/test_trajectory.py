@@ -168,6 +168,24 @@ def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Traje
     assert str(raised.value) == "attach takes an action in this trajectory"
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("score", "to", "message"),
+    [
+        (0.5, Action(id="a1", tool_calls=(READ,)), "score must be a SuspicionScore, got 0.5"),
+        (READS_THE_FILE, "a1", "to must be an Action, got 'a1'"),
+    ],
+    ids=["a-number-as-the-score", "an-id-as-the-action"],
+)
+def test_attaching_what_is_not_a_score_to_an_action_raises_naming_it(
+    reading: Trajectory, score: object, to: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        reading.attach(score, to=to)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
+
+
 def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> None:
     reading.attach(READS_THE_FILE, to=Action(id="a1", tool_calls=(READ,)))
 
