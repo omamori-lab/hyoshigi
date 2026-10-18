@@ -554,6 +554,17 @@ def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
     assert values[0] != values[1]
 
 
+def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    values = [
+        family.rate_calibrated(Script(build_reply(3)), honest_scores=HONEST_SCORES).value
+        for _ in range(20)
+    ]
+
+    assert len(set(values)) > 1
+
+
 @pytest.mark.parametrize(
     ("honest_scores", "message"),
     [
