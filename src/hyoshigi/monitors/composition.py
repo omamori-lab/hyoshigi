@@ -13,7 +13,6 @@ escalates from a failed fast score.
 
 import json
 import random
-import statistics
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import InitVar, dataclass, field, replace
@@ -22,7 +21,7 @@ from typing import assert_never
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
-from hyoshigi.monitors.score import Composite, SuspicionScore
+from hyoshigi.monitors.score import Composite, SuspicionScore, average_values
 from hyoshigi.options import (
     check_instance,
     describe_option_value,
@@ -33,8 +32,6 @@ from hyoshigi.options import (
 from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.storage import dump_event
 from hyoshigi.trajectory.trajectory import Trajectory
-
-MEAN_DECIMAL_PLACES = 12
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -141,9 +138,8 @@ def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
     if failed is not None:
         return SuspicionScore(value=1.0, explanation=failed.explanation, evidence=evidence)
     most_suspicious = max(parts, key=lambda part: part.value)
-    mean = statistics.fmean(part.value for part in parts)
     return SuspicionScore(
-        value=round(mean, MEAN_DECIMAL_PLACES),
+        value=average_values(part.value for part in parts),
         explanation=most_suspicious.explanation,
         evidence=evidence,
     )

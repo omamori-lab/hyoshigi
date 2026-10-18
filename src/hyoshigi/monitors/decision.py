@@ -17,7 +17,6 @@ scores before aggregating (Greenblatt et al., "AI Control: Improving Safety Desp
 Intentional Subversion", arXiv:2312.06942, appendix K).
 """
 
-import statistics
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import assert_never
@@ -41,6 +40,7 @@ from hyoshigi.monitors.score import (
     StatementDecision,
     SuspicionScore,
     Unperceivable,
+    average_values,
     fail_closed,
 )
 from hyoshigi.monitors.view import View
@@ -51,7 +51,10 @@ from hyoshigi.trajectory.trajectory import Trajectory
 
 
 class Aggregation(Enum):
-    """How a decision monitor aggregates the probabilities of several statements."""
+    """How a decision monitor aggregates the probabilities of several statements.
+
+    The mean is rounded as RepeatedMonitor's is, to `MEAN_DECIMAL_PLACES`.
+    """
 
     MAX = auto()
     MIN = auto()
@@ -195,7 +198,7 @@ def aggregate_decisions(
             value = (
                 decision.probability
                 if aggregation is Aggregation.MAX
-                else statistics.fmean(decision.probability for decision in decisions)
+                else average_values(decision.probability for decision in decisions)
             )
             return value, f"The decision model's strongest concern: {statement}"
         case unreachable:
