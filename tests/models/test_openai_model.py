@@ -10,6 +10,7 @@ from typing import Protocol
 import httpx2
 import pytest
 from openai import AsyncOpenAI, OpenAI
+from openai.types import ReasoningEffort
 
 from hyoshigi import (
     AsyncGenerativeModel,
@@ -50,6 +51,7 @@ class Ask(Protocol):
         *,
         model: str = ...,
         max_output_tokens: int | None = None,
+        reasoning_effort: ReasoningEffort = None,
         perceives: MediaTypes = ...,
         strict_validation: bool = False,
     ) -> Exchange: ...
@@ -80,6 +82,7 @@ def generate_synchronously(
     *,
     model: str = MODEL,
     max_output_tokens: int | None = None,
+    reasoning_effort: ReasoningEffort = None,
     perceives: MediaTypes = TEXT_ONLY,
     strict_validation: bool = False,
 ) -> Exchange:
@@ -91,7 +94,11 @@ def generate_synchronously(
         _strict_response_validation=strict_validation,
     )
     built = GenerativeModel.from_openai(
-        client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+        client,
+        model=model,
+        max_output_tokens=max_output_tokens,
+        reasoning_effort=reasoning_effort,
+        perceives=perceives,
     )
     return Exchange(model=built, outcome=built.generate(prompt), requests=requests)
 
@@ -102,6 +109,7 @@ def generate_asynchronously(
     *,
     model: str = MODEL,
     max_output_tokens: int | None = None,
+    reasoning_effort: ReasoningEffort = None,
     perceives: MediaTypes = TEXT_ONLY,
     strict_validation: bool = False,
 ) -> Exchange:
@@ -113,7 +121,11 @@ def generate_asynchronously(
         _strict_response_validation=strict_validation,
     )
     built = AsyncGenerativeModel.from_openai(
-        client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+        client,
+        model=model,
+        max_output_tokens=max_output_tokens,
+        reasoning_effort=reasoning_effort,
+        perceives=perceives,
     )
 
     async def generate() -> GenerationOutcome:
@@ -454,6 +466,33 @@ def test_the_output_limit_is_sent_only_when_given(
     ask: Ask, max_output_tokens: int | None, expected: dict[str, object]
 ) -> None:
     exchange = ask(respond(IMAGE_INPUT_RESPONSE), IMAGE_PROMPT, max_output_tokens=max_output_tokens)
+
+    assert exchange.requests == [expected]
+
+
+# https://developers.openai.com/api/docs/guides/reasoning, "Get started with reasoning": the
+# request carries "reasoning": {"effort": "low"}; "Reasoning effort" lists none among the values.
+@pytest.mark.parametrize(
+    ("reasoning_effort", "expected"),
+    [
+        (None, IMAGE_REQUEST),
+        pytest.param(
+            "low",
+            replace(IMAGE_REQUEST, reasoning={"effort": "low"}),
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
+        ),
+        pytest.param(
+            "none",
+            replace(IMAGE_REQUEST, reasoning={"effort": "none"}),
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
+        ),
+    ],
+    ids=["no-effort-sends-no-field", "effort-is-sent", "none-is-an-effort-and-is-sent"],
+)
+def test_the_reasoning_effort_is_sent_only_when_given(
+    ask: Ask, reasoning_effort: ReasoningEffort, expected: dict[str, object]
+) -> None:
+    exchange = ask(respond(IMAGE_INPUT_RESPONSE), IMAGE_PROMPT, reasoning_effort=reasoning_effort)
 
     assert exchange.requests == [expected]
 

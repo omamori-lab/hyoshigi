@@ -18,6 +18,7 @@ from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 if TYPE_CHECKING:
     from anthropic import Anthropic, AsyncAnthropic
     from openai import AsyncOpenAI, OpenAI
+    from openai.types import ReasoningEffort
     from openrouter import OpenRouter
     from typesafe_sdk import AsyncTypeSafeClient, TypeSafeClient
 
@@ -170,6 +171,7 @@ class GenerativeModel:
         *,
         model: str,
         max_output_tokens: int | None = None,
+        reasoning_effort: ReasoningEffort = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
         """A model on OpenAI's Responses API, through the caller's client."""
@@ -230,6 +232,7 @@ class AsyncGenerativeModel:
         *,
         model: str,
         max_output_tokens: int | None = None,
+        reasoning_effort: ReasoningEffort = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
         """A model on OpenAI's Responses API, through the caller's async client."""
