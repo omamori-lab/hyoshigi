@@ -21,7 +21,6 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, assert_never
 
 from hyoshigi.monitors.score import (
-    Cause,
     Composite,
     Decisions,
     FailedClosed,
@@ -83,23 +82,23 @@ def describe_rating(score: SuspicionScore) -> dict[str, str | float | bool]:
         "gen_ai.evaluation.explanation": score.explanation,
         "hyoshigi.failed_closed": score.failed_closed,
     }
-    cause = find_cause(score)
+    cause = name_cause(score)
     if cause is not None:
-        attributes["hyoshigi.cause"] = type(cause).__name__
+        attributes["hyoshigi.cause"] = cause
     return attributes
 
 
-def find_cause(score: SuspicionScore) -> Cause | None:
-    """The cause a score failed closed with, or None when it did not.
+def name_cause(score: SuspicionScore) -> str | None:
+    """The class of the cause a score failed closed with, or None when it did not.
 
     A composite's cause is that of its first part to fail closed, searched depth first, as
     a RepeatedMonitor's explanation is its first failed call's.
     """
     match score.evidence:
         case FailedClosed(cause=cause):
-            return cause
+            return type(cause).__name__
         case Composite(parts=parts):
-            causes = (find_cause(part) for part in parts)
+            causes = (name_cause(part) for part in parts)
             return next(
                 (cause for cause in causes if cause is not None),
                 None,

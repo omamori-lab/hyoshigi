@@ -447,7 +447,6 @@ def build_calibrated_repeated_cascade(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_langfuse_receives_the_score_on_the_trace_and_observation_of_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -477,7 +476,6 @@ def test_langfuse_receives_the_score_on_the_trace_and_observation_of_the_ratings
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_langsmith_receives_the_score_as_model_feedback_on_the_run_of_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -514,7 +512,6 @@ def test_langsmith_receives_the_score_as_model_feedback_on_the_run_of_the_rating
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "metadata"),
     [
@@ -570,7 +567,6 @@ def test_the_metadata_says_whether_the_score_failed_closed_why_and_from_which_mo
     assert [score["metadata"] for score in langfuse.read_scores()] == [metadata]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("family", "spans_ended"),
     [
@@ -651,7 +647,6 @@ def test_a_rating_in_an_unsampled_trace_sends_nothing(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_rating_in_an_unsampled_trace_logs_at_debug_that_nothing_was_sent(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -697,7 +692,6 @@ def test_a_report_that_fails_to_send_leaves_the_score_returned(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("family", "report"),
     [
@@ -736,7 +730,6 @@ def test_a_report_that_fails_to_send_is_logged_by_its_class_and_error_type_alone
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_other_reports_are_sent_when_one_fails(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -806,7 +799,6 @@ asyncio.run(monitor.rate(action, trajectory=trajectory))
 """
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "script",
     [
@@ -876,7 +868,6 @@ except ConfigurationError as error:
 """
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("script", "message"),
     [
@@ -911,7 +902,6 @@ def test_a_reported_monitor_without_opentelemetry_installed_is_refused_naming_th
     assert process.stdout == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reported", "monitor", "message"),
     [
@@ -947,7 +937,6 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_twin(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reported", "monitor", "build_reports", "message"),
     [
@@ -1007,7 +996,6 @@ def test_reports_that_are_not_a_tuple_of_the_familys_reports_are_refused(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "build_client", "message"),
     [
@@ -1050,7 +1038,6 @@ def test_a_client_that_is_not_the_reports_sdk_client_is_refused_naming_the_twin(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "find_client", "message"),
     [
@@ -1097,7 +1084,6 @@ def test_a_name_that_is_not_a_non_blank_string_is_refused(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "build_client", "project_id", "message"),
     [
