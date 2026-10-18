@@ -603,9 +603,10 @@ def test_each_image_type_the_api_supports_is_sent_by_url(
     assert wire.requests == [build_request([{"type": "image", "source": source}])]
 
 
-# https://platform.claude.com/docs/en/api/messages, TextBlockParam: text has minLength 1. The API
-# answers a block of only whitespace with 400 invalid_request_error, "text content blocks must
-# contain non-whitespace text".
+# https://platform.claude.com/docs/en/api/messages, TextBlockParam: text has minLength 1.
+# Observed live on 2026-10-18 (claude-haiku-5-5): a user message whose only block is whitespace
+# is answered with 400 invalid_request_error, "messages: text content blocks must contain
+# non-whitespace text"; beside other text, such a block is accepted.
 @pytest.mark.parametrize("blank", ["", " \n\t"], ids=["empty", "whitespace"])
 def test_blank_text_is_not_sent(build_driver: BuildDriver, blank: str) -> None:
     wire = Wire(REFERENCE_RESPONSE)
