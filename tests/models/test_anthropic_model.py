@@ -493,16 +493,11 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
 @pytest.mark.parametrize(
     ("thinking", "sent"),
     [
-        pytest.param(
+        (
             {"type": "adaptive", "display": "summarized"},
             {"type": "adaptive", "display": "summarized"},
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
         ),
-        pytest.param(
-            {"type": "disabled"},
-            {"type": "disabled"},
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
-        ),
+        ({"type": "disabled"}, {"type": "disabled"}),
     ],
     ids=["adaptive-summarized", "disabled"],
 )

@@ -201,11 +201,17 @@ class GenerativeModel:
         thinking: ThinkingConfigParam | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
-        """A model on Anthropic's Messages API, through the caller's client."""
+        """A model on Anthropic's Messages API, through the caller's client.
+
+        A thinking configuration, when given, is sent as the request's thinking; without
+        one, the model's default applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[anthropic].
         from hyoshigi.models import anthropic as provider
 
-        return provider.build_model(client, model=model, max_tokens=max_tokens, perceives=perceives)
+        return provider.build_model(
+            client, model=model, max_tokens=max_tokens, thinking=thinking, perceives=perceives
+        )
 
     @classmethod
     def from_openrouter(
@@ -285,12 +291,16 @@ class AsyncGenerativeModel:
         thinking: ThinkingConfigParam | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
-        """A model on Anthropic's Messages API, through the caller's async client."""
+        """A model on Anthropic's Messages API, through the caller's async client.
+
+        A thinking configuration, when given, is sent as the request's thinking; without
+        one, the model's default applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[anthropic].
         from hyoshigi.models import anthropic as provider
 
         return provider.build_async_model(
-            client, model=model, max_tokens=max_tokens, perceives=perceives
+            client, model=model, max_tokens=max_tokens, thinking=thinking, perceives=perceives
         )
 
     @classmethod
