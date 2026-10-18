@@ -55,7 +55,7 @@ minor version.
   the agent proposes and always return a `SuspicionScore`: a value from 0 to 1,
   an explanation, the only part an agent may see (the default prompt asks the
   model to keep its score out of it), and typed evidence (`Rationale`, `Decisions`,
-  `Composite` or `FailedClosed`). A reply the monitor cannot read, content it
+  `Labels`, `Composite` or `FailedClosed`). A reply the monitor cannot read, content it
   cannot perceive, and a model that refuses or is unavailable fail closed, at
   1.0.
 - `LLMMonitor` and `AsyncLLMMonitor`, which ask a generative model for
