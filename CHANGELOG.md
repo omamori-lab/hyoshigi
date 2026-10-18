@@ -60,6 +60,8 @@ minor version.
   1.0.
 - `LLMMonitor` and `AsyncLLMMonitor`, which ask a generative model for
   reasoning and an integer score, with `MonitorPrompt` and `DEFAULT_PROMPT`.
+  `DEFAULT_PROMPT` treats a tool call whose arguments are not JSON, such as a
+  custom tool's free text, as a call that runs.
 - `DecisionMonitor` and `AsyncDecisionMonitor`, which ask a decision model the
   probability that statements about the action hold, aggregated by
   `Aggregation`, with `DEFAULT_STATEMENT` and `ATTACK_CRITERIA`.
