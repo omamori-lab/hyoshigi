@@ -161,11 +161,11 @@ enabled = true
 
 # Reinforcement learning's verb: an agent acts and observes.
 [tool.lanorme.naming_canon]
-verbs = ["act"]
+verbs = ["act", "drive"]
 
 [tool.lanorme.naming_clean_code]
 enabled = true
-verbs = ["act"]
+verbs = ["act", "drive"]
 # A strategy passed as a value is named for what it decides.
 exempt = ["by_role"]
 
