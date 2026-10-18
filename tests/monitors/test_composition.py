@@ -83,14 +83,14 @@ def run[Result](awaitable: Awaitable[Result]) -> Result:
     return asyncio.run(finish())
 
 
-def build_synchronous_llm(script: Script) -> LLMMonitor:
+def build_synchronous_llm(script: Script, *, highest_score: int = 10) -> LLMMonitor:
     model = GenerativeModel(name=MODEL_NAME, generate=script.generate)
-    return LLMMonitor(model=model)
+    return LLMMonitor(model=model, highest_score=highest_score)
 
 
-def build_asynchronous_llm(script: Script) -> AsyncLLMMonitor:
+def build_asynchronous_llm(script: Script, *, highest_score: int = 10) -> AsyncLLMMonitor:
     model = AsyncGenerativeModel(name=MODEL_NAME, generate=script.generate_asynchronously)
-    return AsyncLLMMonitor(model=model)
+    return AsyncLLMMonitor(model=model, highest_score=highest_score)
 
 
 def rate_synchronously(monitor: Monitor, action: Action, trajectory: Trajectory) -> SuspicionScore:
@@ -107,15 +107,16 @@ def rate_asynchronously(
 class Family[Wrapped]:
     """The wrappers of one family, built around scripted LLM monitors, and how they are rated."""
 
-    build_llm: Callable[[Script], Wrapped]
+    build_llm: Callable[..., Wrapped]
     repeated: Callable[..., Wrapped]
     rate: Callable[[Wrapped, Action, Trajectory], SuspicionScore]
 
     def rate_repeated(
-        self, script: Script, *, ensemble_size: int, action: Action = ACTION
+        self, script: Script, *, ensemble_size: int, highest_score: int = 10
     ) -> SuspicionScore:
-        monitor = self.repeated(monitor=self.build_llm(script), ensemble_size=ensemble_size)
-        return self.rate(monitor, action, build_trajectory())
+        llm = self.build_llm(script, highest_score=highest_score)
+        monitor = self.repeated(monitor=llm, ensemble_size=ensemble_size)
+        return self.rate(monitor, ACTION, build_trajectory())
 
 
 SYNCHRONOUS = Family(
@@ -155,6 +156,21 @@ def test_the_value_is_the_mean_of_the_calls_rounded_to_12_decimal_places(
     script = Script(*(build_reply(score) for score in scores))
 
     score = family.rate_repeated(script, ensemble_size=ensemble_size)
+
+    assert score.value == value
+
+
+@pytest.mark.parametrize(
+    ("scores", "value"),
+    [([10, 10], 1e-12), ([3, 0], 0.0)],
+    ids=["twelfth-place-kept", "thirteenth-place-rounded-away"],
+)
+def test_the_mean_keeps_the_twelfth_decimal_place_and_rounds_away_the_thirteenth(
+    family: Family[Monitor] | Family[AsyncMonitor], scores: list[int], value: float
+) -> None:
+    script = Script(*(build_reply(score) for score in scores))
+
+    score = family.rate_repeated(script, ensemble_size=2, highest_score=10**13)
 
     assert score.value == value
 
