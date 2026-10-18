@@ -772,6 +772,50 @@ def test_documents_become_media_and_files_become_opaque() -> None:
     )
 
 
+# https://platform.claude.com/docs/en/build-with-claude/citations: the plain text document of
+# its first example, whose title and context "are passed to the model".
+@pytest.mark.xfail(strict=True)
+def test_a_document_s_title_and_context_are_text_beside_its_content() -> None:
+    request: JSON = {
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "text",
+                            "media_type": "text/plain",
+                            "data": "The grass is green. The sky is blue.",
+                        },
+                        "title": "My Document",
+                        "context": "This is a trustworthy document.",
+                        "citations": {"enabled": True},
+                    },
+                    {
+                        "type": "text",
+                        "text": "What color is the grass and sky?",
+                    },
+                ],
+            },
+        ],
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.USER,
+            parts=(
+                TextPart(text="My Document"),
+                TextPart(text="The grass is green. The sky is blue."),
+                TextPart(text="This is a trustworthy document."),
+                TextPart(text="What color is the grass and sky?"),
+            ),
+        ),
+    )
+
+
 # https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool, "Errors": a
 # server tool's failure is an error object in the result's content.
 def test_a_server_tool_s_error_is_observed_as_an_error() -> None:
@@ -1235,6 +1279,34 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[1]",
         ),
+        pytest.param(
+            build_user_request(
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "text",
+                        "data": "15 degrees",
+                    },
+                    "title": 15,
+                },
+            ),
+            "$.messages[0].content[0].title",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_user_request(
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "text",
+                        "data": "15 degrees",
+                    },
+                    "context": ["weather"],
+                },
+            ),
+            "$.messages[0].content[0].context",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -1269,6 +1341,8 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "server-tool-use-without-input",
         "server-result-without-content",
         "server-result-content-not-a-list-or-object",
+        "document-title-not-text",
+        "document-context-not-text",
     ],
 )
 def test_a_malformed_request_raises_format_error_at_its_path(
