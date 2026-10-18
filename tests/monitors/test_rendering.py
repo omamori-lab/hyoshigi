@@ -443,7 +443,8 @@ def test_text_media_renders_as_its_escaped_text_whatever_the_model_perceives(
     )
 
 
-# Text by URL has no text to escape, and bytes that are not UTF-8 read as no text.
+# Text by URL has no text to escape, and bytes that are not UTF-8 read as no text: the
+# data URL's base64 is "caf\xe9", café in Latin-1.
 def test_text_media_by_url_or_not_utf_8_is_unperceivable_in_the_rated_action() -> None:
     action = Action(
         parts=(
@@ -454,6 +455,13 @@ def test_text_media_by_url_or_not_utf_8_is_unperceivable_in_the_rated_action() -
             MediaPart(
                 media_type="text/plain",
                 data=b"caf\xe9",
+            ),
+        ),
+        tool_calls=(
+            ToolCall(
+                id="c2",
+                name="write",
+                arguments='{"note": "data:text/plain;base64,Y2Fm6Q=="}',
             ),
         ),
     )
@@ -467,10 +475,13 @@ def test_text_media_by_url_or_not_utf_8_is_unperceivable_in_the_rated_action() -
     assert rendering == Rendering(
         trajectory=(),
         proposed_action=build_text(
-            '<agent><omitted_media type="text/plain"/><omitted_media type="text/plain"/></agent>',
+            '<agent><omitted_media type="text/plain"/><omitted_media type="text/plain"/></agent>\n'
+            '<tool_call id="c2" name="write">{"note": "[media 1]"}'
+            '<omitted_media type="text/plain" ref="1"/></tool_call>',
         ),
         hidden_reasoning=(),
         unperceivable=(
+            "text/plain",
             "text/plain",
             "text/plain",
         ),
