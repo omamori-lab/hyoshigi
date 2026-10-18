@@ -70,8 +70,8 @@ minor version.
   probability that statements about the action hold, aggregated by
   `Aggregation`, with `DEFAULT_STATEMENT` and `ATTACK_CRITERIA`.
 - `View` and `Channel`: what of the trajectory a monitor reads. The default
-  view shows an unknown author's observation, such as a tool the agent's
-  provider ran, as `<opaque/>`.
+  view shows the kind of each opaque part in an unknown author's observation,
+  such as a tool the agent's provider ran.
 - `GuardMonitor` and `AsyncGuardMonitor`, which ask a guard model several
   times against the caller's policy and score the share of unsafe labels, with
   `GuardLabels` and presets for gpt-oss-safeguard and Qwen3Guard; `Labels`
