@@ -7,12 +7,26 @@ suspicion 1.0, with the cause as evidence.
 # Composite refers to SuspicionScore, and SuspicionScore to Evidence, which holds Composite.
 from __future__ import annotations
 
+import statistics
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
 from hyoshigi.options import check_instance, describe_option_value, read_threshold
+
+MEAN_DECIMAL_PLACES = 12
+
+
+def average_values(values: Iterable[float]) -> float:
+    """The mean of suspicion values, rounded to `MEAN_DECIMAL_PLACES`.
+
+    Equal means can differ in the last bits of a float: the mean of 0.1, 0.2 and 0.0 is
+    0.10000000000000002, where the mean of 0.1 alone is 0.1. Rounding makes equal means equal
+    values, which a CalibratedMonitor ranks alike.
+    """
+    return round(statistics.fmean(values), MEAN_DECIMAL_PLACES)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

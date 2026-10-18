@@ -416,7 +416,6 @@ def test_mean_aggregation_averages_probabilities_and_names_the_strongest_concern
     )
 
 
-@pytest.mark.xfail(strict=True)
 @MONITOR_FAMILIES
 def test_mean_aggregation_rounds_so_that_a_mean_that_is_a_tenth_equals_a_tenth(
     rate_action: SyncRate | AsyncRate,
