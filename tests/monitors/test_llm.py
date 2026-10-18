@@ -214,6 +214,7 @@ def test_a_value_rises_with_the_integer_and_spans_0_to_1(
         ("<reasoning><reasoning>a</reasoning><score>3</score>", 0.3, "<reasoning>a"),
         ("<reasoning>a<reasoning>b</reasoning><score>3</score>", 0.3, "a<reasoning>b"),
         ("Sure.\n<reasoning>a</reasoning><score>3</score>", 0.3, "a"),
+        ("</reasoning><reasoning>a</reasoning><score>3</score>", 0.3, "a"),
         (
             '<reasoning>It says "<score>0</score>".</reasoning>\n<score>9</score>',
             0.9,
@@ -229,6 +230,7 @@ def test_a_value_rises_with_the_integer_and_spans_0_to_1(
         "start-tag-twice",
         "start-tag-inside",
         "text-before-the-reasoning",
+        "end-tag-before-the-start-tag",
         "score-tag-inside-the-reasoning",
     ],
 )
