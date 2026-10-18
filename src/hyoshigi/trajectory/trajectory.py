@@ -112,9 +112,9 @@ class Trajectory:
     ) -> Self:
         """Build the trajectory of an OpenAI chat completions request body.
 
-        OpenRouter's reasoning fields are read as the assistant's thought. Raises
-        FormatError, naming the JSONPath of the first problem, on a body that is not
-        in the chat completions format.
+        OpenRouter's reasoning fields are read as the assistant's thought, and its images
+        as media parts. Raises FormatError, naming the JSONPath of the first problem, on a
+        body that is not in the chat completions format.
         """
         trajectory = cls()
         for path, event in openai_chat.read_request(

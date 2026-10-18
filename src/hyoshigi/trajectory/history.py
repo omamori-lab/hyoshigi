@@ -61,8 +61,9 @@ class Action:
     def from_openai_chat(message: JSON) -> Action:
         """Read a chat completions response's assistant message into an action.
 
-        OpenRouter's reasoning fields are read as the thought. Raises FormatError, naming
-        the JSONPath of the first problem, on a message that is not in the format.
+        OpenRouter's reasoning fields are read as the thought, and its images as media parts.
+        Raises FormatError, naming the JSONPath of the first problem, on a message that is
+        not in the format.
         """
         # Imported here because the format module builds actions: a top-level import
         # would be a cycle.
