@@ -201,3 +201,25 @@ def test_evidence_that_must_hold_something_raises_when_empty(
         kind(**arguments)
 
     assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("parts", "message"),
+    [
+        (("x",), "parts[0] must be a SuspicionScore, got 'x'"),
+        (
+            (SuspicionScore(value=0.5, explanation="x", evidence=Rationale(model="m")), None),
+            "parts[1] must be a SuspicionScore, got None",
+        ),
+        ([], "parts must be a tuple, got an instance of list"),
+    ],
+    ids=["a-string", "none-after-a-score", "a-list"],
+)
+def test_a_composite_of_anything_but_scores_raises_naming_the_part(
+    parts: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        Composite(parts=parts)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
