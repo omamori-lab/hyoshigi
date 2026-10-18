@@ -4,6 +4,7 @@ import asyncio
 import numbers
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import partial
 
 import pytest
@@ -23,8 +24,10 @@ from hyoshigi import (
 )
 from hyoshigi.monitors.composition import (
     AsyncCalibratedMonitor,
+    AsyncCascadeMonitor,
     AsyncRepeatedMonitor,
     CalibratedMonitor,
+    CascadeMonitor,
     RepeatedMonitor,
 )
 from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
@@ -57,12 +60,14 @@ REFUSED_SCORE = SuspicionScore(
 
 
 class Script:
-    """The outcomes a scripted model returns in order."""
+    """The outcomes a scripted model returns in order, and the prompts it received."""
 
     def __init__(self, *outcomes: GenerationOutcome) -> None:
         self.outcomes = list(outcomes)
+        self.received: list[Prompt] = []
 
     def generate(self, prompt: Prompt) -> GenerationOutcome:
+        self.received.append(prompt)
         return self.outcomes.pop(0)
 
     async def generate_asynchronously(self, prompt: Prompt) -> GenerationOutcome:
@@ -134,6 +139,7 @@ class Family[Wrapped]:
     build_llm: Callable[..., Wrapped]
     repeated: Callable[..., Wrapped]
     calibrated: Callable[..., Wrapped]
+    cascade: Callable[..., Wrapped]
     rate: Callable[[Wrapped, Action, Trajectory], SuspicionScore]
 
     def rate_repeated(
@@ -157,17 +163,29 @@ class Family[Wrapped]:
         )
         return self.rate(monitor, action, build_trajectory() if trajectory is None else trajectory)
 
+    def rate_cascade(
+        self, fast: Script, careful: Script, *, escalation_threshold: float
+    ) -> SuspicionScore:
+        monitor = self.cascade(
+            fast=self.build_llm(fast),
+            careful=self.build_llm(careful),
+            escalation_threshold=escalation_threshold,
+        )
+        return self.rate(monitor, ACTION, build_trajectory())
+
 
 SYNCHRONOUS = Family(
     build_llm=build_synchronous_llm,
     repeated=RepeatedMonitor,
     calibrated=CalibratedMonitor,
+    cascade=CascadeMonitor,
     rate=rate_synchronously,
 )
 ASYNCHRONOUS = Family(
     build_llm=build_asynchronous_llm,
     repeated=AsyncRepeatedMonitor,
     calibrated=AsyncCalibratedMonitor,
+    cascade=AsyncCascadeMonitor,
     rate=rate_asynchronously,
 )
 
@@ -381,12 +399,60 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CalibratedMonitor for a Monitor.",
         ),
+        pytest.param(
+            partial(
+                CascadeMonitor,
+                fast=ASYNCHRONOUS_LLM,
+                careful=SYNCHRONOUS_LLM,
+                escalation_threshold=0.5,
+            ),
+            "fast must be a Monitor, got an instance of AsyncLLMMonitor. "
+            "Use AsyncCascadeMonitor for an AsyncMonitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(
+                CascadeMonitor,
+                fast=SYNCHRONOUS_LLM,
+                careful=ASYNCHRONOUS_LLM,
+                escalation_threshold=0.5,
+            ),
+            "careful must be a Monitor, got an instance of AsyncLLMMonitor. "
+            "Use AsyncCascadeMonitor for an AsyncMonitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(
+                AsyncCascadeMonitor,
+                fast=SYNCHRONOUS_LLM,
+                careful=ASYNCHRONOUS_LLM,
+                escalation_threshold=0.5,
+            ),
+            "fast must be an AsyncMonitor, got an instance of LLMMonitor. "
+            "Use CascadeMonitor for a Monitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(
+                AsyncCascadeMonitor,
+                fast=ASYNCHRONOUS_LLM,
+                careful=SYNCHRONOUS_LLM,
+                escalation_threshold=0.5,
+            ),
+            "careful must be an AsyncMonitor, got an instance of LLMMonitor. "
+            "Use CascadeMonitor for a Monitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "async-monitor-for-the-sync-repeated",
         "sync-monitor-for-the-async-repeated",
         "async-monitor-for-the-sync-calibrated",
         "sync-monitor-for-the-async-calibrated",
+        "async-fast-for-the-sync-cascade",
+        "async-careful-for-the-sync-cascade",
+        "sync-fast-for-the-async-cascade",
+        "sync-careful-for-the-async-cascade",
     ],
 )
 def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_to(
@@ -653,3 +719,103 @@ def test_a_seed_that_is_a_whole_number_but_not_an_int_is_kept_as_an_int(
     calibrated = build()
 
     assert (type(calibrated.random_seed), calibrated.random_seed) == (int, 7)
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("fast_reply", "kept", "careful_asks"),
+    [
+        (2, build_score(0.2, "fast"), 0),
+        (3, build_score(0.9, "careful"), 1),
+        (4, build_score(0.9, "careful"), 1),
+    ],
+    ids=["below-the-threshold", "at-the-threshold", "above-the-threshold"],
+)
+def test_a_fast_score_below_the_threshold_is_kept_and_one_at_or_above_it_escalates(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    fast_reply: int,
+    kept: SuspicionScore,
+    careful_asks: int,
+) -> None:
+    fast = Script(build_reply(fast_reply, "fast"))
+    careful = Script(build_reply(9, "careful"))
+
+    score = family.rate_cascade(fast, careful, escalation_threshold=0.3)
+
+    assert (score, len(careful.received)) == (kept, careful_asks)
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize("escalation_threshold", [0.5, 1.0], ids=["half", "one"])
+def test_a_fast_score_that_failed_closed_always_escalates(
+    family: Family[Monitor] | Family[AsyncMonitor], escalation_threshold: float
+) -> None:
+    fast = Script(Unavailable(status=503))
+    careful = Script(build_reply(9, "careful"))
+
+    score = family.rate_cascade(fast, careful, escalation_threshold=escalation_threshold)
+
+    assert score == build_score(0.9, "careful")
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_careful_score_that_failed_closed_is_returned_unchanged(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    fast = Script(build_reply(5, "fast"))
+    careful = Script(Unavailable(status=503))
+
+    score = family.rate_cascade(fast, careful, escalation_threshold=0.3)
+
+    assert score == UNAVAILABLE_SCORE
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("escalation_threshold", "message"),
+    [
+        (1.2, "escalation_threshold must be between 0 and 1, got 1.2"),
+        (-0.1, "escalation_threshold must be between 0 and 1, got -0.1"),
+        (float("nan"), "escalation_threshold must be between 0 and 1, got nan"),
+        (True, "escalation_threshold must be a number between 0 and 1, got True"),
+        ("0.5", "escalation_threshold must be a number between 0 and 1, got '0.5'"),
+        (None, "escalation_threshold must be a number between 0 and 1, got None"),
+    ],
+    ids=["above-one", "below-zero", "nan", "bool", "string", "none"],
+)
+def test_an_escalation_threshold_that_is_not_from_0_to_1_is_refused_naming_it(
+    family: Family[Monitor] | Family[AsyncMonitor], escalation_threshold: object, message: str
+) -> None:
+    llm = family.build_llm(Script())
+
+    with pytest.raises(ConfigurationError) as raised:
+        family.cascade(fast=llm, careful=llm, escalation_threshold=escalation_threshold)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "build",
+    [
+        partial(
+            CascadeMonitor,
+            fast=SYNCHRONOUS_LLM,
+            careful=SYNCHRONOUS_LLM,
+            escalation_threshold=Fraction(1, 2),
+        ),
+        partial(
+            AsyncCascadeMonitor,
+            fast=ASYNCHRONOUS_LLM,
+            careful=ASYNCHRONOUS_LLM,
+            escalation_threshold=Fraction(1, 2),
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_a_threshold_that_is_a_real_number_but_not_a_float_is_kept_as_a_float(
+    build: Callable[[], CascadeMonitor | AsyncCascadeMonitor],
+) -> None:
+    cascade = build()
+
+    assert (type(cascade.escalation_threshold), cascade.escalation_threshold) == (float, 0.5)
