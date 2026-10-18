@@ -573,6 +573,31 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
     )
 
 
+# RFC 2045, section 5.1: parameter names, base64 among them, are case-insensitive.
+@pytest.mark.xfail(strict=True)
+def test_a_data_url_reads_base64_named_in_capitals() -> None:
+    request = build_user_request(
+        {
+            "type": "image_url",
+            "image_url": {"url": "data:image/png;BASE64,iVBORw=="},
+        },
+    )
+
+    trajectory = Trajectory.from_openai_chat(request)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.USER,
+            parts=(
+                MediaPart(
+                    media_type="image/png",
+                    data=b"\x89PNG",
+                ),
+            ),
+        ),
+    )
+
+
 def test_text_parts_and_the_deprecated_function_message_keep_their_authors() -> None:
     request: JSON = {
         "messages": [
