@@ -52,7 +52,8 @@ lanorme needs Python 3.13, so the script runs it with `uvx --python 3.13`; it
 only parses the code, so it checks 3.12 source correctly. To see why a rule
 fired, run `uvx --python 3.13 lanorme==0.21.1 rule CODE`. Its limits in
 `pyproject.toml` are a ratchet: meet them by naming steps or sharing a
-helper, not by raising a limit.
+helper. A limit rises only in a reviewed change that says why, as the line
+limits did when every call of two or more items was spread one per line.
 
 ## Sending a pull request
 
