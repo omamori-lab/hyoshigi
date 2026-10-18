@@ -787,6 +787,30 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
     assert raised.value.path == path
 
 
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            build_evidence_payload(
+                {"kind": "labels", "model": "m", "labels": [5], "hidden_reasoning": []}
+            ),
+            "$.ratings[0].score.evidence.labels[0]: expected a label or null",
+        ),
+        (
+            build_evidence_payload({"kind": "audit"}),
+            "$.ratings[0].score.evidence: expected rationale, decisions, labels, composite or "
+            "failed-closed evidence",
+        ),
+    ],
+    ids=["label-not-text-or-null", "unknown-evidence"],
+)
+def test_a_format_error_for_evidence_says_what_was_expected(payload: JSON, message: str) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert str(raised.value) == message
+
+
 def test_a_format_error_for_a_rating_never_quotes_the_payload() -> None:
     payload = build_score_payload(value="s3cret-0f3c")
 
