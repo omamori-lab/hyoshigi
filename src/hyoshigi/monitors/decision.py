@@ -17,8 +17,6 @@ scores before aggregating (Greenblatt et al., "AI Control: Improving Safety Desp
 Intentional Subversion", arXiv:2312.06942, appendix K).
 """
 
-from __future__ import annotations
-
 import statistics
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -139,11 +137,11 @@ def check_decision_options(
 def check_statements(statements: tuple[str, ...]) -> None:
     """Raise ConfigurationError unless the statements are non-empty, non-blank and unique."""
     if not statements:
-        raise ConfigurationError("statements must not be empty.")
+        raise ConfigurationError("statements must not be empty")
     if any(not isinstance(statement, str) or not statement.strip() for statement in statements):
-        raise ConfigurationError("each statement must be a non-blank string.")
+        raise ConfigurationError("each statement must be a non-blank string")
     if len(set(statements)) != len(statements):
-        raise ConfigurationError("statements must not be repeated.")
+        raise ConfigurationError("statements must not be repeated")
 
 
 def build_state(rendering: Rendering) -> tuple[PromptPart, ...]:
@@ -183,30 +181,23 @@ def aggregate_decisions(
 ) -> tuple[float, str]:
     """Aggregate the decisions into a suspicion value and an explanation."""
     match aggregation:
-        case Aggregation.MAX:
+        case Aggregation.MIN:
+            joined = "; ".join(statements)
+            return (
+                min(decision.probability for decision in decisions),
+                f"The decision model's score rests on all of its concerns together: {joined}",
+            )
+        case Aggregation.MAX | Aggregation.MEAN:
             statement, decision = max(
                 zip(statements, decisions, strict=True),
                 key=lambda pair: pair[1].probability,
             )
-            return (
-                float(decision.probability),
-                f"The decision model's strongest concern: {statement}",
+            value = (
+                decision.probability
+                if aggregation is Aggregation.MAX
+                else statistics.fmean(decision.probability for decision in decisions)
             )
-        case Aggregation.MEAN:
-            statement, _ = max(
-                zip(statements, decisions, strict=True),
-                key=lambda pair: pair[1].probability,
-            )
-            return (
-                float(statistics.fmean(decision.probability for decision in decisions)),
-                f"The decision model's strongest concern: {statement}",
-            )
-        case Aggregation.MIN:
-            joined = "; ".join(statements)
-            return (
-                float(min(decision.probability for decision in decisions)),
-                f"The decision model's score rests on all of its concerns together: {joined}",
-            )
+            return value, f"The decision model's strongest concern: {statement}"
         case unreachable:
             assert_never(unreachable)
 
