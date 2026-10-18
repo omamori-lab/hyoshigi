@@ -574,7 +574,6 @@ def test_media_parts_become_media_or_opaque_parts() -> None:
 
 
 # RFC 2045, section 5.1: parameter names, base64 among them, are case-insensitive.
-@pytest.mark.xfail(strict=True)
 def test_a_data_url_reads_base64_named_in_capitals() -> None:
     request = build_user_request(
         {

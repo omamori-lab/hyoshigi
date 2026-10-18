@@ -8,9 +8,10 @@ from hyoshigi.trajectory.parts import MediaPart
 from hyoshigi.trajectory.storage import decode_data
 
 # RFC 2397, section 3: data:[<mediatype>][;base64],<data>, where the media type, with its
-# parameters, defaults to text/plain.
+# parameters, defaults to text/plain. Parameter names are case-insensitive (RFC 2045, section
+# 5.1), and so is ;base64.
 _DATA_URL = re.compile(
-    r"data:(?P<media_type>[^;,]*)(?:;[^;,]*?)*?(?P<base64>;base64)?,(?P<data>.*)",
+    r"data:(?P<media_type>[^;,]*)(?:;[^;,]*?)*?(?P<base64>;(?i:base64))?,(?P<data>.*)",
     re.DOTALL,
 )
 
