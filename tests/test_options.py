@@ -228,7 +228,6 @@ def test_an_instance_of_the_expected_class_is_accepted() -> None:
     assert accepted is None
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("value", "expected", "hint", "message"),
     [
