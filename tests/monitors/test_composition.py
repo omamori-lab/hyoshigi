@@ -135,7 +135,6 @@ def family(request: pytest.FixtureRequest) -> Family[Monitor] | Family[AsyncMoni
     return request.param
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("scores", "ensemble_size", "value"),
     [
@@ -160,7 +159,6 @@ def test_the_value_is_the_mean_of_the_calls_rounded_to_12_decimal_places(
     assert score.value == value
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("scores", "explanation"),
     [
@@ -184,7 +182,6 @@ def test_the_explanation_is_the_most_suspicious_calls_and_the_first_of_a_tie(
     assert score.explanation == explanation
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_evidence_holds_each_calls_score_in_order(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -197,7 +194,6 @@ def test_the_evidence_holds_each_calls_score_in_order(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "explanation", "parts"),
     [
@@ -230,7 +226,6 @@ def test_a_call_that_failed_closed_fails_the_whole_score_closed_with_its_explana
     assert score.failed_closed
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_async_wrapper_asks_its_calls_at_once() -> None:
     async def rate_at_a_barrier() -> SuspicionScore:
         # Each call waits for the other two, so only calls in flight together finish.
@@ -249,7 +244,6 @@ def test_the_async_wrapper_asks_its_calls_at_once() -> None:
     assert score.value == 0.4
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("ensemble_size", "message"),
     [
@@ -291,7 +285,6 @@ SYNCHRONOUS_LLM = build_synchronous_llm(Script())
 ASYNCHRONOUS_LLM = build_asynchronous_llm(Script())
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "build",
     [
@@ -308,7 +301,6 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
     assert (type(repeated.ensemble_size), repeated.ensemble_size) == (int, 2)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "message"),
     [
