@@ -1174,3 +1174,30 @@ def test_a_malformed_output_raises_format_error_at_its_path(
         Action.from_open_responses(output)
 
     assert raised.value.path == path
+
+
+# urllib cannot split these URLs, and its error can quote the URL.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://[x",
+        "http://\uff03",
+        "//[",
+    ],
+    ids=["unclosed-ipv6-host", "host-invalid-under-nfkc", "unclosed-ipv6-host-without-scheme"],
+)
+def test_a_media_url_urllib_cannot_split_raises_format_error_naming_only_its_path(
+    url: str,
+) -> None:
+    request = build_user_request(
+        {
+            "type": "input_image",
+            "image_url": url,
+        },
+    )
+
+    with pytest.raises(FormatError) as raised:
+        Trajectory.from_open_responses(request)
+
+    assert str(raised.value) == "$.input[0].content[0].image_url: expected a URL"
