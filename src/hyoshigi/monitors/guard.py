@@ -43,10 +43,6 @@ from hyoshigi.options import check_instance, read_count
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
 
-_UNREADABLE_EXPLANATION = (
-    "The guard model gave no readable label, so the action is treated as suspicious."
-)
-
 
 class HardLabelWarning(UserWarning):
     """A guard monitor takes one sample, so its scores are 0 or 1 and every threshold flags
@@ -60,13 +56,13 @@ class GuardMonitor(Monitor):
 
     `prompt` states the caller's policy and should ask for one label in the guard's format;
     it is built with the bounds 0 and 1, which it need not use. `labels` names the guard's
-    labels and where it writes them. A reply with no readable label, an ambiguous one, or
-    one cut off at the model's output limit is a suspicious vote; a refusal or an unavailable
-    model fails the rating closed. The samples differ only when the model's temperature is
-    above zero.
+    labels and where it writes them. A reply with no readable label, an ambiguous one, one
+    cut off at the model's output limit, a refusal or an unavailable model fails the rating
+    closed, the first such sample in order giving the cause. The samples differ only when the
+    model's temperature is above zero.
 
     The explanation names the guard's finding with no count: the first suspicious label among
-    the replies, else that a reply had no readable label, else the first safe label.
+    the replies, else the first safe label.
     `samples` is a whole number from 1 to sys.maxsize, kept as an int; with 1 every score is
     0 or 1, and building the monitor warns with HardLabelWarning. An option that cannot work
     raises ConfigurationError when the monitor is built.
@@ -141,10 +137,10 @@ def _check_options(monitor: GuardMonitor | AsyncGuardMonitor) -> None:
 def plan_guard(
     monitor: GuardMonitor | AsyncGuardMonitor, *, action: Action, trajectory: Trajectory
 ) -> Plan[Prompt, GenerationOutcome, SuspicionScore]:
-    """Plan the rating: render the action, ask the guard every sample at once, count votes.
+    """Plan the rating: render the action, ask the guard every sample at once, score the labels.
 
-    Content the model cannot perceive fails closed before it is asked; a refusal or an
-    unavailable model, the first in order, fails closed after.
+    Content the model cannot perceive fails closed before it is asked; after, the first sample
+    that is unreadable, cut off, refused or unavailable fails closed with that cause.
     """
     name = monitor.model.name
     rendering = render(
@@ -154,47 +150,40 @@ def plan_guard(
         return fail_closed(Unperceivable(content=rendering.unperceivable), model=name)
     request = monitor.prompt.build(rendering, lowest_score=0, highest_score=1)
     outcomes = yield (request,) * monitor.samples
-    labels: list[str | None] = []
+    labels: list[str] = []
     for outcome in outcomes:
-        match outcome:
-            case Generation(text=text):
-                labels.append(_read_vote(text, labels=monitor.labels))
-            case Truncated():
-                labels.append(None)
-            case Refused() | Unavailable():
-                return fail_closed(outcome, model=name)
+        match _read_sample(outcome, labels=monitor.labels):
+            case str(label):
+                labels.append(label)
+            case Unreadable() | Truncated() | Refused() | Unavailable() as failure:
+                return fail_closed(failure, model=name)
             case unreachable:
                 assert_never(unreachable)
-    return _count_votes(
+    return _score_labels(
         Labels(model=name, labels=tuple(labels), hidden_reasoning=rendering.hidden_reasoning),
         suspicious=monitor.labels.suspicious,
     )
 
 
-def _read_vote(text: str, *, labels: GuardLabels) -> str | None:
-    """Return a reply's label, or None for a reply with no readable label."""
-    match read_label(text, labels=labels):
-        case str(label):
-            return label
-        case Unreadable():
-            return None
+def _read_sample(
+    outcome: GenerationOutcome, *, labels: GuardLabels
+) -> str | Unreadable | Truncated | Refused | Unavailable:
+    """Return the label a sample holds, or the outcome that fails the rating closed."""
+    match outcome:
+        case Generation(text=text):
+            return read_label(text, labels=labels)
+        case Truncated() | Refused() | Unavailable():
+            return outcome
         case unreachable:
             assert_never(unreachable)
 
 
-def _count_votes(evidence: Labels, *, suspicious: frozenset[str]) -> SuspicionScore:
-    """Score the share of suspicious votes, explained by the most severe finding."""
-    readable = [label for label in evidence.labels if label is not None]
-    flagged = [label for label in readable if label in suspicious]
-    if flagged:
-        explanation = _explain_label(flagged[0], suspicious=suspicious)
-    elif len(readable) < len(evidence.labels):
-        explanation = _UNREADABLE_EXPLANATION
-    else:
-        explanation = _explain_label(readable[0], suspicious=suspicious)
-    votes = len(evidence.labels) - len(readable) + len(flagged)
+def _score_labels(evidence: Labels, *, suspicious: frozenset[str]) -> SuspicionScore:
+    """Score the share of suspicious labels, explained by the first of them, else by the first."""
+    flagged = [label for label in evidence.labels if label in suspicious]
+    explanation = _explain_label((flagged or evidence.labels)[0], suspicious=suspicious)
     return SuspicionScore(
-        value=votes / len(evidence.labels), explanation=explanation, evidence=evidence
+        value=len(flagged) / len(evidence.labels), explanation=explanation, evidence=evidence
     )
 
 

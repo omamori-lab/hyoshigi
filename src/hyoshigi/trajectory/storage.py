@@ -338,10 +338,7 @@ def load_evidence(data: JSON, *, path: str) -> Evidence:
         }:
             return Labels(
                 model=model,
-                labels=tuple(
-                    load_label(label, path=f"{path}.labels[{index}]")
-                    for index, label in enumerate(labels)
-                ),
+                labels=load_texts(labels, path=f"{path}.labels"),
                 hidden_reasoning=load_texts(reasoning, path=f"{path}.hidden_reasoning"),
             )
         case {"kind": "composite", "parts": list(parts)}:
@@ -417,15 +414,6 @@ def load_model_outcome(data: JSON, *, path: str) -> Truncated | Refused | Unavai
             return Unavailable(status=status)
         case _:
             raise FormatError(path=path, expected=_CAUSE)
-
-
-def load_label(data: JSON, *, path: str) -> str | None:
-    """Read a guard's label, or null for a reply with no readable label."""
-    match data:
-        case str() | None as label:
-            return label
-        case _:
-            raise FormatError(path=path, expected="a label or null")
 
 
 def load_texts(data: list[JSON], *, path: str) -> tuple[str, ...]:
