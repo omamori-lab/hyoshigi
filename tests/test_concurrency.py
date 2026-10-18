@@ -9,8 +9,6 @@ import pytest
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently, run_concurrently
 
-pytestmark = pytest.mark.xfail(strict=True)
-
 TIMEOUT_SECONDS = 5
 LOGGER = "hyoshigi.concurrency"
 SECRET = "s3cret-0f3c"
