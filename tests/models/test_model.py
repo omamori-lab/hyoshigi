@@ -1,6 +1,8 @@
 """The models a monitor asks: their media, prompts, questions, decisions and names."""
 
 import math
+from decimal import Decimal
+from fractions import Fraction
 
 import pytest
 
@@ -91,9 +93,22 @@ def test_content_a_model_cannot_be_given_raises(kind: type, arguments: dict[str,
         kind(**arguments)
 
 
+@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
-    ("probability", "confidence"),
-    [(1.5, None), (-0.1, None), (math.nan, None), (0.5, 1.5), (0.5, -0.1), (0.5, math.nan)],
+    ("probability", "confidence", "message"),
+    [
+        (1.5, None, "probability must be between 0 and 1, got 1.5"),
+        (-0.1, None, "probability must be between 0 and 1, got -0.1"),
+        (math.nan, None, "probability must be between 0 and 1, got nan"),
+        (0.5, 1.5, "confidence must be between 0 and 1, got 1.5"),
+        (0.5, -0.1, "confidence must be between 0 and 1, got -0.1"),
+        (0.5, math.nan, "confidence must be between 0 and 1, got nan"),
+        (True, None, "probability must be a number between 0 and 1, got True"),
+        ("0.5", None, "probability must be a number between 0 and 1, got '0.5'"),
+        (None, None, "probability must be a number between 0 and 1, got None"),
+        (0.5, True, "confidence must be a number between 0 and 1, got True"),
+        (0.5, "0.5", "confidence must be a number between 0 and 1, got '0.5'"),
+    ],
     ids=[
         "probability-above-one",
         "probability-below-zero",
@@ -101,13 +116,39 @@ def test_content_a_model_cannot_be_given_raises(kind: type, arguments: dict[str,
         "confidence-above-one",
         "confidence-below-zero",
         "confidence-not-a-number",
+        "probability-bool",
+        "probability-string",
+        "probability-none",
+        "confidence-bool",
+        "confidence-string",
     ],
 )
-def test_a_decision_outside_zero_and_one_raises(
-    probability: float, confidence: float | None
+def test_a_decision_that_is_not_a_number_from_zero_to_one_raises_naming_the_field(
+    probability: object, confidence: object, message: str
 ) -> None:
-    with pytest.raises(ConfigurationError):
-        Decision(probability=probability, confidence=confidence)
+    with pytest.raises(ConfigurationError) as raised:
+        Decision(probability=probability, confidence=confidence)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("probability", "confidence", "kept"),
+    [
+        (Fraction(1, 2), Fraction(1, 4), ("0.5", "0.25")),
+        (Decimal("0.25"), Decimal("0.75"), ("0.25", "0.75")),
+        (1, 0, ("1.0", "0.0")),
+        (-0.0, -0.0, ("0.0", "0.0")),
+    ],
+    ids=["fractions", "decimals", "integers", "negative-zeros"],
+)
+def test_a_decision_keeps_its_probability_and_confidence_as_floats(
+    probability: object, confidence: object, kept: tuple[str, str]
+) -> None:
+    decision = Decision(probability=probability, confidence=confidence)  # ty: ignore[invalid-argument-type]
+
+    assert (repr(decision.probability), repr(decision.confidence)) == kept
 
 
 @pytest.mark.parametrize(
