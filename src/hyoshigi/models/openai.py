@@ -8,7 +8,9 @@ from typing import TypedDict, cast
 
 try:
     from openai import APIError, APIStatusError, AsyncOpenAI, Omit, OpenAI, omit
+    from openai.types import ReasoningEffort
     from openai.types.responses import ResponseInputMessageContentListParam, ResponseInputParam
+    from openai.types.shared_params import Reasoning
 except ModuleNotFoundError as error:
     raise ModuleNotFoundError(
         "OpenAI models need the extra: pip install 'hyoshigi[openai]'"
@@ -67,14 +69,15 @@ class RequestArguments(TypedDict):
     instructions: str
     input: ResponseInputParam
     max_output_tokens: int | Omit
+    reasoning: Reasoning | Omit
     store: bool
 
 
 def build_arguments(
-    prompt: Prompt, *, model: str, max_output_tokens: int | None
+    prompt: Prompt, *, model: str, max_output_tokens: int | None, reasoning_effort: ReasoningEffort
 ) -> RequestArguments | None:
     """The prompt as one user message under the instructions, with nothing stored; None if a
-    part is in a form the API cannot take.
+    part is in a form the API cannot take. The reasoning effort is sent only when given.
     """
     content = responses.build_content(prompt)
     if content is None:
@@ -87,6 +90,7 @@ def build_arguments(
         "instructions": prompt.system,
         "input": [{"role": "user", "content": parts}],
         "max_output_tokens": omit if max_output_tokens is None else max_output_tokens,
+        "reasoning": omit if reasoning_effort is None else {"effort": reasoning_effort},
         "store": False,
     }
 
@@ -126,7 +130,12 @@ def read_failure(error: Failure) -> Refused | Unavailable:
 
 
 def build_model(
-    client: OpenAI, *, model: str, max_output_tokens: int | None, perceives: MediaTypes
+    client: OpenAI,
+    *,
+    model: str,
+    max_output_tokens: int | None,
+    reasoning_effort: ReasoningEffort,
+    perceives: MediaTypes,
 ) -> GenerativeModel:
     """A model on the Responses API, through the caller's client.
 
@@ -138,7 +147,12 @@ def build_model(
     check_perceives(perceives, carries=responses.CARRIED_MEDIA)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
-        arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
+        arguments = build_arguments(
+            prompt,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+        )
         if arguments is None:
             return Unavailable()
         try:
@@ -153,7 +167,12 @@ def build_model(
 
 
 def build_async_model(
-    client: AsyncOpenAI, *, model: str, max_output_tokens: int | None, perceives: MediaTypes
+    client: AsyncOpenAI,
+    *,
+    model: str,
+    max_output_tokens: int | None,
+    reasoning_effort: ReasoningEffort,
+    perceives: MediaTypes,
 ) -> AsyncGenerativeModel:
     """A model on the Responses API, through the caller's async client.
 
@@ -165,7 +184,12 @@ def build_async_model(
     check_perceives(perceives, carries=responses.CARRIED_MEDIA)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
-        arguments = build_arguments(prompt, model=model, max_output_tokens=max_output_tokens)
+        arguments = build_arguments(
+            prompt,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+        )
         if arguments is None:
             return Unavailable()
         try:

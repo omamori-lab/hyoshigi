@@ -476,16 +476,8 @@ def test_the_output_limit_is_sent_only_when_given(
     ("reasoning_effort", "expected"),
     [
         (None, IMAGE_REQUEST),
-        pytest.param(
-            "low",
-            replace(IMAGE_REQUEST, reasoning={"effort": "low"}),
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
-        ),
-        pytest.param(
-            "none",
-            replace(IMAGE_REQUEST, reasoning={"effort": "none"}),
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
-        ),
+        ("low", replace(IMAGE_REQUEST, reasoning={"effort": "low"})),
+        ("none", replace(IMAGE_REQUEST, reasoning={"effort": "none"})),
     ],
     ids=["no-effort-sends-no-field", "effort-is-sent", "none-is-an-effort-and-is-sent"],
 )
