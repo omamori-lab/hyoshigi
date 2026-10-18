@@ -106,4 +106,13 @@ def read_threshold(value: object, *, name: str) -> float:
 
 
 def check_instance(value: object, *, expected: type, name: str, hint: str = "") -> None:
-    """Raise ConfigurationError unless the value is an instance of the expected class."""
+    """Raise ConfigurationError unless the value is an instance of the expected class.
+
+    The message names the class and the value, then the hint, a sentence that can name the
+    likely mix-up, such as a sync model given to an async monitor.
+    """
+    if isinstance(value, expected):
+        return
+    article = "an" if expected.__name__[0] in "AEIOU" else "a"
+    message = f"{name} must be {article} {expected.__name__}, got {describe_option_value(value)}"
+    raise ConfigurationError(f"{message}. {hint}" if hint else message)
