@@ -31,7 +31,7 @@ def average_values(values: Iterable[float]) -> float:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Unreadable:
-    """The model's replies held no readable score, after every retry."""
+    """The model's replies held no readable score or label, after any retries."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -85,13 +85,10 @@ class Decisions:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Labels:
-    """The label a guard model gave in each sampled reply, in order, and its hidden reasoning.
-
-    A reply with no readable label, or one cut off at the model's output limit, is None.
-    """
+    """The label a guard model gave in each sampled reply, in order, and its hidden reasoning."""
 
     model: str
-    labels: tuple[str | None, ...]
+    labels: tuple[str, ...]
     hidden_reasoning: tuple[str, ...] = ()
 
 

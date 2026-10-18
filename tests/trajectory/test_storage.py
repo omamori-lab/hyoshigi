@@ -718,7 +718,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.labels[1]",
             id="label-null",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -804,7 +803,6 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
             ),
             "$.ratings[0].score.evidence.labels[0]: expected text",
             id="label-not-text",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload({"kind": "audit"}),

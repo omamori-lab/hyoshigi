@@ -313,7 +313,6 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             (SAFE, Generation(text="I cannot decide."), SAFE, SAFE),
             UNREADABLE_SCORE,
             id="a-reply-with-no-label",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (
@@ -324,13 +323,11 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             ),
             UNREADABLE_SCORE,
             id="an-ambiguous-reply",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (SAFE, Truncated(text="safe"), SAFE, SAFE),
             TRUNCATED_SCORE,
             id="a-reply-cut-off",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (SAFE, Unavailable(status=503), REFUSAL, SAFE),
@@ -341,13 +338,11 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             (Truncated(text="safe"), REFUSAL, SAFE, SAFE),
             TRUNCATED_SCORE,
             id="a-cut-off-reply-before-a-refusal",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (Generation(text="I cannot decide."), REFUSAL, SAFE, SAFE),
             UNREADABLE_SCORE,
             id="a-reply-with-no-label-before-a-refusal",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (SAFE, REFUSAL, Generation(text="I cannot decide."), Truncated(text="safe")),
