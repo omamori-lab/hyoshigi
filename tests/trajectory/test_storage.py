@@ -316,7 +316,6 @@ def trajectory() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None:
     stored = trajectory.dump()
 
@@ -329,7 +328,6 @@ def test_loading_the_stored_format_restores_the_history() -> None:
     assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     loaded = Trajectory.load(DELEGATING)
 
@@ -484,7 +482,6 @@ SCORE_CASES: list[tuple[SuspicionScore, dict[str, JSON]]] = [
 SCORE_IDS = ["rationale", "decisions", "composite", *CAUSE_IDS]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
 def test_a_rating_dumps_to_the_stored_format(
     trajectory: Trajectory, score: SuspicionScore, stored: dict[str, JSON]
@@ -496,7 +493,6 @@ def test_a_rating_dumps_to_the_stored_format(
     assert dumped.get("ratings") == [{"action_id": "a1", "score": stored}]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
 def test_loading_a_stored_rating_restores_the_score(
     score: SuspicionScore, stored: dict[str, JSON]
@@ -547,7 +543,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
@@ -729,7 +724,6 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
     assert raised.value.path == path
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_format_error_for_a_rating_never_quotes_the_payload() -> None:
     payload = build_score_payload(value="s3cret-0f3c")
 
