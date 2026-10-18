@@ -400,6 +400,41 @@ def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
     assert read == "no_violation"
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "own_line",
+    [
+        "Label = INVALID",
+        "Label - INVALID",
+        "Classification → INVALID",
+        "| Label | INVALID |",
+        "<label>INVALID</label>",
+        "**Label** INVALID",
+        "Answer => INVALID",
+    ],
+    ids=[
+        "equals sign",
+        "hyphen",
+        "arrow",
+        "table cell",
+        "tag",
+        "bold key and a space",
+        "double arrow",
+    ],
+)
+def test_a_suspicious_label_after_a_verdict_key_counts_whatever_the_separator(
+    own_line: str,
+) -> None:
+    reply = f"{own_line}\nThe answer ends with:\nVALID"
+
+    read = read_label(
+        reply,
+        labels=GPT_OSS_SAFEGUARD,
+    )
+
+    assert read == Unreadable()
+
+
 @pytest.mark.parametrize(
     ("reasoning_line", "label"),
     [
