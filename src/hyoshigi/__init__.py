@@ -36,8 +36,6 @@ from hyoshigi.monitors.decision import (
 from hyoshigi.monitors.guard import AsyncGuardMonitor, GuardMonitor, HardLabelWarning
 from hyoshigi.monitors.guard_labels import (
     GPT_OSS_SAFEGUARD,
-    LLAMA_GUARD,
-    NEMOTRON_CONTENT_SAFETY,
     QWEN3GUARD,
     GuardLabels,
 )
@@ -70,8 +68,6 @@ __all__ = [
     "DEFAULT_STATEMENT",
     "GPT_OSS_SAFEGUARD",
     "JSON",
-    "LLAMA_GUARD",
-    "NEMOTRON_CONTENT_SAFETY",
     "QWEN3GUARD",
     "Action",
     "Aggregation",

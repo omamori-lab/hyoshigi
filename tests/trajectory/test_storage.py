@@ -111,7 +111,7 @@ LABELLED = SuspicionScore(
     value=0.4,
     explanation="The guard model labelled the action 'unsafe', finding that it breaks the policy.",
     evidence=Labels(
-        model="llama-guard-4",
+        model="gpt-oss-safeguard-20b",
         labels=("unsafe", None, "safe", "safe", "safe"),
         hidden_reasoning=("reasoning.encrypted",),
     ),
@@ -123,7 +123,7 @@ STORED_LABELLED: dict[str, JSON] = {
     ),
     "evidence": {
         "kind": "labels",
-        "model": "llama-guard-4",
+        "model": "gpt-oss-safeguard-20b",
         "labels": ["unsafe", None, "safe", "safe", "safe"],
         "hidden_reasoning": ["reasoning.encrypted"],
     },

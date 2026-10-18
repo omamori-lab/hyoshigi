@@ -132,12 +132,6 @@ def _read_labels(labels: object, *, name: str) -> frozenset[str]:
     return frozenset(label.lower() for label in labels)
 
 
-# Meta, "Llama Guard 4 12B" model card, https://huggingface.co/meta-llama/Llama-Guard-4-12B:
-# its output "indicates whether a given prompt or response is safe or unsafe", and "if
-# unsafe, it also lists the content categories violated"; its example output is unsafe, then
-# S9 on the next line.
-LLAMA_GUARD = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}))
-
 # ROOST and OpenAI, "User guide for gpt-oss-safeguard",
 # https://developers.openai.com/cookbook/articles/gpt-oss-safeguard-guide: its example
 # policies ask to "Classify each example as `VALID` (allowed) or `INVALID`". A policy that
@@ -152,15 +146,6 @@ GPT_OSS_SAFEGUARD = GuardLabels(suspicious=frozenset({"invalid"}), safe=frozense
 # unsafe)".
 QWEN3GUARD = GuardLabels(
     suspicious=frozenset({"unsafe", "controversial"}), safe=frozenset({"safe"}), key="Safety"
-)
-
-# NVIDIA, "Nemotron 3.5 Content Safety" model card,
-# https://huggingface.co/nvidia/Nemotron-3.5-Content-Safety, section Output:
-# 'User Safety: string(required) # "safe" or "unsafe"'. A monitor sends what it rates as one
-# user message, and the card's Response Safety line is omitted "if no assistant response
-# present", so the verdict is the User Safety line.
-NEMOTRON_CONTENT_SAFETY = GuardLabels(
-    suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="User Safety"
 )
 
 
@@ -291,7 +276,9 @@ def _read_suspicious_mentions(line: str, *, suspicious: frozenset[str]) -> set[s
 def _read_first_line_label(
     lines: list[re.Match[str]], *, label_lines: dict[int, _LabelLine], suspicious: frozenset[str]
 ) -> str | Unreadable:
-    """Read Llama Guard's unsafe reply: a suspicious label first, then only category codes."""
+    """Read an unsafe reply written first, followed only by category codes, as Llama Guard
+    writes it (Meta, "Llama Guard 4 12B" model card).
+    """
     first_line = label_lines.get(0)
     if first_line is None or not first_line.is_verdict or first_line.label not in suspicious:
         return Unreadable()

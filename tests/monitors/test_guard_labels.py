@@ -5,8 +5,6 @@ import pytest
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.guard_labels import (
     GPT_OSS_SAFEGUARD,
-    LLAMA_GUARD,
-    NEMOTRON_CONTENT_SAFETY,
     QWEN3GUARD,
     GuardLabels,
     read_label,
@@ -472,7 +470,11 @@ def test_a_long_line_that_holds_no_label_is_passed_over(line: str) -> None:
     assert read == "violation"
 
 
-# Llama Guard writes the label first, then the codes of the categories the content violates.
+# Labels written first, then the codes of the categories the content violates, as Llama Guard
+# writes them.
+FIRST_LINE_LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}))
+
+
 @pytest.mark.parametrize(
     ("reply", "label"),
     [
@@ -498,8 +500,10 @@ def test_a_long_line_that_holds_no_label_is_passed_over(line: str) -> None:
         "a key naming a label",
     ],
 )
-def test_a_label_where_llama_guard_puts_it_is_read(reply: str, label: str | Unreadable) -> None:
-    read = read_label(reply, labels=LLAMA_GUARD)
+def test_a_label_written_first_with_its_category_codes_is_read(
+    reply: str, label: str | Unreadable
+) -> None:
+    read = read_label(reply, labels=FIRST_LINE_LABELS)
 
     assert read == label
 
@@ -507,8 +511,6 @@ def test_a_label_where_llama_guard_puts_it_is_read(reply: str, label: str | Unre
 @pytest.mark.parametrize(
     ("labels", "reply", "label"),
     [
-        (LLAMA_GUARD, "unsafe\nS9", "unsafe"),
-        (LLAMA_GUARD, "safe", "safe"),
         (GPT_OSS_SAFEGUARD, "`INVALID`", "invalid"),
         (GPT_OSS_SAFEGUARD, "`VALID`", "valid"),
         (QWEN3GUARD, "Safety: Unsafe\nCategories: Violent", "unsafe"),
@@ -519,30 +521,14 @@ def test_a_label_where_llama_guard_puts_it_is_read(reply: str, label: str | Unre
             "Safety: Controversial\nCategories: Politically Sensitive Topics",
             "controversial",
         ),
-        (
-            NEMOTRON_CONTENT_SAFETY,
-            "User Safety: unsafe\nResponse Safety: safe\nSafety Categories: Illegal Activity",
-            "unsafe",
-        ),
-        (
-            NEMOTRON_CONTENT_SAFETY,
-            "User Safety: unsafe\nSafety Categories: Illegal Activity",
-            "unsafe",
-        ),
-        (NEMOTRON_CONTENT_SAFETY, "User Safety: safe", "safe"),
     ],
     ids=[
-        "llama-guard-unsafe",
-        "llama-guard-safe",
         "safeguard-invalid",
         "safeguard-valid",
         "qwen3guard-unsafe",
         "qwen3guard-safe",
         "qwen3guard-safe-with-a-refusal-line",
         "qwen3guard-controversial",
-        "nemotron-unsafe-with-a-response-line",
-        "nemotron-unsafe",
-        "nemotron-safe",
     ],
 )
 def test_each_preset_reads_the_replies_its_model_card_shows(
@@ -556,12 +542,10 @@ def test_each_preset_reads_the_replies_its_model_card_shows(
 @pytest.mark.parametrize(
     ("labels", "suspicious", "safe", "key"),
     [
-        (LLAMA_GUARD, {"unsafe"}, {"safe"}, None),
         (GPT_OSS_SAFEGUARD, {"invalid"}, {"valid"}, None),
         (QWEN3GUARD, {"unsafe", "controversial"}, {"safe"}, "Safety"),
-        (NEMOTRON_CONTENT_SAFETY, {"unsafe"}, {"safe"}, "User Safety"),
     ],
-    ids=["llama-guard", "gpt-oss-safeguard", "qwen3guard", "nemotron-content-safety"],
+    ids=["gpt-oss-safeguard", "qwen3guard"],
 )
 def test_each_preset_holds_the_labels_its_model_card_names(
     labels: GuardLabels, suspicious: set[str], safe: set[str], key: str | None
@@ -642,7 +626,11 @@ def test_a_reply_without_exactly_one_keyed_line_holding_a_label_is_unreadable(re
 
 
 def test_a_key_of_several_words_is_read_through_the_markup_around_each() -> None:
-    read = read_label("**User** **Safety**: unsafe", labels=NEMOTRON_CONTENT_SAFETY)
+    labels = GuardLabels(
+        suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="User Safety"
+    )
+
+    read = read_label("**User** **Safety**: unsafe", labels=labels)
 
     assert read == "unsafe"
 

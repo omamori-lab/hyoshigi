@@ -23,7 +23,7 @@ from hyoshigi.models.model import (
     Unavailable,
 )
 from hyoshigi.monitors.guard import AsyncGuardMonitor, GuardMonitor, HardLabelWarning
-from hyoshigi.monitors.guard_labels import LLAMA_GUARD, QWEN3GUARD, GuardLabels
+from hyoshigi.monitors.guard_labels import QWEN3GUARD, GuardLabels
 from hyoshigi.monitors.prompts import MonitorPrompt
 from hyoshigi.monitors.score import (
     FailedClosed,
@@ -36,7 +36,9 @@ from hyoshigi.trajectory.history import Action, ToolCall
 from hyoshigi.trajectory.parts import MediaPart, OpaquePart, TextPart
 from hyoshigi.trajectory.trajectory import Trajectory
 
-MODEL_NAME = "llama-guard-4"
+MODEL_NAME = "a-guard"
+# Labels written first, then category codes, as Llama Guard writes them.
+LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}))
 TASK = "Summarise q3.md"
 READ = ToolCall(id="c1", name="read", arguments='{"path": "q3.md"}')
 ACTION = Action(tool_calls=(READ,))
@@ -82,7 +84,7 @@ class Rate(Protocol):
         script: Script,
         *,
         action: Action = ACTION,
-        labels: GuardLabels = LLAMA_GUARD,
+        labels: GuardLabels = LABELS,
         **options: Unpack[Options],
     ) -> SuspicionScore: ...
 
@@ -95,7 +97,7 @@ def rate_synchronously(
     script: Script,
     *,
     action: Action = ACTION,
-    labels: GuardLabels = LLAMA_GUARD,
+    labels: GuardLabels = LABELS,
     **options: Unpack[Options],
 ) -> SuspicionScore:
     model = GenerativeModel(name=MODEL_NAME, generate=script.generate, perceives=script.perceives)
@@ -107,7 +109,7 @@ def rate_asynchronously(
     script: Script,
     *,
     action: Action = ACTION,
-    labels: GuardLabels = LLAMA_GUARD,
+    labels: GuardLabels = LABELS,
     **options: Unpack[Options],
 ) -> SuspicionScore:
     model = AsyncGenerativeModel(
@@ -364,7 +366,7 @@ def test_the_async_monitor_asks_every_sample_at_once() -> None:
     monitor = AsyncGuardMonitor(
         model=AsyncGenerativeModel(name=MODEL_NAME, generate=generate_together),
         prompt=POLICY,
-        labels=LLAMA_GUARD,
+        labels=LABELS,
     )
 
     score = asyncio.run(monitor.rate(ACTION, trajectory=build_trajectory()))
@@ -401,7 +403,7 @@ def build_with(
     monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object, **options: object
 ) -> GuardMonitor | AsyncGuardMonitor:
     """Build a monitor from arguments of any type, which the constructor must check."""
-    arguments = {"prompt": POLICY, "labels": LLAMA_GUARD, **options}
+    arguments = {"prompt": POLICY, "labels": LABELS, **options}
     return monitor_class(model=model, **arguments)  # ty: ignore[invalid-argument-type]
 
 
@@ -441,7 +443,7 @@ def test_the_one_sample_warning_points_at_the_line_that_builds_the_monitor(
     monitor_class: type[GuardMonitor] | type[AsyncGuardMonitor], model: object
 ) -> None:
     with pytest.warns(HardLabelWarning) as record:
-        monitor_class(model=model, prompt=POLICY, labels=LLAMA_GUARD, samples=1)  # ty: ignore[invalid-argument-type]
+        monitor_class(model=model, prompt=POLICY, labels=LABELS, samples=1)  # ty: ignore[invalid-argument-type]
 
     assert [warning.filename for warning in record] == [__file__]
 
