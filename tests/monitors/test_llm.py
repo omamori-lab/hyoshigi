@@ -527,7 +527,6 @@ def build(request: pytest.FixtureRequest) -> Callable[..., LLMMonitor | AsyncLLM
     return partial(build_with, monitor_class, model)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("monitor_class", "model", "message"),
     [
@@ -555,7 +554,6 @@ def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("options", "message"),
     [
@@ -620,7 +618,6 @@ def test_an_option_that_cannot_work_is_refused_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 def test_whole_numbers_that_are_not_ints_are_kept_as_ints(
     build: Callable[..., LLMMonitor | AsyncLLMMonitor],
 ) -> None:
