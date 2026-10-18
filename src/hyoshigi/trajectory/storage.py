@@ -11,6 +11,7 @@ from hyoshigi.monitors.score import (
     Decisions,
     Evidence,
     FailedClosed,
+    Labels,
     Rationale,
     StatementDecision,
     SuspicionScore,
@@ -244,6 +245,8 @@ def dump_evidence(evidence: Evidence) -> JSON:
                 "decisions": [dump_statement_decision(each) for each in evidence.decisions],
                 "hidden_reasoning": [*evidence.hidden_reasoning],
             }
+        case Labels():
+            return {"kind": "labels"}
         case Composite():
             return {"kind": "composite", "parts": [dump_score(part) for part in evidence.parts]}
         case FailedClosed():
@@ -322,6 +325,8 @@ def load_evidence(data: JSON, *, path: str) -> Evidence:
                 ),
                 hidden_reasoning=load_texts(reasoning, path=f"{path}.hidden_reasoning"),
             )
+        case {"kind": "labels"}:
+            return Labels(model="", labels=())
         case {"kind": "composite", "parts": list(parts)}:
             return load_composite(parts, path=path)
         case {"kind": "failed_closed", "model": str(model), "cause": dict() as cause}:

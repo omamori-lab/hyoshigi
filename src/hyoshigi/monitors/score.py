@@ -84,6 +84,18 @@ class Decisions:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class Labels:
+    """The label a guard model gave in each sampled reply, in order, and its hidden reasoning.
+
+    A reply with no readable label, or one cut off at the model's output limit, is None.
+    """
+
+    model: str
+    labels: tuple[str | None, ...]
+    hidden_reasoning: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Composite:
     """The scores a monitor combined into its own: a tuple of at least one."""
 
@@ -97,7 +109,7 @@ class Composite:
             raise ConfigurationError("a composite holds at least one score")
 
 
-type Evidence = Rationale | Decisions | Composite | FailedClosed
+type Evidence = Rationale | Decisions | Labels | Composite | FailedClosed
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -118,7 +130,7 @@ class SuspicionScore:
         # The dataclass is frozen, so the float is set past its guard.
         object.__setattr__(self, "value", read_threshold(self.value, name="value"))
         check_instance(self.explanation, expected=str, name="explanation")
-        if not isinstance(self.evidence, Rationale | Decisions | Composite | FailedClosed):
+        if not isinstance(self.evidence, Rationale | Decisions | Labels | Composite | FailedClosed):
             raise ConfigurationError(
                 "evidence must be a Rationale, Decisions, Composite or FailedClosed, "
                 f"got {describe_type(self.evidence)}"
@@ -134,7 +146,7 @@ class SuspicionScore:
                 return True
             case Composite(parts=parts):
                 return any(part.failed_closed for part in parts)
-            case Rationale() | Decisions():
+            case Rationale() | Decisions() | Labels():
                 return False
             case unreachable:
                 assert_never(unreachable)
