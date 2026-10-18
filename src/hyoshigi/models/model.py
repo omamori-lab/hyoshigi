@@ -174,12 +174,20 @@ class GenerativeModel:
         reasoning_effort: ReasoningEffort = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
-        """A model on OpenAI's Responses API, through the caller's client."""
+        """A model on OpenAI's Responses API, through the caller's client.
+
+        A reasoning effort, when given, is sent as the request's reasoning effort; without
+        one, OpenAI's default for the model applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[openai].
         from hyoshigi.models import openai as provider
 
         return provider.build_model(
-            client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+            client,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+            perceives=perceives,
         )
 
     @classmethod
@@ -235,12 +243,20 @@ class AsyncGenerativeModel:
         reasoning_effort: ReasoningEffort = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
-        """A model on OpenAI's Responses API, through the caller's async client."""
+        """A model on OpenAI's Responses API, through the caller's async client.
+
+        A reasoning effort, when given, is sent as the request's reasoning effort; without
+        one, OpenAI's default for the model applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[openai].
         from hyoshigi.models import openai as provider
 
         return provider.build_async_model(
-            client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+            client,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+            perceives=perceives,
         )
 
     @classmethod
