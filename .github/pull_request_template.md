@@ -7,8 +7,9 @@ Closes #
 ## Checklist
 
 - [ ] The design this change depends on is agreed in the linked issue.
-- [ ] `scripts/check.sh` passes: the gitleaks secrets scan, ruff, ty, the
-      test suite, lanorme, the package build and the wheel import.
+- [ ] `scripts/check.sh` passes: the gitleaks secrets scan, ruff, the
+      spread check, ty, the test suite, lanorme, the package build and the
+      wheel import.
 - [ ] Each new test was committed first, marked `xfail(strict=True)`, and
       seen failing on its assertion; its expected value comes from a literal,
       a published example or a property, never from the code.
