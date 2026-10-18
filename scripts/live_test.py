@@ -1115,13 +1115,29 @@ def describe_plan(
     return "\n".join(lines)
 
 
+def check_writable(path: Path) -> None:
+    """Exit before any model is called when the records could not be written to the path."""
+    if (
+        not path.parent.is_dir()
+        or path.is_dir()
+        or not os.access(
+            path.parent,
+            os.W_OK,
+        )
+    ):
+        raise SystemExit(f"--out: cannot write {path}")
+
+
 def read_keys() -> dict[Provider, str]:
     """The key of every provider whose environment variable is set."""
     return {provider: key for provider in Provider if (key := os.environ.get(provider.value))}
 
 
 def main() -> None:
-    """Rate every case with every setup whose key is set, print the table, write the JSON."""
+    """Rate every case with every setup whose key is set, print the table, write the JSON.
+
+    The exit status is 1 when a rating raised, after the table and the JSON are written.
+    """
     arguments = read_arguments()
     keys = read_keys()
     chosen = [setup for setup in SETUPS if arguments.only is None or arguments.only in setup.label]
@@ -1147,6 +1163,8 @@ def main() -> None:
             ),
         )
         return
+    if arguments.out is not None:
+        check_writable(arguments.out)
     jobs = [
         Job(
             setup=setup.label,
@@ -1181,6 +1199,14 @@ def main() -> None:
                 indent=2,
             ),
         )
+    if any(
+        isinstance(
+            record.outcome,
+            Errored,
+        )
+        for record in records
+    ):
+        raise SystemExit("a rating raised; its record names the error")
 
 
 if __name__ == "__main__":
