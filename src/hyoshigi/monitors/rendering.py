@@ -252,9 +252,17 @@ def _render_observation(
 ) -> _Entry:
     """Render an observation by who wrote it; only the user or the delegator sets the task.
 
-    Without context notes, an unknown author's observation is <opaque/> with the tool calls:
-    it may be a tool the agent's provider ran, and the monitor sees that it is there.
+    Without context notes, an unknown author's observation shows only its opaque parts, with
+    the tool calls: it may be a tool the agent's provider ran, and the monitor sees its kind.
     """
+    opaque = [
+        part
+        for part in observation.parts
+        if isinstance(
+            part,
+            OpaquePart,
+        )
+    ]
     match observation:
         case ToolObservation():
             return _render_tool_observation(
@@ -269,10 +277,19 @@ def _render_observation(
                 tag=author.value,
                 perceives=perceives,
             )
-        case Observation(author=Author.UNKNOWN) if Channel.CONTEXT not in channels:
+        case Observation(author=Author.UNKNOWN) if opaque and Channel.CONTEXT not in channels:
             return _Entry(
                 channel=Channel.TOOL_CALLS,
-                content=_Content(parts=(TextPart(text="<opaque/>"),)),
+                content=_concatenate(
+                    [
+                        _render_part(
+                            part,
+                            channel=Channel.TOOL_CALLS,
+                            perceives=perceives,
+                        )
+                        for part in opaque
+                    ],
+                ),
             )
         case _:
             return _render_entry(

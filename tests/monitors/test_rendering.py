@@ -832,7 +832,6 @@ def test_the_default_view_shows_the_task_the_tool_calls_and_the_subagent_reports
 
 # An item a format does not model, such as a tool the agent's provider ran, is an unknown
 # author's observation of one opaque part.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("parts", "expected"),
     [
