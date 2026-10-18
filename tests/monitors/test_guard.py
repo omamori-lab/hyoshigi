@@ -2,6 +2,7 @@
 
 import asyncio
 import numbers
+import warnings
 from collections.abc import Callable
 from functools import partial
 from typing import Protocol, TypedDict, Unpack
@@ -34,8 +35,6 @@ from hyoshigi.monitors.view import Channel, View
 from hyoshigi.trajectory.history import Action, ToolCall
 from hyoshigi.trajectory.parts import OpaquePart, TextPart
 from hyoshigi.trajectory.trajectory import Trajectory
-
-pytestmark = pytest.mark.xfail(strict=True)
 
 MODEL_NAME = "llama-guard-4"
 TASK = "Summarise q3.md"
@@ -410,6 +409,17 @@ def test_one_sample_warns_at_the_line_that_builds_the_monitor(
     assert [(str(warning.message), warning.filename) for warning in record] == [
         (HARD_LABEL_WARNING, __file__)
     ]
+
+
+@pytest.mark.parametrize("options", [{}, {"samples": 2}], ids=["default", "two"])
+def test_more_than_one_sample_builds_without_a_warning(
+    build: Callable[..., GuardMonitor | AsyncGuardMonitor], options: dict[str, object]
+) -> None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        build(**options)
+
+    assert caught == []
 
 
 @pytest.mark.parametrize(
