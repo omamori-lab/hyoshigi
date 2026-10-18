@@ -17,6 +17,7 @@ from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
     from anthropic import Anthropic, AsyncAnthropic
+    from anthropic.types import ThinkingConfigParam
     from openai import AsyncOpenAI, OpenAI
     from openai.types import ReasoningEffort
     from openrouter import OpenRouter, components
@@ -192,7 +193,13 @@ class GenerativeModel:
 
     @classmethod
     def from_anthropic(
-        cls, client: Anthropic, *, model: str, max_tokens: int, perceives: MediaTypes = TEXT_ONLY
+        cls,
+        client: Anthropic,
+        *,
+        model: str,
+        max_tokens: int,
+        thinking: ThinkingConfigParam | None = None,
+        perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
         """A model on Anthropic's Messages API, through the caller's client."""
         # Imported here because the SDK is the optional extra hyoshigi[anthropic].
@@ -275,6 +282,7 @@ class AsyncGenerativeModel:
         *,
         model: str,
         max_tokens: int,
+        thinking: ThinkingConfigParam | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
         """A model on Anthropic's Messages API, through the caller's async client."""
