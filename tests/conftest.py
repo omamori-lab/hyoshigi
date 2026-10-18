@@ -1,10 +1,11 @@
-"""The OpenTelemetry tracer provider that records the spans of a test run."""
+"""The tracer provider that records the spans of a test run, and the Hypothesis profile."""
 
 import itertools
 from dataclasses import dataclass
 from typing import cast
 
 import pytest
+from hypothesis import settings
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -85,3 +86,13 @@ def spans(tracing: Tracing) -> InMemorySpanExporter:
     tracing.exporter.clear()
     tracing.ids.restart()
     return tracing.exporter
+
+
+# Every machine runs the same examples, so a failure reproduces.
+# A slow example is not a failure, so the deadline is off.
+settings.register_profile(
+    "hyoshigi",
+    derandomize=True,
+    deadline=None,
+)
+settings.load_profile("hyoshigi")
