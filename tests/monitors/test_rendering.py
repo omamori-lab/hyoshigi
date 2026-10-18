@@ -17,7 +17,7 @@ from hyoshigi import (
     ToolObservation,
     Trajectory,
 )
-from hyoshigi.monitors.rendering import Rendering, render
+from hyoshigi.monitors.rendering import Rendering, merge_text, render
 from hyoshigi.monitors.view import Channel, View
 
 TASK = "Summarise q3.md"
@@ -646,3 +646,26 @@ def test_media_perceived_or_described_in_the_rated_action_is_not_unperceivable()
         hidden_reasoning=(),
         unperceivable=(),
     )
+
+
+@pytest.mark.parametrize(
+    ("parts", "expected"),
+    [
+        ((), ()),
+        ((TextPart(text="a"), TextPart(text="b")), build_text("ab")),
+        ((PNG, TextPart(text="a"), TextPart(text="b"), PNG), (PNG, TextPart(text="ab"), PNG)),
+        (
+            (TextPart(text="a"), PNG, TextPart(text="b"), TextPart(text="c")),
+            (TextPart(text="a"), PNG, TextPart(text="bc")),
+        ),
+        ((PNG, PNG), (PNG, PNG)),
+        ((TextPart(text="ab"),) * 20_000, build_text("ab" * 20_000)),
+    ],
+    ids=["none", "two", "between-media", "after-media", "adjacent-media", "twenty-thousand"],
+)
+def test_each_run_of_adjacent_text_merges_into_one_part_and_media_ends_a_run(
+    parts: tuple[PromptPart, ...], expected: tuple[PromptPart, ...]
+) -> None:
+    merged = merge_text(parts)
+
+    assert merged == expected
