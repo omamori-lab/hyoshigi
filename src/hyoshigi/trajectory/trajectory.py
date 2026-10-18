@@ -10,6 +10,7 @@ from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.monitors.score import SuspicionScore
+from hyoshigi.options import check_instance
 from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
@@ -117,9 +118,12 @@ class Trajectory:
     def attach(self, score: SuspicionScore, *, to: Action) -> None:
         """Record a monitor's score of an action in the history.
 
-        The action's id must be in the history; otherwise nothing is recorded. An action can
-        be rated more than once, and each rating is kept.
+        The score must be a SuspicionScore and the action's id in the history; otherwise
+        ConfigurationError is raised and nothing is recorded. An action can be rated more than
+        once, and each rating is kept.
         """
+        check_instance(score, expected=SuspicionScore, name="score")
+        check_instance(to, expected=Action, name="to")
         if to.id not in self._action_ids:
             raise ConfigurationError("attach takes an action in this trajectory")
         self._ratings.append(Rating(action_id=to.id, score=score))
