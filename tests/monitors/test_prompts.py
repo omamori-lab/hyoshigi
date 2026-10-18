@@ -93,7 +93,6 @@ def test_a_prompt_that_is_not_a_format_string_raises_naming_its_part(
         MonitorPrompt(system=system, request=request_text)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("system", "request_text", "message"),
     [

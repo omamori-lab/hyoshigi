@@ -27,6 +27,7 @@ from string import Formatter
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import Prompt, PromptPart
 from hyoshigi.monitors.rendering import Rendering, merge_text
+from hyoshigi.options import check_instance
 from hyoshigi.trajectory.parts import TextPart
 
 _SCORE_FIELDS = frozenset({"lowest_score", "highest_score"})
@@ -41,14 +42,16 @@ class MonitorPrompt:
     {highest_score}; `request` must hold {trajectory} and {proposed_action} once each,
     and may hold the score's bounds. Any other field, a format spec or a conversion
     raises ConfigurationError naming the field, and so does a missing or repeated
-    {trajectory} or {proposed_action}; a template that is not a format string raises it
-    too.
+    {trajectory} or {proposed_action}; a template that is not a string, or not a format
+    string, raises it too.
     """
 
     system: str
     request: str
 
     def __post_init__(self) -> None:
+        check_instance(self.system, expected=str, name="system")
+        check_instance(self.request, expected=str, name="request")
         _read_fields(self.system, label="system text", allowed=_SCORE_FIELDS)
         fields = _read_fields(
             self.request, label="request", allowed=_SCORE_FIELDS.union(_RENDERING_FIELDS)
