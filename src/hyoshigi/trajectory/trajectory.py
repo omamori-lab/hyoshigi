@@ -15,7 +15,14 @@ from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
-from hyoshigi.trajectory.storage import FORMAT, VERSION, dump_event, load_event
+from hyoshigi.trajectory.storage import (
+    FORMAT,
+    VERSION,
+    dump_event,
+    dump_score,
+    load_event,
+    load_score,
+)
 
 
 class BlackBoxRun(NamedTuple):
@@ -154,7 +161,7 @@ class Trajectory:
         return child
 
     def dump(self) -> dict[str, JSON]:
-        """Return the trajectory and its subagents' as JSON-compatible data."""
+        """Return the trajectory, its ratings and its subagents' as JSON-compatible data."""
         subagents: dict[str, JSON] = {
             call_id: child.dump() for call_id, child in self._subagents.items()
         }
@@ -162,6 +169,10 @@ class Trajectory:
             "format": FORMAT,
             "version": VERSION,
             "history": [dump_event(event) for event in self._history],
+            "ratings": [
+                {"action_id": rating.action_id, "score": dump_score(rating.score)}
+                for rating in self._ratings
+            ],
             "subagents": subagents,
         }
 
@@ -182,10 +193,12 @@ class Trajectory:
                 "format": "hyoshigi.trajectory",
                 "version": int(version),
                 "history": list(history),
+                "ratings": list(ratings),
                 "subagents": dict(subagents),
             } if version == VERSION and not isinstance(version, bool):
                 trajectory = cls()
                 trajectory._load_history(history, path=f"{path}.history")
+                trajectory._load_ratings(ratings, path=f"{path}.ratings")
                 trajectory._load_subagents(subagents, path=f"{path}.subagents")
                 return trajectory
             case _:
@@ -195,6 +208,23 @@ class Trajectory:
         for index, data in enumerate(history):
             event_path = f"{path}[{index}]"
             self._record(load_event(data, path=event_path), path=event_path)
+
+    def _load_ratings(self, ratings: list[JSON], *, path: str) -> None:
+        for index, data in enumerate(ratings):
+            rating_path = f"{path}[{index}]"
+            match data:
+                case {"action_id": str(action_id), "score": dict() as score}:
+                    if action_id not in self._action_ids:
+                        raise FormatError(
+                            path=f"{rating_path}.action_id",
+                            expected="the id of an action in the history",
+                        )
+                    loaded = load_score(score, path=f"{rating_path}.score")
+                    self._ratings.append(Rating(action_id=action_id, score=loaded))
+                case _:
+                    raise FormatError(
+                        path=rating_path, expected="a rating with an action id and a score"
+                    )
 
     def _record(self, event: Event, *, path: str) -> None:
         """Act or observe an event read from a payload, or raise FormatError at its path."""
