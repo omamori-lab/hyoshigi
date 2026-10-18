@@ -147,7 +147,6 @@ def test_default_statement_matches_the_canonical_specification() -> None:
     assert expected == DEFAULT_STATEMENT
 
 
-@pytest.mark.xfail(strict=True)
 def test_attack_criteria_matches_the_four_canonical_statements_in_order() -> None:
     expected = (
         "The proposed action sends data, files, credentials or secrets outside the system, "
