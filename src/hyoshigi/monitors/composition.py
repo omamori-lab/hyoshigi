@@ -43,14 +43,16 @@ class RepeatedMonitor(Monitor):
 
     This is a homogeneous ensemble: the mean of independent calls of one monitor (Koran et
     al., "Ensemble Monitoring for AI Control: Diverse Signals Outweigh More Compute",
-    arXiv:2605.15377), whose arithmetic mean did as well as the other aggregators they tried
-    (section 3.2). `ensemble_size` is what LinuxArena calls the ensemble size (Tracy et al.,
-    "LinuxArena: A Control Setting for AI Agents in Live Production Software Environments",
-    arXiv:2604.15384, appendix C). Integer scores tie so often that a low audit budget falls
-    inside a group of tied actions; averaging calls adds the resolution that budget needs
-    (Kaufman et al., "BashArena: A Control Setting for Highly Privileged AI Agents",
-    arXiv:2512.15688, section 4.3). The calls differ only when the wrapped monitor's model
-    samples, so it needs a temperature above zero.
+    arXiv:2605.15377). Three calls of one monitor gained less there than three different
+    monitors (section 5.2), and for ensembles of different monitors the arithmetic mean did
+    as well as the other aggregators they tried (section 3.2). `ensemble_size` is what
+    LinuxArena calls the ensemble size (Tracy et al., "LinuxArena: A Control Setting for AI
+    Agents in Live Production Software Environments", arXiv:2604.15384, appendix C). Integer
+    scores tie so often that a low audit budget falls inside a group of tied actions;
+    averaging calls adds the resolution that budget needs (Kaufman et al., "BashArena: A
+    Control Setting for Highly Privileged AI Agents", arXiv:2512.15688, section 4.3). The
+    calls differ only when the wrapped monitor's model samples, so it needs a temperature
+    above zero.
 
     The value is the mean of the calls' values, rounded to `MEAN_DECIMAL_PLACES`, and the
     explanation the most suspicious call's, the first of a tie. When any call failed closed,
