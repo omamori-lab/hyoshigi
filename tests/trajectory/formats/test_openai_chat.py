@@ -1031,8 +1031,21 @@ def test_a_malformed_request_raises_format_error_at_its_path(
             },
             "$.images[0]",
         ),
+        (
+            {
+                "role": "assistant",
+                "images": [{"image_url": {"url": "data:image/png;base64,*"}}],
+            },
+            "$.images[0].image_url.url",
+        ),
     ],
-    ids=["not-the-assistant-s", "malformed-part", "images-not-a-list", "image-without-url"],
+    ids=[
+        "not-the-assistant-s",
+        "malformed-part",
+        "images-not-a-list",
+        "image-without-url",
+        "image-data-url-not-base64",
+    ],
 )
 def test_a_malformed_response_raises_format_error_at_its_path(
     message: JSON,
