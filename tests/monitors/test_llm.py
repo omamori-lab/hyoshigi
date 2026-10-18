@@ -688,7 +688,6 @@ def test_an_action_with_content_the_model_cannot_perceive_fails_closed_without_a
 
 
 # The agent's description of media the model cannot perceive is its own claim, not perception.
-@pytest.mark.xfail(strict=True)
 def test_media_the_agent_described_in_the_rated_action_fails_closed_without_asking(
     rate: Rate,
 ) -> None:

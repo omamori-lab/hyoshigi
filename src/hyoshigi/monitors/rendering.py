@@ -10,7 +10,7 @@ import html
 import re
 from base64 import b64decode
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import assert_never
 
 from hyoshigi.models.model import MediaTypes, PromptPart
@@ -42,8 +42,9 @@ class Rendering:
     """The history as a view shows it, the rated action, and what of the action is unseen.
 
     `hidden_reasoning` names the kinds of the rated thought's opaque parts and the media
-    types of its media not shown, and is empty when the view does not show the thought.
-    `unperceivable` names the same of the action's parts and tool calls.
+    types of its media not shown, or shown only as the agent's own description, and is empty
+    when the view does not show the thought. `unperceivable` names the same of the action's
+    parts and tool calls.
     """
 
     trajectory: tuple[PromptPart, ...]
@@ -362,6 +363,7 @@ def _render_media(
 ) -> _Content:
     """Render media as itself if the model perceives it, else its description or a mark.
 
+    The agent's own description is its claim about the media, so the media stays unseen.
     `ref` numbers media lifted from a tool call's arguments, which has no description.
     """
     if perceives.covers(part.media_type):
@@ -372,9 +374,15 @@ def _render_media(
             ref=ref,
         )
     if part.description is not None:
+        description = _escape(part.description.text)
+        if part.description.author is Author.AGENT:
+            description = replace(
+                description,
+                unseen=(part.media_type,),
+            )
         return _wrap(
             "media",
-            content=_escape(part.description.text),
+            content=description,
             type=part.media_type,
             description_author=part.description.author.value,
         )
