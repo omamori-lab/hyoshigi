@@ -1,14 +1,16 @@
-"""OpenAI's Responses API as a monitor's model, through the caller's client.
+"""OpenAI's Responses and Decisions APIs as a monitor's models, through the caller's client.
 
-The API is OpenAI's Responses API reference, https://platform.openai.com/docs/api-reference/responses.
+The generative model is the Responses API, https://platform.openai.com/docs/api-reference/responses.
+The decision model is the Decisions API,
+https://developers.openai.com/api/reference/resources/decisions/methods/create.
 """
 
 import json
-from typing import TypedDict, cast
+from typing import TypedDict, assert_never, cast
 
 try:
     from openai import APIError, APIStatusError, AsyncOpenAI, Omit, OpenAI, omit
-    from openai.types import ReasoningEffort
+    from openai.types import DecisionInputMessageParam, DecisionInputPartUnionParam, ReasoningEffort
     from openai.types.responses import ResponseInputMessageContentListParam, ResponseInputParam
     from openai.types.shared_params import Reasoning
 except ModuleNotFoundError as error:
@@ -19,23 +21,32 @@ except ModuleNotFoundError as error:
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models import responses
 from hyoshigi.models.model import (
-    TEXT_ONLY,
     AsyncDecisionModel,
     AsyncGenerativeModel,
+    Decision,
     DecisionModel,
     DecisionOutcome,
     GenerationOutcome,
     GenerativeModel,
     MediaTypes,
     Prompt,
+    PromptPart,
     Question,
     Refused,
     Unavailable,
     check_name,
     check_perceives,
+    collect,
 )
+from hyoshigi.trajectory.json_data import JSON
+from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Failure = APIError | UnicodeError
+type DecisionInput = str | list[DecisionInputMessageParam]
+
+# https://developers.openai.com/api/docs/guides/images-vision, "Image input requirements": PNG,
+# JPEG, WEBP and non-animated GIF. The Decisions pages list no image types.
+DECISION_IMAGES = MediaTypes("image/png", "image/jpeg", "image/webp", "image/gif")
 
 # What a call to the client raises when it gets no usable reply: the SDK's own errors, and the
 # error of encoding a prompt text that has no UTF-8 form, such as a lone surrogate.
@@ -100,13 +111,71 @@ def build_arguments(
     }
 
 
-def read_body(body: bytes) -> GenerationOutcome:
-    """The outcome of a reply's raw body; a body that is not JSON is unavailable."""
+def load_body(body: bytes) -> JSON:
+    """The JSON of a reply's raw body; None, which no reply is, if it is not JSON."""
     try:
-        reply = json.loads(body)
+        return json.loads(body)
     except ValueError:
-        return Unavailable()
-    return responses.read_reply(reply)
+        return None
+
+
+def build_decision_part(part: PromptPart) -> DecisionInputPartUnionParam | None:
+    """A state part as an input text or an input image; None for an image in a form the API
+    cannot take. Raise ConfigurationError for media that is not an image the API reads.
+
+    The API reference, https://developers.openai.com/api/reference/resources/decisions/methods/create,
+    and the SDK say an image is a base64 data URL or a publicly accessible HTTP(S) URL. The guide,
+    https://developers.openai.com/api/docs/guides/decisions, says images must be data URLs, but a
+    hosted URL was accepted live on 2026-10-18, so a URL is sent as given.
+    """
+    match part:
+        case TextPart(text=text):
+            return {"type": "input_text", "text": text}
+        case MediaPart(media_type=media_type) if (
+            DECISION_IMAGES.covers(media_type) or media_type.lower() == "image/*"
+        ):
+            image_url = responses.locate(part)
+            return None if image_url is None else {"type": "input_image", "image_url": image_url}
+        case MediaPart(media_type=media_type):
+            raise ConfigurationError(
+                f"OpenAI's Decisions API reads png, jpeg, webp and gif images, not {media_type}"
+            )
+        case _:
+            assert_never(part)
+
+
+def build_decision_input(state: tuple[PromptPart, ...]) -> DecisionInput | None:
+    """The state as a string if it is text alone, else as one user message of its parts in
+    order; None if a part is in a form the API cannot take.
+
+    Adjacent text is one run of text, as in a state a monitor builds, so text parts are joined
+    without a separator. Every part is built before the result is decided, so media the API
+    can never read raises whatever parts come before it.
+    """
+    texts = [part.text for part in state if isinstance(part, TextPart)]
+    if len(texts) == len(state):
+        return "".join(texts)
+    parts = collect([build_decision_part(part) for part in state])
+    return None if parts is None else [{"role": "user", "content": parts}]
+
+
+def read_decision(reply: JSON) -> DecisionOutcome:
+    """The outcome of a Decisions reply's JSON body, which answers the one question it was asked.
+
+    A predicate answer is a decision of its probability; one that is not a number from 0 to 1 is
+    unavailable. A refusal answer is a refusal, which carries no explanation. Any other reply,
+    including an answer of another type, is unavailable.
+    """
+    match reply:
+        case {"answers": [{"type": "predicate", "probability": int() | float() as probability}]}:
+            try:
+                return Decision(probability=probability)
+            except ConfigurationError:
+                return Unavailable()
+        case {"answers": [{"type": "refusal"}]}:
+            return Refused()
+        case _:
+            return Unavailable()
 
 
 def read_failure(error: Failure) -> Refused | Unavailable:
@@ -165,7 +234,7 @@ def build_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return read_body(reply.http_response.content)
+            return responses.read_reply(load_body(reply.http_response.content))
         return read_failure(error)
 
     return GenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
@@ -202,27 +271,67 @@ def build_async_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return read_body(reply.http_response.content)
+            return responses.read_reply(load_body(reply.http_response.content))
         return read_failure(error)
 
     return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
 
 
 def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -> DecisionModel:
-    """A stand-in decision model that refuses every question."""
+    """A decision model on the Decisions API, through the caller's client.
+
+    The question is one predicate question, whose instructions are the statement; the
+    probability of its answer is the decision's. The reply is read from its raw body. Raise
+    ConfigurationError if the model id is empty or perceives names media the API cannot read.
+    """
+    check_name(model)
+    check_perceives(perceives, carries=DECISION_IMAGES)
 
     def decide(question: Question) -> DecisionOutcome:
-        return Refused(explanation="stub")
+        state = build_decision_input(question.state)
+        if state is None:
+            return Unavailable()
+        try:
+            reply = client.decisions.with_raw_response.create(
+                model=model,
+                input=state,
+                questions=[{"type": "predicate", "instructions": question.statement}],
+            )
+        except _FAILURES as caught:
+            error = caught
+        else:
+            return read_decision(load_body(reply.http_response.content))
+        return read_failure(error)
 
-    return DecisionModel(name="stub", decide=decide, perceives=TEXT_ONLY)
+    return DecisionModel(name=f"openai:{model}", decide=decide, perceives=perceives)
 
 
 def build_async_decision_model(
     client: AsyncOpenAI, *, model: str, perceives: MediaTypes
 ) -> AsyncDecisionModel:
-    """A stand-in decision model that refuses every question."""
+    """A decision model on the Decisions API, through the caller's async client.
+
+    The question is one predicate question, whose instructions are the statement; the
+    probability of its answer is the decision's. The reply is read from its raw body. Raise
+    ConfigurationError if the model id is empty or perceives names media the API cannot read.
+    """
+    check_name(model)
+    check_perceives(perceives, carries=DECISION_IMAGES)
 
     async def decide(question: Question) -> DecisionOutcome:
-        return Refused(explanation="stub")
+        state = build_decision_input(question.state)
+        if state is None:
+            return Unavailable()
+        try:
+            reply = await client.decisions.with_raw_response.create(
+                model=model,
+                input=state,
+                questions=[{"type": "predicate", "instructions": question.statement}],
+            )
+        except _FAILURES as caught:
+            error = caught
+        else:
+            return read_decision(load_body(reply.http_response.content))
+        return read_failure(error)
 
-    return AsyncDecisionModel(name="stub", decide=decide, perceives=TEXT_ONLY)
+    return AsyncDecisionModel(name=f"openai:{model}", decide=decide, perceives=perceives)
