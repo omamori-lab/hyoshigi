@@ -296,3 +296,21 @@ def test_a_value_that_is_not_an_instance_of_the_expected_class_raises_naming_bot
         check_instance(value, expected=expected, name="model", hint=hint)
 
     assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ("private task text", "to must be an Ordinary, got an instance of str"),
+        (3, "to must be an Ordinary, got an instance of int"),
+    ],
+    ids=["text", "a-number"],
+)
+def test_a_value_of_the_wrong_class_is_named_by_its_type_never_its_content(
+    value: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        check_instance(value, expected=Ordinary, name="to")
+
+    assert str(raised.value) == message
