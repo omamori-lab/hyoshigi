@@ -210,12 +210,20 @@ class GenerativeModel:
         reasoning_effort: components.ReasoningEffort | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> GenerativeModel:
-        """A model on OpenRouter's Responses API, through the caller's client."""
+        """A model on OpenRouter's Responses API, through the caller's client.
+
+        A reasoning effort, when given, is sent as the request's reasoning effort; without
+        one, the model's default applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[openrouter].
         from hyoshigi.models import openrouter as provider
 
         return provider.build_model(
-            client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+            client,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+            perceives=perceives,
         )
 
 
@@ -287,12 +295,20 @@ class AsyncGenerativeModel:
         reasoning_effort: components.ReasoningEffort | None = None,
         perceives: MediaTypes = TEXT_ONLY,
     ) -> AsyncGenerativeModel:
-        """A model on OpenRouter's Responses API, through the caller's client, awaited."""
+        """A model on OpenRouter's Responses API, through the caller's client, awaited.
+
+        A reasoning effort, when given, is sent as the request's reasoning effort; without
+        one, the model's default applies.
+        """
         # Imported here because the SDK is the optional extra hyoshigi[openrouter].
         from hyoshigi.models import openrouter as provider
 
         return provider.build_async_model(
-            client, model=model, max_output_tokens=max_output_tokens, perceives=perceives
+            client,
+            model=model,
+            max_output_tokens=max_output_tokens,
+            reasoning_effort=reasoning_effort,
+            perceives=perceives,
         )
 
 

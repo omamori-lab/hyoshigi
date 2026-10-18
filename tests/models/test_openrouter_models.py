@@ -526,14 +526,7 @@ def test_the_output_limit_is_sent_only_when_given(
 # {"effort": "high"}; "Reasoning Effort Levels" lists minimal, low, medium and high.
 @pytest.mark.parametrize(
     ("reasoning_effort", "sent"),
-    [
-        (None, [{}]),
-        pytest.param(
-            "high",
-            [{"reasoning": {"effort": "high"}}],
-            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
-        ),
-    ],
+    [(None, [{}]), ("high", [{"reasoning": {"effort": "high"}}])],
     ids=["no-effort-sends-no-field", "effort-is-sent"],
 )
 def test_the_reasoning_effort_is_sent_only_when_given(
