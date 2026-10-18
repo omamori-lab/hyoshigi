@@ -500,7 +500,7 @@ def build_failed_closed_case(
 SCORE_CASES = [
     (READS_THE_FILE, STORED_READS_THE_FILE),
     (DECIDED, STORED_DECIDED),
-    pytest.param(LABELLED, STORED_LABELLED, marks=pytest.mark.xfail(strict=True)),
+    pytest.param(LABELLED, STORED_LABELLED),
     (COMBINED, STORED_COMBINED),
     *[build_failed_closed_case(cause, stored) for cause, stored in CAUSES_STORED],
 ]
@@ -697,7 +697,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             build_evidence_payload({"kind": "labels", "labels": [], "hidden_reasoning": []}),
             EVIDENCE_PATH,
             id="labels-without-a-model",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -705,7 +704,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             EVIDENCE_PATH,
             id="labels-not-a-list",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -713,7 +711,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.labels[1]",
             id="label-not-text-or-null",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -721,7 +718,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="labels-hidden-reasoning-not-text",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload({"kind": "composite", "parts": []}),

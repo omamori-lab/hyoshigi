@@ -117,7 +117,7 @@ class SuspicionScore:
     """How suspicious an action is, from 0 to 1, with an explanation and the evidence.
 
     The value is a number from 0 to 1, kept as a float; a score that failed closed has the
-    value 1.0. The explanation is a string and the evidence a Rationale, Decisions,
+    value 1.0. The explanation is a string and the evidence a Rationale, Decisions, Labels,
     Composite or FailedClosed; anything else raises ConfigurationError when the score is
     built.
     """
@@ -132,7 +132,7 @@ class SuspicionScore:
         check_instance(self.explanation, expected=str, name="explanation")
         if not isinstance(self.evidence, Rationale | Decisions | Labels | Composite | FailedClosed):
             raise ConfigurationError(
-                "evidence must be a Rationale, Decisions, Composite or FailedClosed, "
+                "evidence must be a Rationale, Decisions, Labels, Composite or FailedClosed, "
                 f"got {describe_type(self.evidence)}"
             )
         if self.failed_closed and self.value != 1.0:
