@@ -44,6 +44,8 @@ anthropic = ["anthropic>=1.15.0"]
 openrouter = ["openrouter>=1.3.63"]
 typesafe = ["typesafe-sdk>=0.7.5"]
 opentelemetry = ["opentelemetry-api>=1.45.1"]
+langfuse = ["langfuse>=5.0.2"]
+langsmith = ["langsmith>=0.14.11"]
 
 [project.urls]
 Repository = "https://github.com/omamori-lab/hyoshigi"
@@ -52,7 +54,7 @@ Changelog = "https://github.com/omamori-lab/hyoshigi/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "hyoshigi[openai,anthropic,openrouter,typesafe,opentelemetry]",
+    "hyoshigi[openai,anthropic,openrouter,typesafe,opentelemetry,langfuse,langsmith]",
     "mutmut>=3.8.0",
     "opentelemetry-sdk>=1.45.1",
     "pytest>=9.1.1",

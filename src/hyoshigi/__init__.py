@@ -42,6 +42,13 @@ from hyoshigi.monitors.guard_labels import (
 from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
+from hyoshigi.monitors.reporting import (
+    AsyncLangSmithFeedback,
+    AsyncReportedMonitor,
+    LangfuseScores,
+    LangSmithFeedback,
+    ReportedMonitor,
+)
 from hyoshigi.monitors.score import (
     Cause,
     Composite,
@@ -78,8 +85,10 @@ __all__ = [
     "AsyncGenerativeModel",
     "AsyncGuardMonitor",
     "AsyncLLMMonitor",
+    "AsyncLangSmithFeedback",
     "AsyncMonitor",
     "AsyncRepeatedMonitor",
+    "AsyncReportedMonitor",
     "Author",
     "Authorship",
     "BlackBoxRun",
@@ -107,6 +116,8 @@ __all__ = [
     "HardLabelWarning",
     "LLMMonitor",
     "Labels",
+    "LangSmithFeedback",
+    "LangfuseScores",
     "MediaPart",
     "MediaTypes",
     "Monitor",
@@ -121,6 +132,7 @@ __all__ = [
     "Rationale",
     "Refused",
     "RepeatedMonitor",
+    "ReportedMonitor",
     "StatementDecision",
     "SuspicionScore",
     "TextPart",
