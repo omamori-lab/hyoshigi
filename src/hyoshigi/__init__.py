@@ -33,6 +33,14 @@ from hyoshigi.monitors.decision import (
     AsyncDecisionMonitor,
     DecisionMonitor,
 )
+from hyoshigi.monitors.guard import AsyncGuardMonitor, GuardMonitor, HardLabelWarning
+from hyoshigi.monitors.guard_labels import (
+    GPT_OSS_SAFEGUARD,
+    LLAMA_GUARD,
+    NEMOTRON_CONTENT_SAFETY,
+    QWEN3GUARD,
+    GuardLabels,
+)
 from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
@@ -42,6 +50,7 @@ from hyoshigi.monitors.score import (
     Decisions,
     Evidence,
     FailedClosed,
+    Labels,
     Rationale,
     StatementDecision,
     SuspicionScore,
@@ -59,7 +68,11 @@ __all__ = [
     "ATTACK_CRITERIA",
     "DEFAULT_PROMPT",
     "DEFAULT_STATEMENT",
+    "GPT_OSS_SAFEGUARD",
     "JSON",
+    "LLAMA_GUARD",
+    "NEMOTRON_CONTENT_SAFETY",
+    "QWEN3GUARD",
     "Action",
     "Aggregation",
     "AsyncCalibratedMonitor",
@@ -67,6 +80,7 @@ __all__ = [
     "AsyncDecisionModel",
     "AsyncDecisionMonitor",
     "AsyncGenerativeModel",
+    "AsyncGuardMonitor",
     "AsyncLLMMonitor",
     "AsyncMonitor",
     "AsyncRepeatedMonitor",
@@ -92,7 +106,11 @@ __all__ = [
     "Generation",
     "GenerationOutcome",
     "GenerativeModel",
+    "GuardLabels",
+    "GuardMonitor",
+    "HardLabelWarning",
     "LLMMonitor",
+    "Labels",
     "MediaPart",
     "MediaTypes",
     "Monitor",
