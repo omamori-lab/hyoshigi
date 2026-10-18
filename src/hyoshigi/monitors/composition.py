@@ -58,8 +58,8 @@ class RepeatedMonitor(Monitor):
     explanation the most suspicious call's, the first of a tie. When any call failed closed,
     the whole score fails closed: the value is 1.0 and the explanation the first failed
     call's. Either way the evidence is the calls' scores, in order. `ensemble_size` is a
-    whole number of at least 1, and `monitor` a Monitor; otherwise ConfigurationError is
-    raised when the wrapper is built.
+    whole number from 1 to sys.maxsize, and `monitor` a Monitor; otherwise
+    ConfigurationError is raised when the wrapper is built.
     """
 
     monitor: Monitor
