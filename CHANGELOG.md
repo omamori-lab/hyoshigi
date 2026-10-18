@@ -40,6 +40,24 @@ minor version.
   `from_anthropic` (the Messages API, `hyoshigi[anthropic]`), `from_openrouter`
   and `DecisionModel.from_openrouter` (`hyoshigi[openrouter]`), and
   `DecisionModel.from_typesafe` (TypeSafe's Jev, `hyoshigi[typesafe]`).
+- `Monitor` and `AsyncMonitor`, which `rate(action, *, trajectory)` an action
+  the agent proposes and always return a `SuspicionScore`: a value from 0 to 1,
+  an explanation with no numbers, and typed evidence (`Rationale`, `Decisions`,
+  `Composite` or `FailedClosed`). A reply the monitor cannot read, content it
+  cannot perceive, and a model that refuses or is unavailable fail closed, at
+  1.0.
+- `LLMMonitor` and `AsyncLLMMonitor`, which ask a generative model for
+  reasoning and an integer score, with `MonitorPrompt` and `DEFAULT_PROMPT`.
+- `DecisionMonitor` and `AsyncDecisionMonitor`, which ask a decision model the
+  probability that statements about the action hold, aggregated by
+  `Aggregation`, with `DEFAULT_STATEMENT` and `ATTACK_CRITERIA`.
+- `View` and `Channel`: what of the trajectory a monitor reads.
+- `RepeatedMonitor`, `CalibratedMonitor` and `CascadeMonitor`, with their async
+  twins: the mean of repeated ratings, a smoothed conformal p-value against
+  honest scores, and a fast monitor escalating to a careful one. A failure
+  inside any of them fails the whole score closed.
+- `Trajectory.attach` and `Rating`: a trajectory's ratings, kept by `dump` and
+  `load`.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
   `image/*` in `MediaPart`.
