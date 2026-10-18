@@ -2,6 +2,9 @@
 
 import asyncio
 import numbers
+import os
+import subprocess
+import sys
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -643,6 +646,59 @@ def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
     ]
 
     assert values[0] != values[1]
+
+
+RATE_SEEDED_ACTION = """
+import asyncio
+import sys
+
+from hyoshigi import Action, AsyncGenerativeModel, Generation, GenerativeModel, TextPart, Trajectory
+from hyoshigi.monitors.composition import AsyncCalibratedMonitor, CalibratedMonitor
+from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
+
+reply = Generation(text="<reasoning>r</reasoning><score>3</score>")
+trajectory = Trajectory.from_run("Summarise q3.md", answer="Done.").trajectory
+action = Action(parts=(TextPart(text="Reading q3.md."),))
+
+
+async def generate_asynchronously(prompt):
+    return reply
+
+
+if sys.argv[1] == "sync":
+    model = GenerativeModel(name="trusted-1", generate=lambda prompt: reply)
+    monitor = CalibratedMonitor(
+        monitor=LLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
+    )
+    score = monitor.rate(action, trajectory=trajectory)
+else:
+    model = AsyncGenerativeModel(name="trusted-1", generate=generate_asynchronously)
+    monitor = AsyncCalibratedMonitor(
+        monitor=AsyncLLMMonitor(model=model), honest_scores=[0.3, 0.1, 0.2, 0.2], random_seed=7
+    )
+    score = asyncio.run(monitor.rate(action, trajectory=trajectory))
+print(score.value)
+"""
+
+
+@pytest.mark.parametrize("hash_seed", ["0", "1"])
+@pytest.mark.parametrize("family_name", ["sync", "async"])
+def test_a_seeded_rating_is_the_same_in_processes_started_with_different_hash_seeds(
+    family_name: str, hash_seed: str
+) -> None:
+    process = subprocess.run(
+        [sys.executable, "-c", RATE_SEEDED_ACTION, family_name],
+        env={**os.environ, "PYTHONHASHSEED": hash_seed},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    # A raw score of 0.3 against the honest scores 0.1, 0.2, 0.2, 0.3 ranks (3 + u * 2) / 5.
+    # u is the first number of random.Random(seed, a line break and the key): CPython
+    # seeds a str by its SHA-512 whatever the hash seed, and reading the same bytes into
+    # numpy's MT19937 gives u = 0.5883713825888017, so the value is 0.8353485530355208.
+    assert process.stdout == "0.8353485530355208\n"
 
 
 def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
