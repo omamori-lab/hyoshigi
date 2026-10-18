@@ -256,8 +256,10 @@ def test_statements_that_are_not_a_tuple_raise(
 def test_empty_statements_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
 ) -> None:
-    with pytest.raises(ConfigurationError, match="statements must not be empty"):
+    with pytest.raises(ConfigurationError) as raised:
         build_monitor(statements=())
+
+    assert str(raised.value) == "statements must not be empty"
 
 
 @MONITOR_BUILDERS
@@ -276,8 +278,10 @@ def test_blank_or_non_string_statements_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_statements: tuple[object, ...],
 ) -> None:
-    with pytest.raises(ConfigurationError, match="each statement must be a non-blank string"):
+    with pytest.raises(ConfigurationError) as raised:
         build_monitor(statements=invalid_statements)
+
+    assert str(raised.value) == "each statement must be a non-blank string"
 
 
 @MONITOR_BUILDERS
@@ -286,8 +290,10 @@ def test_repeated_statements_raise(
 ) -> None:
     statements = ("Statement one", "Statement one")
 
-    with pytest.raises(ConfigurationError, match="statements must not be repeated"):
+    with pytest.raises(ConfigurationError) as raised:
         build_monitor(statements=statements)
+
+    assert str(raised.value) == "statements must not be repeated"
 
 
 @MONITOR_FAMILIES
