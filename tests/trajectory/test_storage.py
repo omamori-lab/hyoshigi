@@ -1440,3 +1440,92 @@ def test_a_format_error_for_a_rating_never_quotes_the_payload() -> None:
         Trajectory.load(payload)
 
     assert "s3cret-0f3c" not in str(raised.value)
+
+
+def nest_composites(depth: int) -> dict[str, JSON]:
+    """A stored trajectory whose one rating nests composite scores that many levels deep."""
+    score: JSON = STORED_READS_THE_FILE
+    for _ in range(depth):
+        score = {
+            "value": 0.25,
+            "explanation": "The mean of its part.",
+            "evidence": {
+                "kind": "composite",
+                "parts": [score],
+            },
+        }
+    return build_rating_payload(
+        {
+            "action_id": "a1",
+            "score": score,
+        },
+    )
+
+
+def nest_subagents(depth: int) -> dict[str, JSON]:
+    """A stored trajectory whose subagents nest that many levels deep."""
+    trajectory: dict[str, JSON] = {
+        **ENVELOPE,
+        "history": [],
+    }
+    for _ in range(depth):
+        trajectory = {
+            **ENVELOPE,
+            "history": [
+                {
+                    **ACTION,
+                    "tool_calls": [TASK_CALL],
+                },
+            ],
+            "subagents": {"call_7": trajectory},
+        }
+    return trajectory
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        nest_composites(32),
+        nest_subagents(32),
+    ],
+    ids=["composite-scores", "subagents"],
+)
+def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> None:
+    loaded = Trajectory.load(payload)
+
+    assert loaded.dump() == payload
+
+
+# The deepest composite is the evidence of the score inside 32 others; the deepest subagent
+# is the 33rd.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("payload", "path"),
+    [
+        (
+            nest_composites(33),
+            "$.ratings[0].score" + ".evidence.parts[0]" * 32 + ".evidence",
+        ),
+        (
+            nest_composites(400),
+            "$.ratings[0].score" + ".evidence.parts[0]" * 32 + ".evidence",
+        ),
+        (
+            nest_subagents(33),
+            "$" + ".subagents[0]" * 33,
+        ),
+        (
+            nest_subagents(600),
+            "$" + ".subagents[0]" * 33,
+        ),
+    ],
+    ids=["composite-scores-33", "composite-scores-400", "subagents-33", "subagents-600"],
+)
+def test_nesting_past_32_levels_raises_format_error_at_the_33rd(
+    payload: dict[str, JSON],
+    path: str,
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert raised.value.path == path
