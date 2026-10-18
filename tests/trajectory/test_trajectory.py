@@ -171,8 +171,12 @@ def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Traje
 @pytest.mark.parametrize(
     ("score", "to", "message"),
     [
-        (0.5, Action(id="a1", tool_calls=(READ,)), "score must be a SuspicionScore, got 0.5"),
-        (READS_THE_FILE, "a1", "to must be an Action, got 'a1'"),
+        (
+            0.5,
+            Action(id="a1", tool_calls=(READ,)),
+            "score must be a SuspicionScore, got an instance of float",
+        ),
+        (READS_THE_FILE, "a1", "to must be an Action, got an instance of str"),
     ],
     ids=["a-number-as-the-score", "an-id-as-the-action"],
 )

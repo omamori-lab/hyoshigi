@@ -96,7 +96,7 @@ def test_a_prompt_that_is_not_a_format_string_raises_naming_its_part(
 @pytest.mark.parametrize(
     ("system", "request_text", "message"),
     [
-        (123, REQUEST, "system must be a str, got 123"),
+        (123, REQUEST, "system must be a str, got an instance of int"),
         (b"Rate it.", REQUEST, "system must be a str, got an instance of bytes"),
         ("Rate it.", None, "request must be a str, got None"),
         (

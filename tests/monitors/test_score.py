@@ -143,7 +143,7 @@ def test_a_value_that_is_not_a_number_from_zero_to_one_raises(value: object) -> 
 @pytest.mark.parametrize(
     ("evidence", "described"),
     [
-        ("invalid", "'invalid'"),
+        ("invalid", "an instance of str"),
         (None, "None"),
         (Refused(), "an instance of Refused"),
         (Rationale, "the class Rationale; pass an instance"),
@@ -163,7 +163,7 @@ def test_a_score_whose_evidence_is_not_a_kind_of_evidence_raises_when_built(
 
 @pytest.mark.parametrize(
     ("explanation", "described"),
-    [(123, "123"), (None, "None"), (b"x", "an instance of bytes")],
+    [(123, "an instance of int"), (None, "None"), (b"x", "an instance of bytes")],
     ids=["integer", "none", "bytes"],
 )
 def test_a_score_whose_explanation_is_not_a_string_raises_when_built(
@@ -206,7 +206,7 @@ def test_evidence_that_must_hold_something_raises_when_empty(
 @pytest.mark.parametrize(
     ("parts", "message"),
     [
-        (("x",), "parts[0] must be a SuspicionScore, got 'x'"),
+        (("x",), "parts[0] must be a SuspicionScore, got an instance of str"),
         (
             (SuspicionScore(value=0.5, explanation="x", evidence=Rationale(model="m")), None),
             "parts[1] must be a SuspicionScore, got None",

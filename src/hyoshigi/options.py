@@ -30,6 +30,15 @@ def describe_option_value(value: object) -> str:
                 else f"a {name_type(type(value))}"
             )
             return f"{kind} too long to write out"
+    return describe_type(value)
+
+
+def describe_type(value: object) -> str:
+    """Name a refused value by its type alone, never by its content: None, a class, or an
+    instance of a type, since a value of the wrong class may hold trajectory content.
+    """
+    if value is None:
+        return "None"
     if isinstance(value, type):
         return f"the class {name_type(value)}; pass an instance"
     return f"an instance of {name_type(type(value))}"
@@ -123,11 +132,11 @@ def read_threshold(value: object, *, name: str) -> float:
 def check_instance(value: object, *, expected: type, name: str, hint: str = "") -> None:
     """Raise ConfigurationError unless the value is an instance of the expected class.
 
-    The message names the class and the value, then the hint, a sentence that can name the
-    likely mix-up, such as a sync model given to an async monitor.
+    The message names the class and the value's type, never its content, then the hint, a
+    sentence that can name the likely mix-up, such as a sync model given to an async monitor.
     """
     if isinstance(value, expected):
         return
     article = "an" if expected.__name__[0] in "AEIOU" else "a"
-    message = f"{name} must be {article} {expected.__name__}, got {describe_option_value(value)}"
+    message = f"{name} must be {article} {expected.__name__}, got {describe_type(value)}"
     raise ConfigurationError(f"{message}. {hint}" if hint else message)

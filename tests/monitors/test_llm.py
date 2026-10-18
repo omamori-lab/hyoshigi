@@ -560,8 +560,8 @@ def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to
     ("options", "message"),
     [
         ({"view": View}, "view must be a View, got the class View; pass an instance"),
-        ({"view": "all"}, "view must be a View, got 'all'"),
-        ({"prompt": "Rate it."}, "prompt must be a MonitorPrompt, got 'Rate it.'"),
+        ({"view": "all"}, "view must be a View, got an instance of str"),
+        ({"prompt": "Rate it."}, "prompt must be a MonitorPrompt, got an instance of str"),
         ({"lowest_score": 2.5}, "lowest_score must be an integer, got 2.5"),
         ({"lowest_score": None}, "lowest_score must be an integer, got None"),
         ({"highest_score": True}, "highest_score must be an integer, got True"),

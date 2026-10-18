@@ -14,7 +14,7 @@ from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
-from hyoshigi.options import check_instance, describe_option_value, read_threshold
+from hyoshigi.options import check_instance, describe_type, read_threshold
 
 MEAN_DECIMAL_PLACES = 12
 
@@ -121,7 +121,7 @@ class SuspicionScore:
         if not isinstance(self.evidence, Rationale | Decisions | Composite | FailedClosed):
             raise ConfigurationError(
                 "evidence must be a Rationale, Decisions, Composite or FailedClosed, "
-                f"got {describe_option_value(self.evidence)}"
+                f"got {describe_type(self.evidence)}"
             )
         if self.failed_closed and self.value != 1.0:
             raise ConfigurationError("a score that failed closed has the value 1.0")
