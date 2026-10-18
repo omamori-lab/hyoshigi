@@ -18,6 +18,7 @@ from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.storage import (
     FORMAT,
+    NESTING_LIMIT,
     VERSION,
     dump_event,
     dump_score,
@@ -275,12 +276,13 @@ class Trajectory:
         """Rebuild a trajectory from what dump returned.
 
         Raises FormatError, naming the JSONPath of the first problem, on data that
-        lacks what dump writes or holds it in another shape. Keys dump does not
-        write are ignored.
+        lacks what dump writes or holds it in another shape, and on composite scores or
+        subagents nested more than 32 levels deep. Keys dump does not write are ignored.
         """
         return cls._load(
             data,
             path="$",
+            depth=0,
         )
 
     @classmethod
@@ -289,6 +291,7 @@ class Trajectory:
         data: JSON,
         *,
         path: str,
+        depth: int,
     ) -> Self:
         match data:
             case {
@@ -313,6 +316,7 @@ class Trajectory:
                 trajectory._load_subagents(
                     subagents,
                     path=f"{path}.subagents",
+                    depth=depth,
                 )
                 return trajectory
             case _:
@@ -358,6 +362,7 @@ class Trajectory:
                     loaded = load_score(
                         score,
                         path=f"{rating_path}.score",
+                        depth=0,
                     )
                     self._ratings.append(
                         Rating(
@@ -397,7 +402,11 @@ class Trajectory:
         subagents: dict[str, JSON],
         *,
         path: str,
+        depth: int,
     ) -> None:
+        """Load the subagents of a trajectory `depth` levels deep. A subagent deeper than
+        NESTING_LIMIT raises FormatError.
+        """
         for index, (
             call_id,
             data,
@@ -407,7 +416,13 @@ class Trajectory:
                     path=f"{path}[{index}]",
                     expected="a subagent under a tool call in the history",
                 )
+            if depth == NESTING_LIMIT:
+                raise FormatError(
+                    path=f"{path}[{index}]",
+                    expected=f"subagents nested at most {NESTING_LIMIT} deep",
+                )
             self._subagents[call_id] = Trajectory._load(
                 data,
                 path=f"{path}[{index}]",
+                depth=depth + 1,
             )

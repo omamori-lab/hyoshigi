@@ -18,7 +18,8 @@ minor version.
 - `Trajectory`, a run's append-only history of actions and observations:
   `from_run` for a black-box agent, `act`, `observe`, `delegate` to a subagent
   under the tool call that delegated it, and `dump` and `load` in a
-  JSON-compatible format, version 1.
+  JSON-compatible format, version 1. `load` reads composite scores and
+  subagents nested up to 32 levels deep.
 - `Action`, `ToolCall`, `Observation`, `ToolObservation`, `TextPart`,
   `MediaPart`, `Description` and `Author`.
 - `ConfigurationError`, for arguments that cannot work, and `FormatError`,

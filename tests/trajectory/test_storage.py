@@ -1498,7 +1498,6 @@ def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> 
 
 # The deepest composite is the evidence of the score inside 32 others; the deepest subagent
 # is the 33rd.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
