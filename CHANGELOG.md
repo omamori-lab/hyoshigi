@@ -25,7 +25,8 @@ minor version.
   which names the JSONPath of a malformed payload and never quotes it.
 - `Trajectory.from_anthropic` and `Action.from_anthropic`, which read
   Anthropic's Messages format: a request into a trajectory, a response into
-  the action to rate.
+  the action to rate. A document's title and context are read as text beside
+  it.
 - `Trajectory.from_openai_chat` and `Action.from_openai_chat`, which read the
   OpenAI chat completions format with OpenRouter's reasoning fields and the
   images an assistant message carries.

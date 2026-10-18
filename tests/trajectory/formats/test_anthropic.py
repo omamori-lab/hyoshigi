@@ -774,7 +774,6 @@ def test_documents_become_media_and_files_become_opaque() -> None:
 
 # https://platform.claude.com/docs/en/build-with-claude/citations: the plain text document of
 # its first example, whose title and context "are passed to the model".
-@pytest.mark.xfail(strict=True)
 def test_a_document_s_title_and_context_are_text_beside_its_content() -> None:
     request: JSON = {
         "messages": [
@@ -1279,7 +1278,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[1]",
         ),
-        pytest.param(
+        (
             build_user_request(
                 {
                     "type": "document",
@@ -1291,9 +1290,8 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 },
             ),
             "$.messages[0].content[0].title",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             build_user_request(
                 {
                     "type": "document",
@@ -1305,7 +1303,6 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 },
             ),
             "$.messages[0].content[0].context",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

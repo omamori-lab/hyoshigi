@@ -70,12 +70,11 @@ def read_response(message: JSON) -> Action:
                 expected="an assistant message with a list of content blocks",
             )
     for index, block in enumerate(blocks):
-        draft.add(
-            read_assistant_block(
-                block,
-                path=f"$.content[{index}]",
-            ),
-        )
+        for piece in read_assistant_block(
+            block,
+            path=f"$.content[{index}]",
+        ):
+            draft.add(piece)
     return draft.build()
 
 
@@ -222,7 +221,7 @@ def read_user_content(
                     ),
                 )
             case _:
-                parts.append(
+                parts.extend(
                     read_content_block(
                         block,
                         path=block_path,
@@ -296,11 +295,12 @@ def read_result_content(
             return (TextPart(text=text),)
         case {"content": list(items)}:
             return tuple(
-                read_content_block(
+                part
+                for i, item in enumerate(items)
+                for part in read_content_block(
                     item,
                     path=f"{path}[{i}]",
                 )
-                for i, item in enumerate(items)
             )
         case {"content": None}:
             return ()
@@ -317,29 +317,32 @@ def read_content_block(
     block: JSON,
     *,
     path: str,
-) -> Part:
+) -> tuple[Part, ...]:
     """Read a text, image or document block; a block of another type becomes opaque."""
     match block:
         case {
             "type": "text",
             "text": str(text),
         }:
-            return TextPart(text=text)
+            return (TextPart(text=text),)
         case {
             "type": "image",
             "source": dict() as source,
         }:
-            return read_image_source(
-                source,
-                path=f"{path}.source",
+            return (
+                read_image_source(
+                    source,
+                    path=f"{path}.source",
+                ),
             )
         case {
             "type": "document",
             "source": dict() as source,
         }:
-            return read_document_source(
-                source,
-                path=f"{path}.source",
+            return read_document(
+                block,
+                source=source,
+                path=path,
             )
         case {"type": "text" | "image" | "document" as kind}:
             raise FormatError(
@@ -347,7 +350,7 @@ def read_content_block(
                 expected=f"a {kind} block in the Messages format",
             )
         case {"type": str(kind)}:
-            return OpaquePart(kind=kind)
+            return (OpaquePart(kind=kind),)
         case _:
             raise FormatError(
                 path=path,
@@ -395,6 +398,46 @@ def read_image_source(
                 path=path,
                 expected="an image source with a type",
             )
+
+
+def read_document(
+    block: JSON,
+    *,
+    source: JSON,
+    path: str,
+) -> tuple[Part, ...]:
+    """Read a document block: its title, its source, then its context.
+
+    The model reads the title and the context beside the document, so each becomes text.
+    """
+    match block:
+        case {"title": str(text)}:
+            title: tuple[Part, ...] = (TextPart(text=text),)
+        case {"title": text} if text is not None:
+            raise FormatError(
+                path=f"{path}.title",
+                expected="a document title as text",
+            )
+        case _:
+            title = ()
+    match block:
+        case {"context": str(text)}:
+            context: tuple[Part, ...] = (TextPart(text=text),)
+        case {"context": text} if text is not None:
+            raise FormatError(
+                path=f"{path}.context",
+                expected="a document context as text",
+            )
+        case _:
+            context = ()
+    return (
+        *title,
+        read_document_source(
+            source,
+            path=f"{path}.source",
+        ),
+        *context,
+    )
 
 
 def read_document_source(
@@ -490,12 +533,11 @@ def read_assistant_content(
                 )
             case _:
                 draft = draft or ActionDraft(id=block_path)
-                draft.add(
-                    read_assistant_block(
-                        block,
-                        path=block_path,
-                    ),
-                )
+                for piece in read_assistant_block(
+                    block,
+                    path=block_path,
+                ):
+                    draft.add(piece)
     return events + close(draft)
 
 
@@ -536,28 +578,30 @@ def read_assistant_block(
     block: JSON,
     *,
     path: str,
-) -> Thought | Part | ToolCall:
-    """Read an assistant's block: a thought, a tool call, or a content block."""
+) -> tuple[Thought | Part | ToolCall, ...]:
+    """Read an assistant's block: a thought, a tool call, or a content block's parts."""
     match block:
         case {
             "type": "thinking",
             "thinking": str(text),
         }:
-            return Thought(TextPart(text=text))
+            return (Thought(TextPart(text=text)),)
         case {"type": "redacted_thinking"}:
-            return Thought(OpaquePart(kind="redacted_thinking"))
+            return (Thought(OpaquePart(kind="redacted_thinking")),)
         case {
             "type": "tool_use" | "server_tool_use",
             "id": str(call_id),
             "name": str(name),
             "input": dict(arguments),
         }:
-            return ToolCall(
-                id=call_id,
-                name=name,
-                arguments=json.dumps(
-                    arguments,
-                    ensure_ascii=False,
+            return (
+                ToolCall(
+                    id=call_id,
+                    name=name,
+                    arguments=json.dumps(
+                        arguments,
+                        ensure_ascii=False,
+                    ),
                 ),
             )
         case {"type": "thinking" | "tool_use" | "server_tool_use" as kind}:
