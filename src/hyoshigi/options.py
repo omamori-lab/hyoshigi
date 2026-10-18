@@ -6,6 +6,7 @@ object is built and not at the first rating.
 
 import numbers
 import operator
+import sys
 from decimal import Decimal
 from typing import TypeGuard
 
@@ -71,8 +72,9 @@ def read_integer(value: object, *, name: str) -> int:
 
 
 def read_count(value: object, *, name: str, minimum: int) -> int:
-    """Return a count option as an int: a whole number of at least minimum.
+    """Return a count option as an int: a whole number from minimum to sys.maxsize.
 
+    A count is a size or a number of repeats, and Python cannot index past sys.maxsize.
     Anything else raises ConfigurationError.
     """
     if not is_whole_number(value):
@@ -84,6 +86,10 @@ def read_count(value: object, *, name: str, minimum: int) -> int:
     if count < minimum:
         raise ConfigurationError(
             f"{name} must be at least {minimum}, got {describe_option_value(count)}"
+        )
+    if count > sys.maxsize:
+        raise ConfigurationError(
+            f"{name} must be at most {sys.maxsize}, got {describe_option_value(count)}"
         )
     return count
 
