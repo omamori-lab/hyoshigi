@@ -4,7 +4,6 @@ The API is Anthropic's Messages API reference, https://platform.claude.com/docs/
 """
 
 from base64 import b64encode
-from json import JSONDecodeError
 
 try:
     from anthropic import Anthropic, APIError, APIStatusError, AsyncAnthropic, BaseModel
@@ -42,13 +41,10 @@ from hyoshigi.models.model import (
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
 type Block = TextBlockParam | ImageBlockParam | DocumentBlockParam
-# JSONDecodeError and UnicodeError are ValueErrors; the ValueError that is neither is the SDK
-# refusing the request's arguments.
+# What the client raises instead of a reply: the SDK's errors, and ValueErrors: a body that is
+# not JSON or not UTF-8, text it cannot encode, and the SDK refusing the request's arguments.
 type Failure = APIError | ValueError
-
-# What the client raises instead of a reply: the SDK's errors, a body that is not JSON or not
-# UTF-8, and text it cannot encode.
-_FAILURES = (APIError, JSONDecodeError, UnicodeError)
+_FAILURES = (APIError, ValueError)
 
 # The client errors a retry or a smaller prompt can clear: the SDK retries 408, 409 and 429, and
 # the prompt's content can make a request too large (413), so these fail closed.
@@ -81,8 +77,6 @@ def build_model(
             reply: Message | Failure = client.messages.create(**request)
         except _FAILURES as error:
             reply = error
-        except ValueError as error:
-            reply = error
         return read_reply(reply)
 
     return GenerativeModel(name=f"anthropic:{model}", generate=generate, perceives=perceives)
@@ -107,8 +101,6 @@ def build_async_model(
         try:
             reply: Message | Failure = await client.messages.create(**request)
         except _FAILURES as error:
-            reply = error
-        except ValueError as error:
             reply = error
         return read_reply(reply)
 
@@ -145,7 +137,9 @@ def build_request(
 
 
 def is_blank(part: PromptPart) -> bool:
-    """Whether a part is text with no non-whitespace character, which the API rejects."""
+    """Whether a part is text with no non-whitespace character, which the API rejects in a
+    message that holds nothing else.
+    """
     return isinstance(part, TextPart) and not part.text.strip()
 
 
