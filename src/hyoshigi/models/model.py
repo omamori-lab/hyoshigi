@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hyoshigi.errors import ConfigurationError
+from hyoshigi.options import read_threshold
 from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
@@ -109,16 +110,23 @@ class Unavailable:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Decision:
-    """The probability that the statement holds, and the model's confidence if it gave one."""
+    """The probability that the statement holds, and the model's confidence if it gave one.
+
+    Each is read as a threshold is, as a float from 0 to 1, so that a stored trajectory
+    writes it as a JSON number; anything else raises ConfigurationError.
+    """
 
     probability: float
     confidence: float | None = None
 
     def __post_init__(self) -> None:
-        if not 0 <= self.probability <= 1:
-            raise ConfigurationError("probability must be between 0 and 1")
-        if self.confidence is not None and not 0 <= self.confidence <= 1:
-            raise ConfigurationError("confidence must be between 0 and 1")
+        # The dataclass is frozen, so the floats are set past its guard.
+        object.__setattr__(
+            self, "probability", read_threshold(self.probability, name="probability")
+        )
+        if self.confidence is not None:
+            confidence = read_threshold(self.confidence, name="confidence")
+            object.__setattr__(self, "confidence", confidence)
 
 
 type GenerationOutcome = Generation | Truncated | Refused | Unavailable
