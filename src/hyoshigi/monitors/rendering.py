@@ -2,8 +2,9 @@
 
 Each entry is one element: an observation, or an action's thought, its parts or one of
 its tool calls. Text inside an element is HTML-escaped, so a tool result cannot close a
-tag and pose as another entry. Media the model perceives sits in place among the text;
-other media is its description, tagged with who wrote it, or a placeholder.
+tag and pose as another entry. Text media is its escaped text, and other media the model
+perceives sits in place among the text; the rest is its description, tagged with who wrote
+it, or a placeholder.
 """
 
 import html
@@ -389,11 +390,25 @@ def _render_media(
     perceives: MediaTypes,
     ref: str | None = None,
 ) -> _Content:
-    """Render media as itself if the model perceives it, else its description or a mark.
+    """Render text media as its escaped text, and other media as itself if the model
+    perceives it; otherwise media is its description or a mark.
 
-    The agent's own description is its claim about the media, so the media stays unseen.
-    `ref` numbers media lifted from a tool call's arguments, which has no description.
+    Text media is never passed on, so text by URL or in bytes that are not UTF-8 falls to its
+    description or a mark. `ref` numbers media lifted from a tool call's arguments.
     """
+    if part.media_type.lower().startswith("text/"):
+        text = _decode_text(part.data)
+        if text is None:
+            return _describe_media(
+                part,
+                ref=ref,
+            )
+        return _wrap(
+            "media",
+            content=_escape(text),
+            type=part.media_type,
+            ref=ref,
+        )
     if perceives.covers(part.media_type):
         return _wrap(
             "media",
@@ -401,6 +416,22 @@ def _render_media(
             type=part.media_type,
             ref=ref,
         )
+    return _describe_media(
+        part,
+        ref=ref,
+    )
+
+
+def _describe_media(
+    part: MediaPart,
+    *,
+    ref: str | None,
+) -> _Content:
+    """Render media the model is not given as its description, or else as a mark.
+
+    The agent's own description is its claim about the media, so the media stays unseen.
+    Media lifted from a tool call's arguments has no description.
+    """
     if part.description is not None:
         description = _escape(part.description.text)
         if part.description.author is Author.AGENT:
@@ -420,6 +451,16 @@ def _render_media(
         type=part.media_type,
         ref=ref,
     )
+
+
+def _decode_text(data: bytes | None) -> str | None:
+    """Return bytes as UTF-8 text, or None when there are none or they are not UTF-8."""
+    if data is None:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _render_tool_call(
