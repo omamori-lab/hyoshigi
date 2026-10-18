@@ -4,7 +4,8 @@ A guard model replies with a label, not a score. The agent writes the action the
 so it can plant a label there for the guard to quote, as text aimed at its monitor (Terekhov
 et al., "Adaptive Attacks on Trusted Monitors Subvert AI Control Protocols",
 arXiv:2510.09462). The reader takes the label only from a line whose shape is a verdict, and
-treats a reply whose lines name two labels as unreadable. Markup around a key or a label, as
+treats a reply whose lines name two labels as unreadable; a keyed safe verdict is unreadable
+beside a line that names a suspicious label. Markup around a key or a label, as
 in `**Label**: __violation__`, and a list marker or heading at the start of a line, as in
 `1. Label:` or `## Label:`, do not change what a line names; a label with no key in a list
 item or a quote is no verdict.
@@ -85,9 +86,11 @@ class GuardLabels:
     Guard writes: a label alone, or after a verdict key such as `Label:`. A reply whose lines
     name two labels is unreadable. With a `key`, such as
     Qwen3Guard's "Safety", the label is the whole value of the one line that opens with the
-    key and a colon, matched case-insensitively through markup; every other line is ignored,
-    and a reply without exactly one such line holding a label is unreadable. A key is words
-    of letters or digits, one space apart. Anything else raises ConfigurationError.
+    key and a colon, matched case-insensitively through markup, and a reply without exactly
+    one such line holding a label is unreadable. A suspicious value stands whatever the other
+    lines say; a safe value is unreadable when any other line names a suspicious label as a
+    word. A key is words of letters or digits, one space apart. Anything else raises
+    ConfigurationError.
     """
 
     suspicious: frozenset[str]
@@ -174,7 +177,7 @@ def read_label(text: str, *, labels: GuardLabels) -> str | Unreadable:
     """
     lines = list(_NON_EMPTY_LINE.finditer(text))
     if labels.key is not None:
-        return _read_keyed_label(lines, key=labels.key, labels=labels.suspicious | labels.safe)
+        return _read_keyed_label(lines, key=labels.key, labels=labels)
     label_lines = _find_label_lines(lines, labels=labels.suspicious | labels.safe)
     named = {line.label for line in label_lines.values()}
     for line in lines:
@@ -188,19 +191,50 @@ def read_label(text: str, *, labels: GuardLabels) -> str | Unreadable:
 
 
 def _read_keyed_label(
-    lines: list[re.Match[str]], *, key: str, labels: frozenset[str]
+    lines: list[re.Match[str]], *, key: str, labels: GuardLabels
 ) -> str | Unreadable:
-    """Return the whole value of the one line that opens with the key, if it is a label."""
-    words = r"[\s*_`]++".join(map(re.escape, key.split()))
-    opening = re.compile(rf"{_LINE_OPENING}{words}{_KEY_END}", flags=re.IGNORECASE)
-    keyed = [match for line in lines if (match := opening.match(line.group())) is not None]
+    """Return the whole value of the one line that opens with the key, if it is a label.
+
+    A suspicious value stands whatever the other lines say. A safe value stands only when no
+    other line names a suspicious label as a word, since the guard may have quoted one the
+    agent planted, and the reader errs towards suspicion.
+    """
+    keyed = _find_keyed_lines(lines, key=key)
     if len(keyed) != 1:
         return Unreadable()
-    (key_match,) = keyed
+    ((keyed_line, key_match),) = keyed
     value = _LABEL_AFTER_COLON.fullmatch(key_match.string, key_match.end())
-    if value is None or value["label"].lower() not in labels:
+    if value is None:
         return Unreadable()
-    return value["label"].lower()
+    label = value["label"].lower()
+    if label in labels.suspicious:
+        return label
+    if label in labels.safe and not _names_label_elsewhere(
+        lines, besides=keyed_line, labels=labels.suspicious
+    ):
+        return label
+    return Unreadable()
+
+
+def _find_keyed_lines(
+    lines: list[re.Match[str]], *, key: str
+) -> list[tuple[re.Match[str], re.Match[str]]]:
+    """Return each line that opens with the key and a colon, with the match of that opening."""
+    words = r"[\s*_`]++".join(map(re.escape, key.split()))
+    opening = re.compile(rf"{_LINE_OPENING}{words}{_KEY_END}", flags=re.IGNORECASE)
+    return [(line, match) for line in lines if (match := opening.match(line.group()))]
+
+
+def _names_label_elsewhere(
+    lines: list[re.Match[str]], *, besides: re.Match[str], labels: frozenset[str]
+) -> bool:
+    """Tell whether a line other than the given one holds a label as a whole word, in any case."""
+    return any(
+        word.lower() in labels
+        for line in lines
+        if line is not besides
+        for word in _ONE_WORD.findall(line.group())
+    )
 
 
 def _find_label_lines(

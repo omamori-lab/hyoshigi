@@ -633,27 +633,22 @@ def test_a_reply_without_exactly_one_keyed_line_holding_a_label_is_unreadable(re
         pytest.param(
             "Safety: Safe\nUnsafe",
             id="a label alone on the next line",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             "Unsafe\nSafety: Safe",
             id="a label alone on the line before",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             "Safety: Safe\nCategories: **Controversial**",
             id="a label in bold after another key",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             "Safety: Safe\n__unsafe__",
             id="a label in underscores",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             "Safety: Safe\nThe action looks UNSAFE to me.",
             id="a label in capitals inside prose",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
