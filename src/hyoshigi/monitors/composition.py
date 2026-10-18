@@ -3,8 +3,8 @@
 A wrapper is a monitor itself, of the family of the monitors it holds: a wrapper of Monitors is
 a Monitor, and one of AsyncMonitors an AsyncMonitor. A monitor of the other family raises
 ConfigurationError when the wrapper is built. Wrappers stack around one another. A wrapper
-changes a score's value and passes on the explanation of a wrapped score word for word, so
-the explanation, the only part of a score an agent may see, never states the new value.
+changes a score's value and passes on the explanation of a wrapped score word for word: it
+adds nothing to the explanation, the only part of a score an agent may see.
 
 A score that failed closed has the value 1.0 whatever the wrapper: repeated calls fail closed
 when any call did, a calibrated monitor returns a failed score unranked, and a cascade
