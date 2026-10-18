@@ -19,11 +19,16 @@ except ModuleNotFoundError as error:
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models import responses
 from hyoshigi.models.model import (
+    TEXT_ONLY,
+    AsyncDecisionModel,
     AsyncGenerativeModel,
+    DecisionModel,
+    DecisionOutcome,
     GenerationOutcome,
     GenerativeModel,
     MediaTypes,
     Prompt,
+    Question,
     Refused,
     Unavailable,
     check_name,
@@ -201,3 +206,23 @@ def build_async_model(
         return read_failure(error)
 
     return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
+
+
+def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -> DecisionModel:
+    """A stand-in decision model that refuses every question."""
+
+    def decide(question: Question) -> DecisionOutcome:
+        return Refused(explanation="stub")
+
+    return DecisionModel(name="stub", decide=decide, perceives=TEXT_ONLY)
+
+
+def build_async_decision_model(
+    client: AsyncOpenAI, *, model: str, perceives: MediaTypes
+) -> AsyncDecisionModel:
+    """A stand-in decision model that refuses every question."""
+
+    async def decide(question: Question) -> DecisionOutcome:
+        return Refused(explanation="stub")
+
+    return AsyncDecisionModel(name="stub", decide=decide, perceives=TEXT_ONLY)

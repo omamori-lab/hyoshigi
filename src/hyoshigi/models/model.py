@@ -346,6 +346,18 @@ class DecisionModel:
         check_name(self.name)
 
     @classmethod
+    def from_openai(
+        cls, client: OpenAI, *, model: str, perceives: MediaTypes = TEXT_ONLY
+    ) -> DecisionModel:
+        """A decision model on OpenAI's Decisions API, such as gpt-6-luna, through the caller's
+        client.
+        """
+        # Imported here because the SDK is the optional extra hyoshigi[openai].
+        from hyoshigi.models import openai as provider
+
+        return provider.build_decision_model(client, model=model, perceives=perceives)
+
+    @classmethod
     def from_openrouter(
         cls, client: OpenRouter, *, model: str, perceives: MediaTypes = TEXT_ONLY
     ) -> DecisionModel:
@@ -381,6 +393,16 @@ class AsyncDecisionModel:
 
     def __post_init__(self) -> None:
         check_name(self.name)
+
+    @classmethod
+    def from_openai(
+        cls, client: AsyncOpenAI, *, model: str, perceives: MediaTypes = TEXT_ONLY
+    ) -> AsyncDecisionModel:
+        """A decision model on OpenAI's Decisions API, through the caller's async client."""
+        # Imported here because the SDK is the optional extra hyoshigi[openai].
+        from hyoshigi.models import openai as provider
+
+        return provider.build_async_decision_model(client, model=model, perceives=perceives)
 
     @classmethod
     def from_openrouter(

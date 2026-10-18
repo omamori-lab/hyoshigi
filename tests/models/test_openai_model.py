@@ -1,4 +1,6 @@
-"""OpenAI's Responses API as a model: the request the SDK sends and the outcome of each reply."""
+"""OpenAI's Responses and Decisions APIs as models: the request the SDK sends and the outcome of
+each reply.
+"""
 
 import asyncio
 import json
@@ -13,14 +15,19 @@ from openai import AsyncOpenAI, OpenAI
 from openai.types import ReasoningEffort
 
 from hyoshigi import (
+    AsyncDecisionModel,
     AsyncGenerativeModel,
     ConfigurationError,
+    Decision,
+    DecisionModel,
+    DecisionOutcome,
     Generation,
     GenerationOutcome,
     GenerativeModel,
     MediaPart,
     MediaTypes,
     Prompt,
+    Question,
     Refused,
     TextPart,
     Truncated,
@@ -34,10 +41,10 @@ TEXT_ONLY = MediaTypes()
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Exchange:
-    """What a model returned for a prompt, and the JSON request bodies the SDK sent."""
+    """What a model returned for a prompt or a question, and the JSON request bodies sent."""
 
-    model: GenerativeModel | AsyncGenerativeModel
-    outcome: GenerationOutcome
+    model: GenerativeModel | AsyncGenerativeModel | DecisionModel | AsyncDecisionModel
+    outcome: GenerationOutcome | DecisionOutcome
     requests: list[dict[str, object]]
 
 
@@ -57,7 +64,35 @@ class Ask(Protocol):
     ) -> Exchange: ...
 
 
+class AskDecision(Protocol):
+    """Gives a question to a decision model on a stand-in for OpenAI's API that serves one reply."""
+
+    def __call__(
+        self,
+        reply: httpx2.Response | Exception,
+        question: Question = ...,
+        *,
+        model: str = ...,
+        perceives: MediaTypes = ...,
+        strict_validation: bool = False,
+    ) -> Exchange: ...
+
+
+class AskEither(Protocol):
+    """Gives its default prompt or question to a model of either kind."""
+
+    def __call__(
+        self,
+        reply: httpx2.Response | Exception,
+        *,
+        model: str = ...,
+        strict_validation: bool = False,
+    ) -> Exchange: ...
+
+
 PROMPT = Prompt(system="You are a helpful assistant.", content=(TextPart(text="Hello!"),))
+DECISION_MODEL = "gpt-6-luna"
+QUESTION = Question(statement="The action is safe.", state=(TextPart(text="Run: ls"),))
 
 
 def respond(body: object, *, status: int = 200) -> httpx2.Response:
@@ -136,6 +171,73 @@ def generate_asynchronously(
 
 @pytest.fixture(params=[generate_synchronously, generate_asynchronously], ids=["sync", "async"])
 def ask(request: pytest.FixtureRequest) -> Ask:
+    return request.param
+
+
+def decide_synchronously(
+    reply: httpx2.Response | Exception,
+    question: Question = QUESTION,
+    *,
+    model: str = DECISION_MODEL,
+    perceives: MediaTypes = TEXT_ONLY,
+    strict_validation: bool = False,
+) -> Exchange:
+    requests: list[dict[str, object]] = []
+    client = OpenAI(
+        api_key=API_KEY,
+        max_retries=0,
+        http_client=httpx2.Client(transport=serve(reply, requests)),
+        _strict_response_validation=strict_validation,
+    )
+    built = DecisionModel.from_openai(client, model=model, perceives=perceives)
+    return Exchange(model=built, outcome=built.decide(question), requests=requests)
+
+
+def decide_asynchronously(
+    reply: httpx2.Response | Exception,
+    question: Question = QUESTION,
+    *,
+    model: str = DECISION_MODEL,
+    perceives: MediaTypes = TEXT_ONLY,
+    strict_validation: bool = False,
+) -> Exchange:
+    requests: list[dict[str, object]] = []
+    client = AsyncOpenAI(
+        api_key=API_KEY,
+        max_retries=0,
+        http_client=httpx2.AsyncClient(transport=serve(reply, requests)),
+        _strict_response_validation=strict_validation,
+    )
+    built = AsyncDecisionModel.from_openai(client, model=model, perceives=perceives)
+
+    async def decide() -> DecisionOutcome:
+        return await built.decide(question)
+
+    return Exchange(model=built, outcome=asyncio.run(decide()), requests=requests)
+
+
+NOT_BUILT = pytest.mark.xfail(strict=True, reason="the Decisions adapter is a stub")
+
+
+@pytest.fixture(
+    params=[
+        pytest.param(decide_synchronously, marks=NOT_BUILT, id="sync"),
+        pytest.param(decide_asynchronously, marks=NOT_BUILT, id="async"),
+    ]
+)
+def ask_decision(request: pytest.FixtureRequest) -> AskDecision:
+    return request.param
+
+
+@pytest.fixture(
+    params=[
+        pytest.param(generate_synchronously, id="generative-sync"),
+        pytest.param(generate_asynchronously, id="generative-async"),
+        pytest.param(decide_synchronously, marks=NOT_BUILT, id="decision-sync"),
+        pytest.param(decide_asynchronously, marks=NOT_BUILT, id="decision-async"),
+    ]
+)
+def ask_either(request: pytest.FixtureRequest) -> AskEither:
     return request.param
 
 
@@ -633,9 +735,9 @@ def test_a_prompt_that_cannot_be_encoded_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
-def test_a_model_without_a_model_id_raises_when_it_is_built(ask: Ask) -> None:
+def test_a_model_without_a_model_id_raises_when_it_is_built(ask_either: AskEither) -> None:
     with pytest.raises(ConfigurationError):
-        ask(respond(IMAGE_INPUT_RESPONSE), model="")
+        ask_either(respond(IMAGE_INPUT_RESPONSE), model="")
 
 
 def test_a_completed_reply_is_a_generation_of_its_text(ask: Ask) -> None:
@@ -937,10 +1039,10 @@ def test_a_reply_with_fields_of_the_wrong_type_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
-def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> None:
+def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask_either: AskEither) -> None:
     reply = httpx2.Response(200, text="<html>502 Bad Gateway</html>")
 
-    exchange = ask(reply)
+    exchange = ask_either(reply)
 
     assert exchange.outcome == Unavailable(status=None)
 
@@ -949,17 +1051,19 @@ def test_a_reply_that_is_not_json_is_unavailable_without_a_status(ask: Ask) -> N
 # raises its own error for a reply that does not fit.
 @pytest.mark.parametrize("body", [[], "nope"], ids=["list", "string"])
 def test_a_reply_the_client_rejects_on_validation_is_unavailable_without_a_status(
-    ask: Ask, body: object
+    ask_either: AskEither, body: object
 ) -> None:
-    exchange = ask(respond(body), strict_validation=True)
+    exchange = ask_either(respond(body), strict_validation=True)
 
     assert exchange.outcome == Unavailable(status=None)
 
 
-def test_a_reply_that_is_not_json_on_validation_is_unavailable_without_a_status(ask: Ask) -> None:
+def test_a_reply_that_is_not_json_on_validation_is_unavailable_without_a_status(
+    ask_either: AskEither,
+) -> None:
     reply = httpx2.Response(200, text="<html>502 Bad Gateway</html>")
 
-    exchange = ask(reply, strict_validation=True)
+    exchange = ask_either(reply, strict_validation=True)
 
     assert exchange.outcome == Unavailable(status=None)
 
@@ -970,22 +1074,22 @@ def test_a_reply_that_is_not_json_on_validation_is_unavailable_without_a_status(
     ids=["truncated", "empty", "not-utf-8"],
 )
 def test_a_reply_labelled_json_that_cannot_be_decoded_is_unavailable_without_a_status(
-    ask: Ask, content: bytes
+    ask_either: AskEither, content: bytes
 ) -> None:
     reply = httpx2.Response(200, content=content, headers={"content-type": "application/json"})
 
-    exchange = ask(reply)
+    exchange = ask_either(reply)
 
     assert exchange.outcome == Unavailable(status=None)
 
 
 def test_a_reply_whose_content_encoding_cannot_be_decoded_is_unavailable_without_a_status(
-    ask: Ask,
+    ask_either: AskEither,
 ) -> None:
     headers = {"content-type": "application/json", "content-encoding": "gzip"}
     reply = httpx2.Response(200, headers=headers, stream=httpx2.ByteStream(b"not gzip"))
 
-    exchange = ask(reply)
+    exchange = ask_either(reply)
 
     assert exchange.outcome == Unavailable(status=None)
 
@@ -996,9 +1100,9 @@ def test_a_reply_whose_content_encoding_cannot_be_decoded_is_unavailable_without
     ids=["connection-error", "timeout"],
 )
 def test_a_connection_that_fails_is_unavailable_without_a_status(
-    ask: Ask, failure: Exception
+    ask_either: AskEither, failure: Exception
 ) -> None:
-    exchange = ask(failure)
+    exchange = ask_either(failure)
 
     assert exchange.outcome == Unavailable(status=None)
 
@@ -1021,9 +1125,9 @@ def test_a_connection_that_fails_is_unavailable_without_a_status(
     ],
 )
 def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
-    ask: Ask, status: int, body: dict[str, object]
+    ask_either: AskEither, status: int, body: dict[str, object]
 ) -> None:
-    exchange = ask(respond(body, status=status))
+    exchange = ask_either(respond(body, status=status))
 
     assert exchange.outcome == Unavailable(status=status)
 
@@ -1031,11 +1135,11 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
 # openapi.yaml, schema SessionTurnErrorCodeResource: context_length_exceeded, "The request
 # exceeds the model's context window." The Responses API's own error codes list none.
 def test_an_input_that_exceeds_the_context_window_is_unavailable_with_its_status(
-    ask: Ask,
+    ask_either: AskEither,
 ) -> None:
     body = reject("The request exceeds the model's context window.", code="context_length_exceeded")
 
-    exchange = ask(respond(body, status=400))
+    exchange = ask_either(respond(body, status=400))
 
     assert exchange.outcome == Unavailable(status=400)
 
@@ -1059,10 +1163,12 @@ def test_an_input_that_exceeds_the_context_window_is_unavailable_with_its_status
         "failed_to_download_image",
     ],
 )
-def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(ask: Ask, code: str) -> None:
+def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(
+    ask_either: AskEither, code: str
+) -> None:
     body = reject("The image cannot be used.", code=code)
 
-    exchange = ask(respond(body, status=400))
+    exchange = ask_either(respond(body, status=400))
 
     assert exchange.outcome == Unavailable(status=400)
 
@@ -1076,11 +1182,11 @@ def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(ask: Ask, co
     ],
 )
 def test_an_http_error_whose_code_names_a_refusal_is_a_refusal_without_an_explanation(
-    ask: Ask, code: str
+    ask_either: AskEither, code: str
 ) -> None:
     body = reject("The image was blocked.", code=code)
 
-    exchange = ask(respond(body, status=400))
+    exchange = ask_either(respond(body, status=400))
 
     assert exchange.outcome == Refused(explanation=None)
 
@@ -1098,18 +1204,386 @@ def test_an_http_error_whose_code_names_a_refusal_is_a_refusal_without_an_explan
     ],
 )
 def test_a_rejected_request_raises_naming_only_its_status(
-    ask: Ask, status: int, message: str
+    ask_either: AskEither, status: int, message: str
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
-        ask(respond(reject(message), status=status))
+        ask_either(respond(reject(message), status=status))
 
     assert str(status) in str(raised.value)
     assert message not in str(raised.value)
 
 
-def test_a_rejected_request_does_not_carry_the_providers_error(ask: Ask) -> None:
+def test_a_rejected_request_does_not_carry_the_providers_error(ask_either: AskEither) -> None:
     with pytest.raises(ConfigurationError) as raised:
-        ask(respond(reject("Incorrect API key provided"), status=401))
+        ask_either(respond(reject("Incorrect API key provided"), status=401))
 
     assert raised.value.__cause__ is None
     assert raised.value.__context__ is None
+
+
+# https://developers.openai.com/api/reference/resources/decisions/methods/create, "Create a
+# decision": the example request and its response. The published question is named "damaged"; the
+# one question this adapter asks is not named, since its answer is the only one.
+DAMAGED_INPUT = "The package arrived with a broken screen."
+DAMAGED_STATEMENT = "Does the customer report a damaged item?"
+DAMAGED = Question(statement=DAMAGED_STATEMENT, state=(TextPart(text=DAMAGED_INPUT),))
+DAMAGED_REQUEST: dict[str, object] = {
+    "model": DECISION_MODEL,
+    "input": DAMAGED_INPUT,
+    "questions": [{"type": "predicate", "instructions": DAMAGED_STATEMENT}],
+}
+USAGE: dict[str, object] = {
+    "input_tokens": 42,
+    "input_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0},
+    "output_tokens": 0,
+    "output_tokens_details": {"reasoning_tokens": 0},
+    "total_tokens": 42,
+}
+DAMAGED_RESPONSE: dict[str, object] = {
+    "model": DECISION_MODEL,
+    "answers": [{"type": "predicate", "name": "damaged", "probability": 0.95}],
+    "usage": USAGE,
+}
+
+# https://developers.openai.com/api/docs/guides/decisions, "Check an image for visible damage": a
+# user message of an input_text part and an input_image part holding a base64 data URL, and the
+# guide's response excerpt, which it calls illustrative. The data is the PNG signature.
+INSPECTION = "Inspect the product in this photo."
+DAMAGE_STATEMENT = (
+    "Does the product have visible damage, such as a crack, tear, or dent? "
+    "Ignore shadows and damage to the packaging."
+)
+PHOTO = Question(
+    statement=DAMAGE_STATEMENT,
+    state=(TextPart(text=INSPECTION), MediaPart(media_type="image/png", data=PNG_SIGNATURE)),
+)
+PHOTO_REQUEST: dict[str, object] = {
+    "model": DECISION_MODEL,
+    "input": [
+        {
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": INSPECTION},
+                {"type": "input_image", "image_url": "data:image/png;base64,iVBORw0KGgo="},
+            ],
+        }
+    ],
+    "questions": [{"type": "predicate", "instructions": DAMAGE_STATEMENT}],
+}
+PHOTO_RESPONSE: dict[str, object] = replace(
+    DAMAGED_RESPONSE,
+    answers=[{"type": "predicate", "name": "visible_damage", "probability": 0.92}],
+)
+
+# The same guide's "Select from fixed options" and "Score against a rubric": the response
+# excerpts, whose answers are of the other two types.
+CHOICE_ANSWER: dict[str, object] = {
+    "type": "choice",
+    "name": "department",
+    "choice": "billing",
+    "probabilities": [
+        {"value": "billing", "probability": 0.95},
+        {"value": "technical", "probability": 0.02},
+        {"value": "shipping", "probability": 0.01},
+        {"value": "other", "probability": 0.02},
+    ],
+    "confidence": 0.93,
+}
+SCORE_ANSWER: dict[str, object] = {
+    "type": "score",
+    "name": "severity",
+    "score": 1.1,
+    "probabilities": [
+        {"value": 0, "label": "Cosmetic", "probability": 0.1},
+        {"value": 1, "label": "Workaround available", "probability": 0.7},
+        {"value": 2, "label": "Fully blocked", "probability": 0.2},
+    ],
+    "confidence": 0.55,
+}
+# The reference's schema Refusal is {"name": string or null, "type": "refusal"}; it has no
+# example response of a refusal, so this answer is written from the schema.
+REFUSAL_ANSWER: dict[str, object] = {"type": "refusal", "name": None}
+
+# The reference and the SDK's DecisionInputImageParam say an image is "a base64 data URL or a
+# publicly accessible HTTP(S) image URL"; the guide says images must be inline base64 data URLs.
+# A hosted URL, this one, was accepted live on 2026-10-18 and answered with probability 1.0.
+DICE = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"
+
+
+def test_a_decision_model_is_named_for_the_provider_and_its_model_id(
+    ask_decision: AskDecision,
+) -> None:
+    exchange = ask_decision(respond(DAMAGED_RESPONSE))
+
+    assert exchange.model.name == "openai:gpt-6-luna"
+
+
+@pytest.mark.parametrize(
+    "perceives",
+    [
+        MediaTypes("image/png", "image/jpeg", "image/webp", "image/gif"),
+        MediaTypes("image/png"),
+    ],
+    ids=["every-type-the-api-reads", "one-of-them"],
+)
+def test_a_decision_model_perceives_the_images_it_was_given(
+    ask_decision: AskDecision, perceives: MediaTypes
+) -> None:
+    exchange = ask_decision(respond(DAMAGED_RESPONSE), perceives=perceives)
+
+    assert exchange.model.perceives == perceives
+
+
+# https://developers.openai.com/api/docs/guides/images-vision, "Image input requirements": PNG,
+# JPEG, WEBP and non-animated GIF. The Decisions pages list no types, so a range names types
+# that the API may not read.
+@pytest.mark.parametrize(
+    ("patterns", "named"),
+    [
+        (("image/*",), "image/*"),
+        (("image/svg+xml",), "image/svg+xml"),
+        (("application/pdf",), "application/pdf"),
+        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+    ],
+    ids=[
+        "image-range",
+        "image-type-outside-the-four",
+        "pdf",
+        "the-first-of-those-it-cannot-carry",
+    ],
+)
+def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming_it_when_built(
+    ask_decision: AskDecision, patterns: tuple[str, ...], named: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=re.escape(named)):
+        ask_decision(respond(DAMAGED_RESPONSE), perceives=MediaTypes(*patterns))
+
+
+def test_text_is_sent_as_the_input_with_one_predicate_question(
+    ask_decision: AskDecision,
+) -> None:
+    exchange = ask_decision(respond(DAMAGED_RESPONSE), DAMAGED)
+
+    assert exchange.requests == [DAMAGED_REQUEST]
+
+
+# Adjacent text is one run of text, as the monitor builds a state; so no separator is added.
+def test_text_parts_are_joined_into_the_input_without_a_separator(
+    ask_decision: AskDecision,
+) -> None:
+    question = Question(
+        statement=DAMAGED_STATEMENT,
+        state=(TextPart(text="The package arrived "), TextPart(text="with a broken screen.")),
+    )
+
+    exchange = ask_decision(respond(DAMAGED_RESPONSE), question)
+
+    assert exchange.requests == [DAMAGED_REQUEST]
+
+
+def test_a_state_with_an_image_is_sent_as_one_user_message_of_its_parts_in_order(
+    ask_decision: AskDecision,
+) -> None:
+    exchange = ask_decision(respond(PHOTO_RESPONSE), PHOTO)
+
+    assert exchange.requests == [PHOTO_REQUEST]
+
+
+# RFC 4648, section 10: the base64 of "foobar" is "Zm9vYmFy".
+@pytest.mark.parametrize("media_type", ["image/png", "image/jpeg", "image/webp", "image/gif"])
+def test_each_image_type_the_api_reads_is_sent_as_a_data_url_of_its_type(
+    ask_decision: AskDecision, media_type: str
+) -> None:
+    media = MediaPart(media_type=media_type, data=b"foobar")
+    question = Question(statement=DAMAGE_STATEMENT, state=(media,))
+
+    exchange = ask_decision(respond(PHOTO_RESPONSE), question)
+
+    image_url = f"data:{media_type};base64,Zm9vYmFy"
+    assert [request["input"] for request in exchange.requests] == [
+        [{"role": "user", "content": [{"type": "input_image", "image_url": image_url}]}]
+    ]
+
+
+@pytest.mark.parametrize("media_type", ["image/png", "image/*"])
+def test_an_image_at_a_url_is_sent_as_that_url(ask_decision: AskDecision, media_type: str) -> None:
+    media = MediaPart(media_type=media_type, url=DICE)
+    question = Question(statement="The image shows dice.", state=(media,))
+
+    exchange = ask_decision(respond(PHOTO_RESPONSE), question)
+
+    assert [request["input"] for request in exchange.requests] == [
+        [{"role": "user", "content": [{"type": "input_image", "image_url": DICE}]}]
+    ]
+
+
+# A data URL cannot name the subtype of a range such as image/*.
+def test_image_bytes_of_a_range_are_unavailable_without_a_status_and_nothing_is_sent(
+    ask_decision: AskDecision,
+) -> None:
+    media = MediaPart(media_type="image/*", data=b"foobar")
+    question = Question(statement=DAMAGE_STATEMENT, state=(media,))
+
+    exchange = ask_decision(respond(PHOTO_RESPONSE), question)
+
+    assert (exchange.outcome, exchange.requests) == (Unavailable(status=None), [])
+
+
+@pytest.mark.parametrize(
+    "media",
+    [
+        MediaPart(media_type="application/pdf", data=b"foobar"),
+        MediaPart(media_type="text/plain", url="https://example.com/notes.txt"),
+        MediaPart(media_type="audio/wav", data=b"foobar"),
+    ],
+    ids=["pdf", "text-by-url", "audio"],
+)
+def test_media_that_is_not_an_image_raises_naming_its_media_type(
+    ask_decision: AskDecision, media: MediaPart
+) -> None:
+    question = Question(statement=DAMAGE_STATEMENT, state=(TextPart(text="Look."), media))
+
+    with pytest.raises(ConfigurationError, match=re.escape(media.media_type)):
+        ask_decision(respond(PHOTO_RESPONSE), question)
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        pytest.param((RANGE_BYTES, AUDIO), id="unusable-form-first"),
+        pytest.param((AUDIO, RANGE_BYTES), id="never-carried-first"),
+    ],
+)
+def test_media_the_api_can_never_read_raises_whatever_the_order_of_the_parts(
+    ask_decision: AskDecision, state: tuple[MediaPart, ...]
+) -> None:
+    question = Question(statement=DAMAGE_STATEMENT, state=state)
+
+    with pytest.raises(ConfigurationError, match=re.escape("audio/wav")):
+        ask_decision(respond(PHOTO_RESPONSE), question)
+
+
+# A lone surrogate, as json.loads produces from "a\\ud800b", has no UTF-8 encoding.
+@pytest.mark.parametrize(
+    "question",
+    [
+        Question(statement="a\ud800b", state=(TextPart(text="Run: ls"),)),
+        Question(statement="The action is safe.", state=(TextPart(text="a\ud800b"),)),
+    ],
+    ids=["statement", "text-part"],
+)
+def test_a_question_that_cannot_be_encoded_is_unavailable_without_a_status(
+    ask_decision: AskDecision, question: Question
+) -> None:
+    exchange = ask_decision(respond(DAMAGED_RESPONSE), question)
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+@pytest.mark.parametrize(
+    ("body", "probability"),
+    [(DAMAGED_RESPONSE, 0.95), (PHOTO_RESPONSE, 0.92)],
+    ids=["reference-example", "guide-image-example"],
+)
+def test_a_predicate_answer_is_a_decision_of_its_probability(
+    ask_decision: AskDecision, body: dict[str, object], probability: float
+) -> None:
+    exchange = ask_decision(respond(body))
+
+    assert exchange.outcome == Decision(probability=probability)
+
+
+# JSON writes a probability of exactly 0 or 1 without a fraction, which reads as an integer.
+@pytest.mark.parametrize(("written", "expected"), [(0, 0.0), (1, 1.0), (0.0, 0.0), (1.0, 1.0)])
+def test_a_probability_at_either_end_of_its_range_is_a_decision(
+    ask_decision: AskDecision, written: float, expected: float
+) -> None:
+    answer = {"type": "predicate", "name": "damaged", "probability": written}
+    body = replace(DAMAGED_RESPONSE, answers=[answer])
+
+    exchange = ask_decision(respond(body))
+
+    assert exchange.outcome == Decision(probability=expected)
+
+
+def test_a_refusal_answer_is_a_refusal_without_an_explanation(
+    ask_decision: AskDecision,
+) -> None:
+    body = replace(DAMAGED_RESPONSE, answers=[REFUSAL_ANSWER])
+
+    exchange = ask_decision(respond(body))
+
+    assert exchange.outcome == Refused(explanation=None)
+
+
+@pytest.mark.parametrize("answer", [CHOICE_ANSWER, SCORE_ANSWER], ids=["choice", "score"])
+def test_an_answer_of_another_type_is_unavailable_without_a_status(
+    ask_decision: AskDecision, answer: dict[str, object]
+) -> None:
+    body = replace(DAMAGED_RESPONSE, answers=[answer])
+
+    exchange = ask_decision(respond(body))
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+PREDICATE: dict[str, object] = {"type": "predicate", "name": "damaged", "probability": 0.95}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        [],
+        {"model": DECISION_MODEL, "usage": USAGE},
+        replace(DAMAGED_RESPONSE, answers="nope"),
+        replace(DAMAGED_RESPONSE, answers=[]),
+        replace(DAMAGED_RESPONSE, answers=[PREDICATE, PREDICATE]),
+        replace(DAMAGED_RESPONSE, answers=[REFUSAL_ANSWER, PREDICATE]),
+        replace(DAMAGED_RESPONSE, answers=["nope"]),
+        replace(DAMAGED_RESPONSE, answers=[None]),
+        replace(DAMAGED_RESPONSE, answers=[{"probability": 0.95}]),
+        replace(DAMAGED_RESPONSE, answers=[{"type": "predicate", "name": "damaged"}]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability="0.95")]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability=True)]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability=None)]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability=[0.95])]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability=1.5)]),
+        replace(DAMAGED_RESPONSE, answers=[replace(PREDICATE, probability=-0.1)]),
+    ],
+    ids=[
+        "body-is-not-an-object",
+        "no-answers-field",
+        "answers-is-not-a-list",
+        "no-answer",
+        "two-answers",
+        "refusal-and-answer",
+        "answer-is-a-string",
+        "answer-is-null",
+        "answer-without-a-type",
+        "predicate-without-a-probability",
+        "probability-is-a-string",
+        "probability-is-a-bool",
+        "probability-is-null",
+        "probability-is-a-list",
+        "probability-above-one",
+        "probability-below-zero",
+    ],
+)
+def test_a_reply_that_is_not_one_answer_to_the_question_is_unavailable_without_a_status(
+    ask_decision: AskDecision, body: object
+) -> None:
+    exchange = ask_decision(respond(body))
+
+    assert exchange.outcome == Unavailable(status=None)
+
+
+# Python's json module reads the literal NaN, which JSON does not have.
+def test_a_probability_that_is_not_a_number_is_unavailable_without_a_status(
+    ask_decision: AskDecision,
+) -> None:
+    content = b'{"answers": [{"type": "predicate", "probability": NaN}]}'
+    reply = httpx2.Response(200, content=content, headers={"content-type": "application/json"})
+
+    exchange = ask_decision(reply)
+
+    assert exchange.outcome == Unavailable(status=None)
