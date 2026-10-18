@@ -143,14 +143,12 @@ def test_a_new_trajectory_has_no_ratings(trajectory: Trajectory) -> None:
     assert trajectory.ratings == ()
 
 
-@pytest.mark.xfail(strict=True)
 def test_attaching_a_score_records_a_rating_of_the_action(reading: Trajectory) -> None:
     reading.attach(READS_THE_FILE, to=Action(id="a1", tool_calls=(READ,)))
 
     assert reading.ratings == (Rating(action_id="a1", score=READS_THE_FILE),)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_second_score_of_one_action_is_kept_after_the_first(reading: Trajectory) -> None:
     action = Action(id="a1", tool_calls=(READ,))
     reading.attach(READS_THE_FILE, to=action)
@@ -163,13 +161,11 @@ def test_a_second_score_of_one_action_is_kept_after_the_first(reading: Trajector
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Trajectory) -> None:
     with pytest.raises(ConfigurationError):
         reading.attach(READS_THE_FILE, to=Action(id="a2"))
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> None:
     reading.attach(READS_THE_FILE, to=Action(id="a1", tool_calls=(READ,)))
 
