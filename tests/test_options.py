@@ -10,8 +10,6 @@ import pytest
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.options import describe_option_value, read_count, read_integer, read_threshold
 
-pytestmark = pytest.mark.xfail(strict=True)
-
 HUGE = 10**5000
 
 
