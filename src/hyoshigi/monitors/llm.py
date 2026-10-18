@@ -42,7 +42,7 @@ from hyoshigi.monitors.score import (
     fail_closed,
 )
 from hyoshigi.monitors.view import View
-from hyoshigi.options import check_instance, describe_option_value, read_count, read_integer
+from hyoshigi.options import check_instance, read_count, read_integer
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
 
@@ -121,8 +121,8 @@ def _check_options(monitor: LLMMonitor | AsyncLLMMonitor) -> None:
     """
     check_instance(monitor.view, expected=View, name="view")
     check_instance(monitor.prompt, expected=MonitorPrompt, name="prompt")
-    lowest = _read_scale_end(monitor.lowest_score, name="lowest_score")
-    highest = _read_scale_end(monitor.highest_score, name="highest_score")
+    lowest = read_integer(monitor.lowest_score, name="lowest_score")
+    highest = read_integer(monitor.highest_score, name="highest_score")
     if lowest >= highest:
         raise ConfigurationError(f"lowest_score ({lowest}) must be below highest_score ({highest})")
     retries = read_count(monitor.max_parse_retries, name="max_parse_retries", minimum=0)
@@ -130,19 +130,6 @@ def _check_options(monitor: LLMMonitor | AsyncLLMMonitor) -> None:
     object.__setattr__(monitor, "lowest_score", lowest)
     object.__setattr__(monitor, "highest_score", highest)
     object.__setattr__(monitor, "max_parse_retries", retries)
-
-
-def _read_scale_end(value: object, *, name: str) -> int:
-    """Read an end of the scale as an int that Python can write out, since the prompt shows it."""
-    end = read_integer(value, name=name)
-    try:
-        str(end)
-    except ValueError:
-        # Python refuses to write an integer of more than 4,300 digits, by default.
-        raise ConfigurationError(
-            f"{name} must be an integer Python can write out, got {describe_option_value(end)}"
-        ) from None
-    return end
 
 
 # The cause of an attempt that is asked again.
