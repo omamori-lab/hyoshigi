@@ -1115,9 +1115,9 @@ def describe_plan(
     return "\n".join(lines)
 
 
-def check_writable(path: Path) -> None:
+def check_writable(path: Path | None) -> None:
     """Exit before any model is called when the records could not be written to the path."""
-    if (
+    if path is not None and (
         not path.parent.is_dir()
         or path.is_dir()
         or not os.access(
@@ -1126,6 +1126,38 @@ def check_writable(path: Path) -> None:
         )
     ):
         raise SystemExit(f"--out: cannot write {path}")
+
+
+def finish(
+    records: Sequence[Record],
+    *,
+    setups: Sequence[SetupKind],
+    out: Path | None,
+) -> None:
+    """Print the table and write the records, then exit 1 if a rating raised."""
+    summaries = [
+        summarise(
+            setup.label,
+            records=[record for record in records if record.setup == setup.label],
+        )
+        for setup in setups
+    ]
+    print(render_table(summaries))
+    if out is not None:
+        out.write_text(
+            json.dumps(
+                [dump_record(record) for record in records],
+                indent=2,
+            ),
+        )
+    if any(
+        isinstance(
+            record.outcome,
+            Errored,
+        )
+        for record in records
+    ):
+        raise SystemExit("a rating raised; its record names the error")
 
 
 def read_keys() -> dict[Provider, str]:
@@ -1163,8 +1195,7 @@ def main() -> None:
             ),
         )
         return
-    if arguments.out is not None:
-        check_writable(arguments.out)
+    check_writable(arguments.out)
     jobs = [
         Job(
             setup=setup.label,
@@ -1183,30 +1214,11 @@ def main() -> None:
             arguments.runs + 1,
         )
     ]
-    records = asyncio.run(rate_all(jobs))
-    summaries = [
-        summarise(
-            setup.label,
-            records=[record for record in records if record.setup == setup.label],
-        )
-        for setup in runnable
-    ]
-    print(render_table(summaries))
-    if arguments.out is not None:
-        arguments.out.write_text(
-            json.dumps(
-                [dump_record(record) for record in records],
-                indent=2,
-            ),
-        )
-    if any(
-        isinstance(
-            record.outcome,
-            Errored,
-        )
-        for record in records
-    ):
-        raise SystemExit("a rating raised; its record names the error")
+    finish(
+        asyncio.run(rate_all(jobs)),
+        setups=runnable,
+        out=arguments.out,
+    )
 
 
 if __name__ == "__main__":
