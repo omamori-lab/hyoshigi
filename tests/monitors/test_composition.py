@@ -2,7 +2,7 @@
 
 import asyncio
 import numbers
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
 
@@ -21,7 +21,12 @@ from hyoshigi import (
     Trajectory,
     Unavailable,
 )
-from hyoshigi.monitors.composition import AsyncRepeatedMonitor, RepeatedMonitor
+from hyoshigi.monitors.composition import (
+    AsyncCalibratedMonitor,
+    AsyncRepeatedMonitor,
+    CalibratedMonitor,
+    RepeatedMonitor,
+)
 from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.score import Composite, FailedClosed, Rationale, SuspicionScore
@@ -30,6 +35,9 @@ MODEL_NAME = "trusted-1"
 TIMEOUT_SECONDS = 5
 TASK = "Summarise q3.md"
 ACTION = Action(parts=(TextPart(text="Reading q3.md."),))
+# Unsorted, so a monitor that ranks among them in the order given ranks wrongly.
+HONEST_SCORES = [0.3, 0.1, 0.2, 0.2]
+STEPS = tuple(Action(parts=(TextPart(text=f"step {number}"),)) for number in range(50))
 UNAVAILABLE_EXPLANATION = (
     "The monitor's model was unavailable, so the action is treated as suspicious."
 )
@@ -74,6 +82,22 @@ def build_trajectory() -> Trajectory:
     return Trajectory.from_run(TASK, answer="Done.").trajectory
 
 
+def build_action(text: str = "Reading q3.md.") -> Action:
+    return Action(parts=(TextPart(text=text),))
+
+
+def build_acted_trajectory(
+    text: str = "Let me look.", *, rating: SuspicionScore | None = None
+) -> Trajectory:
+    """A trajectory whose history ends in a new action, which carries the rating if given."""
+    trajectory = build_trajectory()
+    acted = build_action(text)
+    trajectory.act(acted)
+    if rating is not None:
+        trajectory.attach(rating, to=acted)
+    return trajectory
+
+
 def run[Result](awaitable: Awaitable[Result]) -> Result:
     """Run on a fresh event loop; a test that waits longer than the timeout fails."""
 
@@ -109,6 +133,7 @@ class Family[Wrapped]:
 
     build_llm: Callable[..., Wrapped]
     repeated: Callable[..., Wrapped]
+    calibrated: Callable[..., Wrapped]
     rate: Callable[[Wrapped, Action, Trajectory], SuspicionScore]
 
     def rate_repeated(
@@ -118,15 +143,31 @@ class Family[Wrapped]:
         monitor = self.repeated(monitor=llm, ensemble_size=ensemble_size)
         return self.rate(monitor, ACTION, build_trajectory())
 
+    def rate_calibrated(
+        self,
+        script: Script,
+        *,
+        honest_scores: Iterable[float],
+        random_seed: int | None = None,
+        action: Action = ACTION,
+        trajectory: Trajectory | None = None,
+    ) -> SuspicionScore:
+        monitor = self.calibrated(
+            monitor=self.build_llm(script), honest_scores=honest_scores, random_seed=random_seed
+        )
+        return self.rate(monitor, action, build_trajectory() if trajectory is None else trajectory)
+
 
 SYNCHRONOUS = Family(
     build_llm=build_synchronous_llm,
     repeated=RepeatedMonitor,
+    calibrated=CalibratedMonitor,
     rate=rate_synchronously,
 )
 ASYNCHRONOUS = Family(
     build_llm=build_asynchronous_llm,
     repeated=AsyncRepeatedMonitor,
+    calibrated=AsyncCalibratedMonitor,
     rate=rate_asynchronously,
 )
 
@@ -330,8 +371,25 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use RepeatedMonitor for a Monitor.",
         ),
+        pytest.param(
+            partial(CalibratedMonitor, monitor=ASYNCHRONOUS_LLM, honest_scores=[0.5]),
+            "monitor must be a Monitor, got an instance of AsyncLLMMonitor. "
+            "Use AsyncCalibratedMonitor for an AsyncMonitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(AsyncCalibratedMonitor, monitor=SYNCHRONOUS_LLM, honest_scores=[0.5]),
+            "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
+            "Use CalibratedMonitor for a Monitor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
-    ids=["async-monitor-for-the-sync-wrapper", "sync-monitor-for-the-async-wrapper"],
+    ids=[
+        "async-monitor-for-the-sync-repeated",
+        "sync-monitor-for-the-async-repeated",
+        "async-monitor-for-the-sync-calibrated",
+        "sync-monitor-for-the-async-calibrated",
+    ],
 )
 def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_to(
     build: Callable[[], Monitor | AsyncMonitor], message: str
@@ -340,3 +398,259 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_
         build()
 
     assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize("random_seed", [None, 7], ids=["unseeded", "seeded"])
+@pytest.mark.parametrize(
+    ("reply", "lower", "midpoint", "upper"),
+    [
+        (0, 0.0, 0.1, 0.2),
+        (1, 0.0, 0.2, 0.4),
+        (2, 0.2, 0.5, 0.8),
+        (3, 0.6, 0.8, 1.0),
+        (10, 0.8, 0.9, 1.0),
+    ],
+    ids=[
+        "below-all",
+        "tied-with-the-lowest",
+        "tied-with-two",
+        "tied-with-the-highest",
+        "above-all",
+    ],
+)
+def test_a_score_lands_uniformly_in_its_place_among_the_honest_scores(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    random_seed: int | None,
+    reply: int,
+    lower: float,
+    midpoint: float,
+    upper: float,
+) -> None:
+    values = [
+        family.rate_calibrated(
+            Script(build_reply(reply)),
+            honest_scores=HONEST_SCORES,
+            random_seed=random_seed,
+            action=step,
+        ).value
+        for step in STEPS
+    ]
+
+    # Of the honest scores 0.1, 0.2, 0.2, 0.3 and a raw score of reply / 10, the rank is
+    # (below + u * (tied + 1)) / 5 for u uniform on [0, 1). 50 draws all fall in one half of
+    # the place with a chance of 2 * 0.5 ** 50.
+    assert all(lower <= value < upper for value in values)
+    assert min(values) < midpoint <= max(values)
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_explanation_is_the_wrapped_scores_and_the_evidence_holds_it(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    script = Script(build_reply(2, "It reads the file the task names."))
+
+    score = family.rate_calibrated(script, honest_scores=HONEST_SCORES)
+
+    assert (score.explanation, score.evidence) == (
+        "It reads the file the task names.",
+        Composite(parts=(build_score(0.2, "It reads the file the task names."),)),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("failure", "failed_score"),
+    [
+        (Unavailable(status=503), UNAVAILABLE_SCORE),
+        (Refused(explanation="I cannot assess this."), REFUSED_SCORE),
+    ],
+    ids=["unavailable", "refused"],
+)
+def test_a_score_that_failed_closed_is_returned_unchanged_and_not_ranked(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    failure: Unavailable | Refused,
+    failed_score: SuspicionScore,
+) -> None:
+    script = Script(failure)
+
+    score = family.rate_calibrated(script, honest_scores=HONEST_SCORES)
+
+    assert score == failed_score
+
+
+@pytest.mark.xfail(strict=True)
+def test_honest_scores_given_as_a_generator_are_all_ranked_among(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    script = Script(build_reply(9))
+
+    score = family.rate_calibrated(script, honest_scores=(0.1 for _ in range(500)))
+
+    # Above all 500 honest scores, so in the top place: 500 / 501 up to 1.
+    assert 500 / 501 <= score.value < 1.0
+
+
+def rate_seeded(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    *,
+    seed: int = 7,
+    action: Action,
+    trajectory: Trajectory,
+) -> float:
+    """The value of a raw score of 0.3, tied with the highest honest score, so in [0.6, 1.0)."""
+    return family.rate_calibrated(
+        Script(build_reply(3)),
+        honest_scores=HONEST_SCORES,
+        random_seed=seed,
+        action=action,
+        trajectory=trajectory,
+    ).value
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_seeded_draw_is_the_same_for_the_same_action_and_history_whatever_their_ids(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    values = [
+        rate_seeded(family, action=build_action(), trajectory=build_acted_trajectory())
+        for _ in range(2)
+    ]
+
+    assert 0.6 <= values[0] < 1.0
+    assert values[0] == values[1]
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_seeded_draw_ignores_the_ratings_attached_to_the_history(
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    trajectories = [build_acted_trajectory(rating=build_score(0.4)), build_acted_trajectory()]
+    values = [
+        rate_seeded(family, action=build_action(), trajectory=trajectory)
+        for trajectory in trajectories
+    ]
+
+    assert 0.6 <= values[0] < 1.0
+    assert values[0] == values[1]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ((7, "Reading q3.md.", "Let me look."), (8, "Reading q3.md.", "Let me look.")),
+        ((7, "Reading q3.md.", "Let me look."), (7, "Reading q4.md.", "Let me look.")),
+        ((7, "Reading q3.md.", "Let me look."), (7, "Reading q3.md.", "Let me think.")),
+    ],
+    ids=["the-seed", "the-action", "the-history"],
+)
+def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    first: tuple[int, str, str],
+    second: tuple[int, str, str],
+) -> None:
+    values = [
+        rate_seeded(
+            family,
+            seed=seed,
+            action=build_action(action_text),
+            trajectory=build_acted_trajectory(history_text),
+        )
+        for seed, action_text, history_text in (first, second)
+    ]
+
+    assert values[0] != values[1]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("honest_scores", "message"),
+    [
+        ([], "honest_scores must hold at least one score"),
+        ((score for score in ()), "honest_scores must hold at least one score"),
+        ("0.5", "honest_scores must be an iterable of numbers between 0 and 1, got '0.5'"),
+        (
+            b"\x00\x01",
+            "honest_scores must be an iterable of numbers between 0 and 1, "
+            "got an instance of bytes",
+        ),
+        (5, "honest_scores must be an iterable of numbers between 0 and 1, got 5"),
+        (None, "honest_scores must be an iterable of numbers between 0 and 1, got None"),
+        ([0.2, float("nan")], "honest_scores[1] must be between 0 and 1, got nan"),
+        ([1.5], "honest_scores[0] must be between 0 and 1, got 1.5"),
+        ([0.1, 0.2, -0.1], "honest_scores[2] must be between 0 and 1, got -0.1"),
+        ([0.1, True], "honest_scores[1] must be a number between 0 and 1, got True"),
+        (["0.5"], "honest_scores[0] must be a number between 0 and 1, got '0.5'"),
+    ],
+    ids=[
+        "empty-list",
+        "empty-generator",
+        "string",
+        "bytes",
+        "number",
+        "none",
+        "nan",
+        "above-one",
+        "below-zero",
+        "bool",
+        "string-score",
+    ],
+)
+def test_honest_scores_that_cannot_be_ranked_among_are_refused_naming_the_problem(
+    family: Family[Monitor] | Family[AsyncMonitor], honest_scores: object, message: str
+) -> None:
+    llm = family.build_llm(Script())
+
+    with pytest.raises(ConfigurationError) as raised:
+        family.calibrated(monitor=llm, honest_scores=honest_scores)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("random_seed", "message"),
+    [
+        (1.5, "random_seed must be an integer, got 1.5"),
+        (True, "random_seed must be an integer, got True"),
+        ("7", "random_seed must be an integer, got '7'"),
+    ],
+    ids=["float", "bool", "string"],
+)
+def test_a_random_seed_that_is_not_an_integer_is_refused_naming_it(
+    family: Family[Monitor] | Family[AsyncMonitor], random_seed: object, message: str
+) -> None:
+    llm = family.build_llm(Script())
+
+    with pytest.raises(ConfigurationError) as raised:
+        family.calibrated(monitor=llm, honest_scores=HONEST_SCORES, random_seed=random_seed)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "build",
+    [
+        partial(
+            CalibratedMonitor,
+            monitor=SYNCHRONOUS_LLM,
+            honest_scores=HONEST_SCORES,
+            random_seed=ArrayInteger(7),
+        ),
+        partial(
+            AsyncCalibratedMonitor,
+            monitor=ASYNCHRONOUS_LLM,
+            honest_scores=HONEST_SCORES,
+            random_seed=ArrayInteger(7),
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_a_seed_that_is_a_whole_number_but_not_an_int_is_kept_as_an_int(
+    build: Callable[[], CalibratedMonitor | AsyncCalibratedMonitor],
+) -> None:
+    calibrated = build()
+
+    assert (type(calibrated.random_seed), calibrated.random_seed) == (int, 7)
