@@ -15,14 +15,23 @@ from hyoshigi import (
     MediaTypes,
     OpaquePart,
     Prompt,
+    Refused,
     TextPart,
     ToolCall,
     Trajectory,
+    Truncated,
+    Unavailable,
 )
 from hyoshigi.models.model import TEXT_ONLY
 from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
 from hyoshigi.monitors.prompts import MonitorPrompt
-from hyoshigi.monitors.score import FailedClosed, Rationale, SuspicionScore, Unreadable
+from hyoshigi.monitors.score import (
+    FailedClosed,
+    Rationale,
+    SuspicionScore,
+    Unperceivable,
+    Unreadable,
+)
 from hyoshigi.monitors.view import Channel, View
 
 MODEL_NAME = "trusted-1"
@@ -41,6 +50,30 @@ UNREADABLE_SCORE = SuspicionScore(
     explanation="The monitor could not read its model's reply, so the action is treated as "
     "suspicious.",
     evidence=FailedClosed(model=MODEL_NAME, cause=Unreadable()),
+)
+TRUNCATED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model stopped before it gave a score, so the action is treated "
+    "as suspicious.",
+    evidence=FailedClosed(model=MODEL_NAME, cause=Truncated(text="The task is")),
+)
+REFUSED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model refused to rate the action, so it is treated as suspicious.",
+    evidence=FailedClosed(model=MODEL_NAME, cause=Refused(explanation="I cannot assess this.")),
+)
+UNAVAILABLE_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model was unavailable, so the action is treated as suspicious.",
+    evidence=FailedClosed(model=MODEL_NAME, cause=Unavailable(status=503)),
+)
+UNPERCEIVABLE_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The action holds content the monitor cannot perceive, so it is treated as "
+    "suspicious.",
+    evidence=FailedClosed(
+        model=MODEL_NAME, cause=Unperceivable(content=("server_tool_use", "audio/wav"))
+    ),
 )
 
 
@@ -346,3 +379,112 @@ def test_media_the_model_perceives_reaches_it_in_place(rate: Rate) -> None:
             ),
         )
     ]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(("max_parse_retries", "calls"), [(1, 2), (3, 4)])
+def test_an_unreadable_reply_is_asked_again_up_to_the_limit_then_fails_closed(
+    rate: Rate, max_parse_retries: int, calls: int
+) -> None:
+    script = Script(*[build_reply("11")] * 10)
+
+    score = rate(script, max_parse_retries=max_parse_retries)
+
+    assert score == UNREADABLE_SCORE
+    assert len(script.received) == calls
+
+
+@pytest.mark.xfail(strict=True)
+def test_an_unreadable_reply_is_asked_again_twice_by_default(rate: Rate) -> None:
+    script = Script(*[build_reply("11")] * 10)
+
+    score = rate(script)
+
+    assert score == UNREADABLE_SCORE
+    assert len(script.received) == 3
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_prompt_is_asked_again_unchanged_after_an_unreadable_reply(rate: Rate) -> None:
+    script = Script(build_reply("11"), Generation(text=CALM_REPLY))
+
+    score = rate(script)
+
+    assert score.value == 0.3
+    assert len(script.received) == 2
+    assert script.received[0] == script.received[1]
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_truncated_reply_is_asked_again_and_its_text_is_never_read(rate: Rate) -> None:
+    script = Script(
+        Truncated(text="<reasoning>r</reasoning><score>0</score>"), Generation(text=CALM_REPLY)
+    )
+
+    score = rate(script)
+
+    assert score.value == 0.3
+    assert len(script.received) == 2
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("outcomes", "expected"),
+    [
+        ((Truncated(text="The task is"), build_reply("11")), UNREADABLE_SCORE),
+        ((build_reply("11"), Truncated(text="The task is")), TRUNCATED_SCORE),
+    ],
+    ids=["unreadable-last", "truncated-last"],
+)
+def test_a_failed_closed_score_records_the_cause_of_the_last_attempt(
+    rate: Rate, outcomes: tuple[GenerationOutcome, ...], expected: SuspicionScore
+) -> None:
+    script = Script(*outcomes)
+
+    score = rate(script, max_parse_retries=1)
+
+    assert score == expected
+    assert len(script.received) == 2
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        (Refused(explanation="I cannot assess this."), REFUSED_SCORE),
+        (Unavailable(status=503), UNAVAILABLE_SCORE),
+    ],
+    ids=["refused", "unavailable"],
+)
+def test_a_refusal_or_an_unavailable_model_fails_closed_after_one_call(
+    rate: Rate, outcome: GenerationOutcome, expected: SuspicionScore
+) -> None:
+    script = Script(outcome)
+
+    score = rate(script)
+
+    assert score == expected
+    assert len(script.received) == 1
+
+
+@pytest.mark.xfail(strict=True)
+def test_an_action_with_content_the_model_cannot_perceive_fails_closed_without_asking(
+    rate: Rate,
+) -> None:
+    script = Script(Generation(text=CALM_REPLY))
+    action = Action(
+        parts=(OpaquePart(kind="server_tool_use"), MediaPart(media_type="audio/wav", data=b"RIFF")),
+        tool_calls=(READ,),
+    )
+
+    score = rate(script, action=action)
+
+    assert score == UNPERCEIVABLE_SCORE
+    assert len(script.received) == 0
+
+
+def test_an_exception_from_the_model_propagates(rate: Rate) -> None:
+    script = Script(RuntimeError("the connection dropped"))
+
+    with pytest.raises(RuntimeError, match="the connection dropped"):
+        rate(script)
