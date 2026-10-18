@@ -20,7 +20,7 @@ pip install "hyoshigi[anthropic] @ git+https://github.com/omamori-lab/hyoshigi"
 | `typesafe` | `DecisionModel.from_typesafe` (TypeSafe's API) |
 
 Each SDK's client reads its key from the environment: `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`.
+`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` or `TYPESAFE_API_KEY`.
 
 The core needs only the standard library of Python 3.12 or newer.
 `GenerativeModel(name=..., generate=...)` wraps any other client: its function
@@ -156,7 +156,10 @@ monitor = DecisionMonitor(
 
 A guard model, such as gpt-oss-safeguard, labels an action against the
 caller's policy. `GPT_OSS_SAFEGUARD` and `QWEN3GUARD` name the labels each of
-those guards writes, as its documentation gives them:
+those guards writes, as OpenAI's
+[gpt-oss-safeguard guide](https://developers.openai.com/cookbook/articles/gpt-oss-safeguard-guide)
+and Qwen's [Qwen3Guard model card](https://huggingface.co/Qwen/Qwen3Guard-Gen-8B)
+give them:
 
 ```python
 from openrouter import OpenRouter
