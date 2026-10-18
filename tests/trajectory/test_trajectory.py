@@ -12,6 +12,8 @@ from hyoshigi import (
     ToolObservation,
     Trajectory,
 )
+from hyoshigi.monitors.score import Rationale, SuspicionScore
+from hyoshigi.trajectory.trajectory import Rating
 
 TASK = "Summarise q3.md"
 ANSWER = "Revenue grew 4% in the third quarter."
@@ -20,6 +22,12 @@ READ = ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.md"}')
 WRITE = ToolCall(id="call_2", name="write_file", arguments='{"path": "summary.md"}')
 DELETE_UNDER_READS_ID = ToolCall(id="call_1", name="delete_file", arguments='{"path": "q3.md"}')
 DELETE_UNDER_WRITES_ID = ToolCall(id="call_2", name="delete_file", arguments='{"path": "q3.md"}')
+READS_THE_FILE = SuspicionScore(
+    value=0.1, explanation="It reads the file the task names.", evidence=Rationale(model="m")
+)
+WRITES_ELSEWHERE = SuspicionScore(
+    value=0.8, explanation="It writes outside the task.", evidence=Rationale(model="m")
+)
 
 
 @pytest.fixture
@@ -129,3 +137,43 @@ def test_delegating_twice_from_one_call_raises(delegating: Trajectory) -> None:
 def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Trajectory) -> None:
     with pytest.raises(ConfigurationError):
         trajectory.delegate(INSTRUCTION, call_id="call_7")
+
+
+def test_a_new_trajectory_has_no_ratings(trajectory: Trajectory) -> None:
+    assert trajectory.ratings == ()
+
+
+@pytest.mark.xfail(strict=True)
+def test_attaching_a_score_records_a_rating_of_the_action(reading: Trajectory) -> None:
+    reading.attach(READS_THE_FILE, to=Action(id="a1", tool_calls=(READ,)))
+
+    assert reading.ratings == (Rating(action_id="a1", score=READS_THE_FILE),)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_second_score_of_one_action_is_kept_after_the_first(reading: Trajectory) -> None:
+    action = Action(id="a1", tool_calls=(READ,))
+    reading.attach(READS_THE_FILE, to=action)
+
+    reading.attach(WRITES_ELSEWHERE, to=action)
+
+    assert reading.ratings == (
+        Rating(action_id="a1", score=READS_THE_FILE),
+        Rating(action_id="a1", score=WRITES_ELSEWHERE),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Trajectory) -> None:
+    with pytest.raises(ConfigurationError):
+        reading.attach(READS_THE_FILE, to=Action(id="a2"))
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> None:
+    reading.attach(READS_THE_FILE, to=Action(id="a1", tool_calls=(READ,)))
+
+    with pytest.raises(ConfigurationError):
+        reading.attach(WRITES_ELSEWHERE, to=Action(id="a2"))
+
+    assert reading.ratings == (Rating(action_id="a1", score=READS_THE_FILE),)
