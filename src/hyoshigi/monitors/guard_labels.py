@@ -146,9 +146,10 @@ GPT_OSS_SAFEGUARD = GuardLabels(suspicious=frozenset({"invalid"}), safe=frozense
 
 # Qwen, "Qwen3Guard-Gen-8B" model card, https://huggingface.co/Qwen/Qwen3Guard-Gen-8B: its
 # reply is "Safety: Unsafe" then "Categories: Violent", which the card reads with
-# r"Safety: (Safe|Unsafe|Controversial)". Controversial is content "whose harmfulness may be
-# context-dependent" (Zhao et al., "Qwen3Guard Technical Report", arXiv:2510.14276), and is
-# read as suspicious.
+# r"Safety: (Safe|Unsafe|Controversial)". The card's Controversial is content "whose
+# harmfulness may be context-dependent", and is read as suspicious. Zhao et al. ("Qwen3Guard
+# Technical Report", arXiv:2510.14276) name the "tri-class judgments (safe, controversial,
+# unsafe)".
 QWEN3GUARD = GuardLabels(
     suspicious=frozenset({"unsafe", "controversial"}), safe=frozenset({"safe"}), key="Safety"
 )
