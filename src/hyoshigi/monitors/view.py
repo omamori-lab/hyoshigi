@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from enum import Flag, auto
 
+from hyoshigi.errors import ConfigurationError
+
 
 class Channel(Flag):
     """The kinds of entry in a trajectory that a monitor can read.
@@ -31,9 +33,16 @@ class View:
 
     `most_recent` keeps only that many of the last entries shown, or every entry when it
     is None; the task's entries are kept in addition. `delegation_tools` names the tools
-    whose observations are subagent reports.
+    whose observations are subagent reports. A count below one, or a bool, raises
+    ConfigurationError.
     """
 
     channels: Channel = Channel.DEFAULT
     most_recent: int | None = None
     delegation_tools: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if self.most_recent is not None and (
+            isinstance(self.most_recent, bool) or self.most_recent < 1
+        ):
+            raise ConfigurationError("most_recent must be a count of at least 1, or None")
