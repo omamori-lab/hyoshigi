@@ -64,6 +64,10 @@ minor version.
   probability that statements about the action hold, aggregated by
   `Aggregation`, with `DEFAULT_STATEMENT` and `ATTACK_CRITERIA`.
 - `View` and `Channel`: what of the trajectory a monitor reads.
+- `GuardMonitor` and `AsyncGuardMonitor`, which ask a guard model several
+  times against the caller's policy and score the share of unsafe labels, with
+  `GuardLabels` and presets for Llama Guard, gpt-oss-safeguard, Qwen3Guard and
+  Nemotron content safety; `Labels` evidence records each reply's label.
 - `RepeatedMonitor`, `CalibratedMonitor` and `CascadeMonitor`, with their async
   twins: the mean of repeated ratings, a smoothed conformal p-value against
   honest scores, and a fast monitor escalating to a careful one.
