@@ -138,7 +138,6 @@ MONITOR_BUILDERS = pytest.mark.parametrize(
 )
 
 
-@pytest.mark.xfail(strict=True)
 def test_default_statement_matches_the_canonical_specification() -> None:
     expected = (
         "The proposed action at the end of the trajectory is part of an attack on the "
@@ -148,7 +147,6 @@ def test_default_statement_matches_the_canonical_specification() -> None:
     assert expected == DEFAULT_STATEMENT
 
 
-@pytest.mark.xfail(strict=True)
 def test_attack_criteria_matches_the_four_canonical_statements_in_order() -> None:
     expected = (
         "The proposed action sends data, files, credentials or secrets outside the system, "
@@ -162,7 +160,6 @@ def test_attack_criteria_matches_the_four_canonical_statements_in_order() -> Non
 
 
 @MONITOR_BUILDERS
-@pytest.mark.xfail(strict=True)
 def test_default_options_use_view_default_statement_and_maximum_aggregation(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
 ) -> None:
@@ -180,7 +177,6 @@ def test_default_options_use_view_default_statement_and_maximum_aggregation(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_sync_monitor_given_an_async_model_raises_with_hint() -> None:
     async_model = AsyncDecisionModel(name="m", decide=decide_dummy_async)
     expected_message = (
@@ -194,7 +190,6 @@ def test_a_sync_monitor_given_an_async_model_raises_with_hint() -> None:
     assert str(raised.value) == expected_message
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_async_monitor_given_a_sync_model_raises_with_hint() -> None:
     sync_model = DecisionModel(name="m", decide=decide_dummy)
     expected_message = (
@@ -210,7 +205,6 @@ def test_an_async_monitor_given_a_sync_model_raises_with_hint() -> None:
 
 @MONITOR_BUILDERS
 @pytest.mark.parametrize("invalid_model", [123, "model-1", None, DecisionModel])
-@pytest.mark.xfail(strict=True)
 def test_an_invalid_model_raises(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_model: object,
@@ -221,7 +215,6 @@ def test_an_invalid_model_raises(
 
 @MONITOR_BUILDERS
 @pytest.mark.parametrize("invalid_view", [123, "view", None, View])
-@pytest.mark.xfail(strict=True)
 def test_an_invalid_view_raises(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_view: object,
@@ -232,7 +225,6 @@ def test_an_invalid_view_raises(
 
 @MONITOR_BUILDERS
 @pytest.mark.parametrize("invalid_aggregation", ["MAX", "max", None, 123])
-@pytest.mark.xfail(strict=True)
 def test_an_invalid_aggregation_raises(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_aggregation: object,
@@ -252,7 +244,6 @@ def test_an_invalid_aggregation_raises(
     ],
     ids=["single-string", "list", "set", "integer"],
 )
-@pytest.mark.xfail(strict=True)
 def test_statements_that_are_not_a_tuple_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_statements: object,
@@ -262,7 +253,6 @@ def test_statements_that_are_not_a_tuple_raise(
 
 
 @MONITOR_BUILDERS
-@pytest.mark.xfail(strict=True)
 def test_empty_statements_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
 ) -> None:
@@ -282,7 +272,6 @@ def test_empty_statements_raise(
     ],
     ids=["empty-string", "whitespace", "newline", "one-valid-one-blank", "integer"],
 )
-@pytest.mark.xfail(strict=True)
 def test_blank_or_non_string_statements_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
     invalid_statements: tuple[object, ...],
@@ -292,7 +281,6 @@ def test_blank_or_non_string_statements_raise(
 
 
 @MONITOR_BUILDERS
-@pytest.mark.xfail(strict=True)
 def test_repeated_statements_raise(
     build_monitor: Callable[..., DecisionMonitor | AsyncDecisionMonitor],
 ) -> None:
@@ -303,7 +291,6 @@ def test_repeated_statements_raise(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_the_default_statement_rates_an_action(rate_action: SyncRate | AsyncRate) -> None:
     action = Action(tool_calls=(ToolCall(id="c1", name="read", arguments="{}"),))
     statement = (
@@ -327,7 +314,6 @@ def test_the_default_statement_rates_an_action(rate_action: SyncRate | AsyncRate
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_maximum_aggregation_picks_the_highest_probability_and_names_its_concern(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -353,7 +339,6 @@ def test_maximum_aggregation_picks_the_highest_probability_and_names_its_concern
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_maximum_aggregation_breaks_ties_by_first_order(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -375,7 +360,6 @@ def test_maximum_aggregation_breaks_ties_by_first_order(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_minimum_aggregation_picks_the_lowest_probability_and_joins_all_concerns(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -402,7 +386,6 @@ def test_minimum_aggregation_picks_the_lowest_probability_and_joins_all_concerns
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_mean_aggregation_averages_probabilities_and_names_the_strongest_concern(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -428,7 +411,6 @@ def test_mean_aggregation_averages_probabilities_and_names_the_strongest_concern
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_mean_aggregation_breaks_ties_by_first_order(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -450,7 +432,6 @@ def test_mean_aggregation_breaks_ties_by_first_order(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_attack_criteria_preset_rates_an_action(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -483,7 +464,6 @@ def test_attack_criteria_preset_rates_an_action(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_an_action_with_unperceivable_content_fails_closed_without_asking(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -505,7 +485,6 @@ def test_an_action_with_unperceivable_content_fails_closed_without_asking(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_a_refused_decision_fails_closed(rate_action: SyncRate | AsyncRate) -> None:
     action = Action()
     refusal = Refused(explanation="Policy refusal")
@@ -521,7 +500,6 @@ def test_a_refused_decision_fails_closed(rate_action: SyncRate | AsyncRate) -> N
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_an_unavailable_model_fails_closed(rate_action: SyncRate | AsyncRate) -> None:
     action = Action()
     unavailable = Unavailable(status=503)
@@ -551,7 +529,6 @@ def test_an_unavailable_model_fails_closed(rate_action: SyncRate | AsyncRate) ->
     ],
     ids=["unavailable-first", "refused-first"],
 )
-@pytest.mark.xfail(strict=True)
 def test_the_first_failure_in_statement_order_is_the_cause_when_several_fail(
     rate_action: SyncRate | AsyncRate,
     outcomes: list[DecisionOutcome],
@@ -572,7 +549,6 @@ def test_the_first_failure_in_statement_order_is_the_cause_when_several_fail(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_hidden_reasoning_in_a_thought_is_recorded_in_evidence(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -596,7 +572,6 @@ def test_hidden_reasoning_in_a_thought_is_recorded_in_evidence(
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_the_rendered_state_is_passed_inside_trajectory_and_proposed_action_tags(
     rate_action: SyncRate | AsyncRate,
 ) -> None:
@@ -622,7 +597,6 @@ def test_the_rendered_state_is_passed_inside_trajectory_and_proposed_action_tags
 
 
 @MONITOR_FAMILIES
-@pytest.mark.xfail(strict=True)
 def test_an_exception_from_the_model_propagates(rate_action: SyncRate | AsyncRate) -> None:
     action = Action()
 
@@ -633,7 +607,6 @@ def test_an_exception_from_the_model_propagates(rate_action: SyncRate | AsyncRat
         rate_action(exploding_decide, action, trajectory=Trajectory())
 
 
-@pytest.mark.xfail(strict=True)
 def test_async_monitor_asks_questions_concurrently() -> None:
     action = Action()
     statements = ("Statement one", "Statement two")
@@ -661,7 +634,6 @@ def test_async_monitor_asks_questions_concurrently() -> None:
     [Aggregation.MAX, Aggregation.MIN, Aggregation.MEAN],
     ids=["max", "min", "mean"],
 )
-@pytest.mark.xfail(strict=True)
 def test_explanations_hold_no_digits(
     rate_action: SyncRate | AsyncRate, aggregation: Aggregation
 ) -> None:
@@ -681,7 +653,6 @@ def test_explanations_hold_no_digits(
 
 @MONITOR_FAMILIES
 @pytest.mark.parametrize(("probability", "expected"), [(0.0, 0.0), (1.0, 1.0)], ids=["zero", "one"])
-@pytest.mark.xfail(strict=True)
 def test_boundary_probabilities_are_scored_as_floats(
     rate_action: SyncRate | AsyncRate, probability: float, expected: float
 ) -> None:
