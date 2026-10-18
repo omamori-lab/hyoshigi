@@ -19,9 +19,18 @@ from hyoshigi.trajectory.history import Action, Observation, ToolCall, ToolObser
 from hyoshigi.trajectory.parts import MEDIA_TYPE, Author, MediaPart, OpaquePart, Part, TextPart
 from hyoshigi.trajectory.trajectory import Trajectory
 
-# A JSON string that is a whole data URL of base64 data (RFC 2397, section 3). It is
-# matched in the raw arguments, so arguments that are not valid JSON are read too.
-_DATA_URL = re.compile(f'"data:(?P<media_type>{MEDIA_TYPE.pattern});base64,(?P<data>[^"]*)"')
+# RFC 2045, section 5.1: a parameter is an attribute and a value joined by =, each one or
+# more US-ASCII characters except SPACE, controls and the tspecials ( ) < > @ , ; : \ " / [ ] ? =
+_PARAMETER_CHARACTER = r"[!#$%&'*+.^_`{|}~0-9A-Za-z-]"
+_PARAMETER = f";{_PARAMETER_CHARACTER}+={_PARAMETER_CHARACTER}+"
+# A JSON string that is a whole data URL of base64 data (RFC 2397, section 3): a media
+# type, parameters, then ;base64. The scheme is case-insensitive (RFC 3986, section 3.1),
+# as are the parameter names (RFC 2045, section 5.1), and so ;base64. The URL is matched
+# in the raw arguments, so arguments that are not valid JSON are read too.
+_DATA_URL = re.compile(
+    f'"data:(?P<media_type>{MEDIA_TYPE.pattern})(?:{_PARAMETER})*;base64,(?P<data>[^"]*)"',
+    re.ASCII | re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

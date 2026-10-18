@@ -55,9 +55,6 @@ LIFTED_PNG_UPLOAD = (
     '<tool_call id="c2" name="upload">{"image": "[media 1]"}'
     '<omitted_media type="image/png" ref="1"/></tool_call>'
 )
-PARAMETERS_AND_CASE_NOT_READ = pytest.mark.xfail(
-    strict=True, reason="the data URL pattern reads only data:type/subtype;base64,"
-)
 
 
 def render_history(
@@ -370,26 +367,13 @@ def test_media_in_tool_call_arguments_is_lifted_after_them(
             '<tool_call id="c2" name="upload">'
             '{"image": "data:image/png;base64;name=a.png,iVBORw0KGgo="}</tool_call>',
         ),
-        pytest.param(
-            '{"image": "data:image/png;name=a.png;base64,iVBORw0KGgo="}',
-            LIFTED_PNG_UPLOAD,
-            marks=PARAMETERS_AND_CASE_NOT_READ,
-        ),
-        pytest.param(
+        ('{"image": "data:image/png;name=a.png;base64,iVBORw0KGgo="}', LIFTED_PNG_UPLOAD),
+        (
             '{"image": "data:image/png;charset=binary;name=a%20b.png;base64,iVBORw0KGgo="}',
             LIFTED_PNG_UPLOAD,
-            marks=PARAMETERS_AND_CASE_NOT_READ,
         ),
-        pytest.param(
-            '{"image": "DATA:image/png;base64,iVBORw0KGgo="}',
-            LIFTED_PNG_UPLOAD,
-            marks=PARAMETERS_AND_CASE_NOT_READ,
-        ),
-        pytest.param(
-            '{"image": "data:image/png;BASE64,iVBORw0KGgo="}',
-            LIFTED_PNG_UPLOAD,
-            marks=PARAMETERS_AND_CASE_NOT_READ,
-        ),
+        ('{"image": "DATA:image/png;base64,iVBORw0KGgo="}', LIFTED_PNG_UPLOAD),
+        ('{"image": "data:image/png;BASE64,iVBORw0KGgo="}', LIFTED_PNG_UPLOAD),
     ],
     ids=[
         "numbered-in-order",
