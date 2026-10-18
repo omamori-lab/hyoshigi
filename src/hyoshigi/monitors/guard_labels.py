@@ -205,7 +205,7 @@ def _read_keyed_label(
     lines: list[re.Match[str]], *, key: str, labels: frozenset[str]
 ) -> str | Unreadable:
     """Return the whole value of the one line that opens with the key, if it is a label."""
-    words = r"[\s*_`]++".join(map(re.escape, key.split(" ")))
+    words = r"[\s*_`]++".join(map(re.escape, key.split()))
     opening = re.compile(rf"{_LINE_OPENING}{words}{_KEY_END}", flags=re.IGNORECASE)
     keyed = [match for line in lines if (match := opening.match(line.group())) is not None]
     if len(keyed) != 1:
