@@ -114,7 +114,6 @@ def test_an_integer_is_any_whole_number(value: object, expected: int) -> None:
     assert (integer, type(integer)) == (expected, int)
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_integer_python_cannot_write_out_raises() -> None:
     with pytest.raises(ConfigurationError) as raised:
         read_integer(HUGE, name="random_seed")

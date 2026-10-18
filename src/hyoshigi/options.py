@@ -54,11 +54,20 @@ def read_integer(value: object, *, name: str) -> int:
     """Return an integer option as an int.
 
     Any whole number counts, negative ones and numpy's integers included; a bool, a float
-    such as 2.0 or a string raises ConfigurationError.
+    such as 2.0, a string, or an integer too long for Python to write out raises
+    ConfigurationError, since an integer option is written into a prompt or a seed.
     """
     if not is_whole_number(value):
         raise ConfigurationError(f"{name} must be an integer, got {describe_option_value(value)}")
-    return operator.index(value)
+    integer = operator.index(value)
+    try:
+        str(integer)
+    except ValueError:
+        # Python refuses to write an integer of more than 4,300 digits, by default.
+        raise ConfigurationError(
+            f"{name} must be an integer Python can write out, got {describe_option_value(integer)}"
+        ) from None
+    return integer
 
 
 def read_count(value: object, *, name: str, minimum: int) -> int:
