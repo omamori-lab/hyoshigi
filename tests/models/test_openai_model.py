@@ -216,15 +216,7 @@ def decide_asynchronously(
     return Exchange(model=built, outcome=asyncio.run(decide()), requests=requests)
 
 
-NOT_BUILT = pytest.mark.xfail(strict=True, reason="the Decisions adapter is a stub")
-
-
-@pytest.fixture(
-    params=[
-        pytest.param(decide_synchronously, marks=NOT_BUILT, id="sync"),
-        pytest.param(decide_asynchronously, marks=NOT_BUILT, id="async"),
-    ]
-)
+@pytest.fixture(params=[decide_synchronously, decide_asynchronously], ids=["sync", "async"])
 def ask_decision(request: pytest.FixtureRequest) -> AskDecision:
     return request.param
 
@@ -233,8 +225,8 @@ def ask_decision(request: pytest.FixtureRequest) -> AskDecision:
     params=[
         pytest.param(generate_synchronously, id="generative-sync"),
         pytest.param(generate_asynchronously, id="generative-async"),
-        pytest.param(decide_synchronously, marks=NOT_BUILT, id="decision-sync"),
-        pytest.param(decide_asynchronously, marks=NOT_BUILT, id="decision-async"),
+        pytest.param(decide_synchronously, id="decision-sync"),
+        pytest.param(decide_asynchronously, id="decision-async"),
     ]
 )
 def ask_either(request: pytest.FixtureRequest) -> AskEither:
