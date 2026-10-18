@@ -1,6 +1,9 @@
 """The LLM monitor: the prompt it asks, how it reads the reply, and what it records."""
 
 import asyncio
+import numbers
+from collections.abc import Callable
+from functools import partial
 from typing import Protocol, TypedDict, Unpack
 
 import pytest
@@ -8,6 +11,7 @@ import pytest
 from hyoshigi import (
     Action,
     AsyncGenerativeModel,
+    ConfigurationError,
     Generation,
     GenerationOutcome,
     GenerativeModel,
@@ -481,3 +485,152 @@ def test_an_exception_from_the_model_propagates(rate: Rate) -> None:
 
     with pytest.raises(RuntimeError, match="the connection dropped"):
         rate(script)
+
+
+class ArrayInteger:
+    """Stands in for numpy's integers: registered as integral, but not a subclass of int."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def __index__(self) -> int:
+        return self.value
+
+
+numbers.Integral.register(ArrayInteger)
+
+
+def build_refusal(prompt: Prompt) -> GenerationOutcome:
+    return Refused()
+
+
+async def build_refusal_asynchronously(prompt: Prompt) -> GenerationOutcome:
+    return Refused()
+
+
+SYNC_MODEL = GenerativeModel(name=MODEL_NAME, generate=build_refusal)
+ASYNC_MODEL = AsyncGenerativeModel(name=MODEL_NAME, generate=build_refusal_asynchronously)
+
+
+def build_with(
+    monitor_class: type[LLMMonitor] | type[AsyncLLMMonitor], model: object, **options: object
+) -> LLMMonitor | AsyncLLMMonitor:
+    """Build a monitor from arguments of any type, which the constructor must check."""
+    return monitor_class(model=model, **options)  # ty: ignore[invalid-argument-type]
+
+
+@pytest.fixture(
+    params=[(LLMMonitor, SYNC_MODEL), (AsyncLLMMonitor, ASYNC_MODEL)], ids=["sync", "async"]
+)
+def build(request: pytest.FixtureRequest) -> Callable[..., LLMMonitor | AsyncLLMMonitor]:
+    monitor_class, model = request.param
+    return partial(build_with, monitor_class, model)
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("monitor_class", "model", "message"),
+    [
+        (
+            LLMMonitor,
+            ASYNC_MODEL,
+            "model must be a GenerativeModel, got an instance of AsyncGenerativeModel. "
+            "Use AsyncLLMMonitor for an AsyncGenerativeModel.",
+        ),
+        (
+            AsyncLLMMonitor,
+            SYNC_MODEL,
+            "model must be an AsyncGenerativeModel, got an instance of GenerativeModel. "
+            "Use LLMMonitor for a GenerativeModel.",
+        ),
+    ],
+    ids=["async-model-for-the-sync-monitor", "sync-model-for-the-async-monitor"],
+)
+def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to(
+    monitor_class: type[LLMMonitor] | type[AsyncLLMMonitor], model: object, message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        build_with(monitor_class, model)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"view": View}, "view must be a View, got the class View; pass an instance"),
+        ({"view": "all"}, "view must be a View, got 'all'"),
+        ({"prompt": "Rate it."}, "prompt must be a MonitorPrompt, got 'Rate it.'"),
+        ({"lowest_score": 2.5}, "lowest_score must be an integer, got 2.5"),
+        ({"lowest_score": None}, "lowest_score must be an integer, got None"),
+        ({"highest_score": True}, "highest_score must be an integer, got True"),
+        ({"highest_score": "10"}, "highest_score must be an integer, got '10'"),
+        (
+            {"lowest_score": 5, "highest_score": 5},
+            "lowest_score (5) must be below highest_score (5)",
+        ),
+        (
+            {"lowest_score": 10, "highest_score": 0},
+            "lowest_score (10) must be below highest_score (0)",
+        ),
+        (
+            {"lowest_score": -(10**5000)},
+            "lowest_score must be an integer Python can write out, "
+            "got an integer too long to write out",
+        ),
+        (
+            {"highest_score": 10**5000},
+            "highest_score must be an integer Python can write out, "
+            "got an integer too long to write out",
+        ),
+        ({"max_parse_retries": -1}, "max_parse_retries must be at least 0, got -1"),
+        (
+            {"max_parse_retries": 1.5},
+            "max_parse_retries must be a whole number of at least 0, got 1.5",
+        ),
+        (
+            {"max_parse_retries": True},
+            "max_parse_retries must be a whole number of at least 0, got True",
+        ),
+    ],
+    ids=[
+        "view-class",
+        "view-string",
+        "prompt-string",
+        "lowest-float",
+        "lowest-none",
+        "highest-bool",
+        "highest-string",
+        "scale-of-one-point",
+        "scale-reversed",
+        "lowest-too-long",
+        "highest-too-long",
+        "retries-negative",
+        "retries-float",
+        "retries-bool",
+    ],
+)
+def test_an_option_that_cannot_work_is_refused_naming_it(
+    build: Callable[..., LLMMonitor | AsyncLLMMonitor], options: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        build(**options)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+def test_whole_numbers_that_are_not_ints_are_kept_as_ints(
+    build: Callable[..., LLMMonitor | AsyncLLMMonitor],
+) -> None:
+    monitor = build(
+        lowest_score=ArrayInteger(-2),
+        highest_score=ArrayInteger(2),
+        max_parse_retries=ArrayInteger(1),
+    )
+
+    assert [
+        (type(value), value)
+        for value in (monitor.lowest_score, monitor.highest_score, monitor.max_parse_retries)
+    ] == [(int, -2), (int, 2), (int, 1)]
