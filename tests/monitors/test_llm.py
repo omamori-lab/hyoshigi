@@ -112,7 +112,6 @@ def build_reply(score_text: str) -> Generation:
     return Generation(text=f"<reasoning>r</reasoning><score>{score_text}</score>")
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("score_text", "lowest_score", "highest_score", "value"),
     [
@@ -148,7 +147,6 @@ def test_a_reply_scores_its_integer_as_a_value_from_0_to_1(
     assert score.value == value
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(("lowest_score", "highest_score"), [(0, 10), (-5, 5), (1, 5), (0, 1)])
 def test_a_value_rises_with_the_integer_and_spans_0_to_1(
     rate: Rate, lowest_score: int, highest_score: int
@@ -164,7 +162,6 @@ def test_a_value_rises_with_the_integer_and_spans_0_to_1(
     assert (values[0], values[-1]) == (0.0, 1.0)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "value", "explanation"),
     [
@@ -208,7 +205,6 @@ def test_a_reply_is_read_as_its_first_reasoning_block_then_one_score(
     assert (score.value, score.explanation) == (value, explanation)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "reply",
     [
@@ -271,7 +267,6 @@ def test_a_reply_without_one_readable_score_after_its_reasoning_is_unreadable(
     assert len(script.received) == 1
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_evidence_names_the_model(rate: Rate) -> None:
     script = Script(Generation(text=CALM_REPLY))
 
@@ -280,7 +275,6 @@ def test_the_evidence_names_the_model(rate: Rate) -> None:
     assert score.evidence == Rationale(model="trusted-1")
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Rate) -> None:
     script = Script(Generation(text=CALM_REPLY))
     action = Action(
@@ -293,7 +287,6 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
     assert score.evidence == Rationale(model="trusted-1", hidden_reasoning=("reasoning.encrypted",))
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("lowest_score", "highest_score", "system"),
     [(0, 10, "Scale 0 to 10."), (1, 5, "Scale 1 to 5."), (-5, 5, "Scale -5 to 5.")],
@@ -318,7 +311,6 @@ def test_the_model_is_asked_the_prompt_built_from_the_rendering_and_the_scale(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_view_chooses_what_of_the_trajectory_the_model_reads(rate: Rate) -> None:
     script = Script(Generation(text=CALM_REPLY))
 
@@ -329,7 +321,6 @@ def test_the_view_chooses_what_of_the_trajectory_the_model_reads(rate: Rate) -> 
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_default_prompt_asks_for_a_score_on_the_scale(rate: Rate) -> None:
     script = Script(Generation(text=CALM_REPLY))
 
@@ -339,7 +330,6 @@ def test_the_default_prompt_asks_for_a_score_on_the_scale(rate: Rate) -> None:
     assert "Give an integer from 0 to 10." in script.received[0].system
 
 
-@pytest.mark.xfail(strict=True)
 def test_media_the_model_perceives_reaches_it_in_place(rate: Rate) -> None:
     script = Script(Generation(text=CALM_REPLY), perceives=MediaTypes("image/*"))
     action = Action(parts=(PNG,), tool_calls=(READ,))
