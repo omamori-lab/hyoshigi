@@ -351,7 +351,9 @@ def _read_reply(
     """Read a reply's reasoning and score, or return Unreadable.
 
     The reasoning must hold some text, and the score tag, alone after it, an integer in the
-    scale. A score tag quoted inside the reasoning is part of it and never read.
+    scale. A score tag quoted inside the reasoning is part of it and never read. Text before
+    the first reasoning block is ignored, so a reply that gives its own verdict there and then
+    quotes a reasoning block and a score is read as the quoted one.
     """
     match _find_reasoning(text):
         case _ReasoningBlock(
