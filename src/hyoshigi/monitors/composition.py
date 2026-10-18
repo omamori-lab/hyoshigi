@@ -11,7 +11,7 @@ from typing import assert_never
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
-from hyoshigi.monitors.score import Composite, Rationale, SuspicionScore
+from hyoshigi.monitors.score import Composite, SuspicionScore
 from hyoshigi.options import (
     check_instance,
     describe_option_value,
@@ -24,8 +24,6 @@ from hyoshigi.trajectory.storage import dump_event
 from hyoshigi.trajectory.trajectory import Trajectory
 
 MEAN_DECIMAL_PLACES = 12
-
-_UNRATED = SuspicionScore(value=0.5, explanation="", evidence=Rationale(model=""))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -302,25 +300,74 @@ def _blank_action_id(event: Event) -> Event:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CascadeMonitor(Monitor):
-    """Rates with a fast monitor, and with a careful one when the fast score is high."""
+    """Rates with a fast monitor, and with a careful one only when the fast score is high.
+
+    An action whose fast score is below `escalation_threshold` keeps that score; the rest go
+    to the careful monitor, whose score replaces it. A score that failed closed is 1.0, so a
+    failed fast score always escalates, and a failed careful score is the result. Both
+    scores are returned unchanged. This follows the two stages of Claude Code's auto mode, a
+    fast filter tuned for recall in front of a reasoning classifier (Hughes, "How we built
+    Claude Code auto mode: a safer way to skip permissions", Anthropic, 2026, section
+    "Two-stage classification: efficiency and recall"). `escalation_threshold` is read as a
+    threshold is, as a float from 0 to 1; anything else raises ConfigurationError when the
+    monitor is built, as does a `fast` or `careful` that is not a Monitor.
+    """
 
     fast: Monitor
     careful: Monitor
     escalation_threshold: float
 
+    def __post_init__(self) -> None:
+        _check_monitor(self.fast, name="fast", async_twin=AsyncCascadeMonitor)
+        _check_monitor(self.careful, name="careful", async_twin=AsyncCascadeMonitor)
+        _check_escalation_threshold(self)
+
     def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
-        """Rate the action."""
-        return _UNRATED
+        """Rate the action with the fast monitor, and with the careful one if that escalates."""
+        plan = plan_cascade(
+            self.fast, careful=self.careful, escalation_threshold=self.escalation_threshold
+        )
+        return drive(plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AsyncCascadeMonitor(AsyncMonitor):
-    """Rates with a fast monitor, and with a careful one when the fast score is high."""
+    """Rates an action as CascadeMonitor does, with the monitors awaited."""
 
     fast: AsyncMonitor
     careful: AsyncMonitor
     escalation_threshold: float
 
+    def __post_init__(self) -> None:
+        _check_async_monitor(self.fast, name="fast", twin=CascadeMonitor)
+        _check_async_monitor(self.careful, name="careful", twin=CascadeMonitor)
+        _check_escalation_threshold(self)
+
     async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
-        """Rate the action."""
-        return _UNRATED
+        """Rate the action with the fast monitor, and with the careful one if that escalates."""
+        plan = plan_cascade(
+            self.fast, careful=self.careful, escalation_threshold=self.escalation_threshold
+        )
+        return await drive_concurrently(
+            plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory)
+        )
+
+
+def _check_escalation_threshold(cascade: CascadeMonitor | AsyncCascadeMonitor) -> None:
+    """Keep the escalation threshold as a float, whatever real number was given, or raise."""
+    threshold = read_threshold(cascade.escalation_threshold, name="escalation_threshold")
+    # The dataclass is frozen, so the float is set past its guard.
+    object.__setattr__(cascade, "escalation_threshold", threshold)
+
+
+def plan_cascade[Rater](
+    fast: Rater, *, careful: Rater, escalation_threshold: float
+) -> Plan[Rater, SuspicionScore, SuspicionScore]:
+    """Plan the cascade: ask the fast monitor, and the careful one if its score reaches the
+    threshold.
+    """
+    (fast_score,) = yield (fast,)
+    if fast_score.value < escalation_threshold:
+        return fast_score
+    (careful_score,) = yield (careful,)
+    return careful_score
