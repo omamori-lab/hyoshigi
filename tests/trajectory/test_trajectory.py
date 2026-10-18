@@ -168,7 +168,6 @@ def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Traje
     assert str(raised.value) == "attach takes an action in this trajectory"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("score", "to", "message"),
     [
