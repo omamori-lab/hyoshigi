@@ -660,6 +660,46 @@ def test_a_reply_after_a_tool_call_is_a_generation_of_the_message_text(ask: Ask)
     )
 
 
+# https://developers.openai.com/api/docs/guides/reasoning, "Reasoning summaries": the output of a
+# request with a reasoning summary, a reasoning item before the assistant's message.
+REASONING_ITEM: dict[str, object] = {
+    "id": "rs_6876cf02e0bc8192b74af0fb64b715ff06fa2fcced15a5ac",
+    "type": "reasoning",
+    "summary": [
+        {
+            "type": "summary_text",
+            "text": "**Answering a simple question**\n\nI\u2019m looking at a straightforward "
+            "question: the capital of France is Paris. It\u2019s a well-known fact, and I want "
+            "to keep it brief and to the point.",
+        }
+    ],
+}
+PARIS_MESSAGE: dict[str, object] = {
+    "id": "msg_6876cf054f58819284ecc1058131305506fa2fcced15a5ac",
+    "type": "message",
+    "status": "completed",
+    "content": [
+        {
+            "type": "output_text",
+            "annotations": [],
+            "logprobs": [],
+            "text": "The capital of France is Paris.",
+        }
+    ],
+    "role": "assistant",
+}
+
+
+def test_a_reply_that_holds_a_reasoning_item_is_a_generation_of_the_message_text(
+    ask: Ask,
+) -> None:
+    body = replace(IMAGE_INPUT_RESPONSE, output=[REASONING_ITEM, PARIS_MESSAGE])
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Generation(text="The capital of France is Paris.")
+
+
 # openai's Response.output_text joins the text parts in order with no separator.
 def test_the_text_parts_of_a_reply_are_joined_in_order(ask: Ask) -> None:
     parts = [replace(OUTPUT_TEXT, text="foo"), replace(OUTPUT_TEXT, text="bar")]
