@@ -2,6 +2,7 @@
 
 import math
 import numbers
+import sys
 from decimal import Decimal
 from fractions import Fraction
 
@@ -101,6 +102,33 @@ def test_a_count_that_is_not_a_whole_number_of_at_least_the_minimum_raises(
         read_count(value, name="ensemble_size", minimum=1)
 
     assert str(raised.value) == message
+
+
+def test_a_count_of_the_largest_size_python_indexes_with_is_accepted() -> None:
+    count = read_count(sys.maxsize, name="ensemble_size", minimum=1)
+
+    assert count == sys.maxsize
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_count_one_above_the_largest_size_python_indexes_with_raises() -> None:
+    with pytest.raises(ConfigurationError, match="ensemble_size must be at most"):
+        read_count(sys.maxsize + 1, name="ensemble_size", minimum=1)
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("value", "described"),
+    [(10**20, "100000000000000000000"), (HUGE, "an integer too long to write out")],
+    ids=["far-above-the-bound", "too-long-to-write-out"],
+)
+def test_a_count_above_the_largest_size_python_indexes_with_raises_naming_the_bound(
+    value: int, described: str
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        read_count(value, name="ensemble_size", minimum=1)
+
+    assert str(raised.value) == f"ensemble_size must be at most {sys.maxsize}, got {described}"
 
 
 @pytest.mark.parametrize(
