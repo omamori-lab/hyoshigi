@@ -79,12 +79,20 @@ def render(
 def merge_text(parts: Iterable[PromptPart]) -> tuple[PromptPart, ...]:
     """Return the parts with each run of adjacent text joined into one text part."""
     merged: list[PromptPart] = []
+    run: list[str] = []
     for part in parts:
-        match merged[-1:], part:
-            case [TextPart(text=before)], TextPart(text=after):
-                merged[-1] = TextPart(text=before + after)
-            case _:
+        match part:
+            case TextPart(text=text):
+                run.append(text)
+            case MediaPart():
+                if run:
+                    merged.append(TextPart(text="".join(run)))
+                    run.clear()
                 merged.append(part)
+            case unreachable:
+                assert_never(unreachable)
+    if run:
+        merged.append(TextPart(text="".join(run)))
     return tuple(merged)
 
 
