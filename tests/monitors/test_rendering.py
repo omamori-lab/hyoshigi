@@ -707,7 +707,7 @@ def test_media_perceived_or_described_in_the_rated_action_is_not_unperceivable()
     ],
     ids=["none", "two", "between-media", "after-media", "adjacent-media", "twenty-thousand"],
 )
-def test_each_run_of_adjacent_text_merges_into_one_part_and_media_ends_a_run(
+def test_each_run_of_adjacent_text_merges_into_one_part(
     parts: tuple[PromptPart, ...], expected: tuple[PromptPart, ...]
 ) -> None:
     merged = merge_text(parts)
