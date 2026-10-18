@@ -4,8 +4,10 @@ import asyncio
 import numbers
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+from enum import Enum, auto
 from fractions import Fraction
 from functools import partial
+from typing import assert_never
 
 import pytest
 
@@ -49,6 +51,7 @@ UNAVAILABLE_SCORE = SuspicionScore(
     explanation=UNAVAILABLE_EXPLANATION,
     evidence=FailedClosed(model=MODEL_NAME, cause=Unavailable(status=503)),
 )
+FAILURES = (Unavailable(status=503),) * 8
 REFUSED_EXPLANATION = (
     "The monitor's model refused to rate the action, so it is treated as suspicious."
 )
@@ -132,6 +135,14 @@ def rate_asynchronously(
     return run(monitor.rate(action, trajectory=trajectory))
 
 
+class Layer(Enum):
+    """A wrapper, built with options that do not matter to the property it is used to test."""
+
+    REPEATED = auto()
+    CALIBRATED = auto()
+    CASCADE = auto()
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Family[Wrapped]:
     """The wrappers of one family, built around scripted LLM monitors, and how they are rated."""
@@ -172,6 +183,24 @@ class Family[Wrapped]:
             escalation_threshold=escalation_threshold,
         )
         return self.rate(monitor, ACTION, build_trajectory())
+
+    def rate_stack(self, script: Script, *, layers: tuple[Layer, ...]) -> SuspicionScore:
+        """Rate with the layers wrapped around an LLM monitor, the first layer innermost."""
+        monitor = self.build_llm(script)
+        for layer in layers:
+            monitor = self.wrap(layer, monitor)
+        return self.rate(monitor, ACTION, build_trajectory())
+
+    def wrap(self, layer: Layer, monitor: Wrapped) -> Wrapped:
+        match layer:
+            case Layer.REPEATED:
+                return self.repeated(monitor=monitor, ensemble_size=2)
+            case Layer.CALIBRATED:
+                return self.calibrated(monitor=monitor, honest_scores=HONEST_SCORES)
+            case Layer.CASCADE:
+                return self.cascade(fast=monitor, careful=monitor, escalation_threshold=0.5)
+            case unreachable:
+                assert_never(unreachable)
 
 
 SYNCHRONOUS = Family(
@@ -810,3 +839,45 @@ def test_a_threshold_that_is_a_real_number_but_not_a_float_is_kept_as_a_float(
     cascade = build()
 
     assert (type(cascade.escalation_threshold), cascade.escalation_threshold) == (float, 0.5)
+
+
+@pytest.mark.parametrize(
+    ("layers", "outcomes"),
+    [
+        ((Layer.REPEATED,), FAILURES),
+        ((Layer.CALIBRATED,), FAILURES),
+        ((Layer.CASCADE,), FAILURES),
+        ((Layer.REPEATED, Layer.CALIBRATED), FAILURES),
+        ((Layer.CALIBRATED, Layer.REPEATED), FAILURES),
+        ((Layer.CASCADE, Layer.CALIBRATED), FAILURES),
+        ((Layer.CALIBRATED, Layer.CASCADE), FAILURES),
+        ((Layer.REPEATED, Layer.CASCADE), FAILURES),
+        ((Layer.CASCADE, Layer.REPEATED), FAILURES),
+        (
+            (Layer.REPEATED, Layer.REPEATED),
+            (build_reply(1), Unavailable(status=503), build_reply(1), build_reply(1)),
+        ),
+    ],
+    ids=[
+        "repeated",
+        "calibrated",
+        "cascade",
+        "calibrated-around-repeated",
+        "repeated-around-calibrated",
+        "calibrated-around-cascade",
+        "cascade-around-calibrated",
+        "cascade-around-repeated",
+        "repeated-around-cascade",
+        "repeated-around-a-repeated-with-one-failed-call",
+    ],
+)
+def test_a_failure_in_any_stack_of_wrappers_fails_the_whole_score_closed_at_1(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    layers: tuple[Layer, ...],
+    outcomes: tuple[GenerationOutcome, ...],
+) -> None:
+    script = Script(*outcomes)
+
+    score = family.rate_stack(script, layers=layers)
+
+    assert (score.failed_closed, score.value) == (True, 1.0)
