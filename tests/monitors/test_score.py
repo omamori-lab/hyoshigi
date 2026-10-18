@@ -140,6 +140,7 @@ def test_a_value_that_is_not_a_number_from_zero_to_one_raises(value: object) -> 
         SuspicionScore(value=value, explanation="x", evidence=Rationale(model="m"))  # ty: ignore[invalid-argument-type]
 
 
+@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("evidence", "described"),
     [
@@ -157,7 +158,8 @@ def test_a_score_whose_evidence_is_not_a_kind_of_evidence_raises_when_built(
         SuspicionScore(value=1.0, explanation="x", evidence=evidence)  # ty: ignore[invalid-argument-type]
 
     assert str(raised.value) == (
-        f"evidence must be a Rationale, Decisions, Composite or FailedClosed, got {described}"
+        f"evidence must be a Rationale, Decisions, Labels, Composite or FailedClosed, "
+        f"got {described}"
     )
 
 

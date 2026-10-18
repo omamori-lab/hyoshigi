@@ -24,6 +24,7 @@ from hyoshigi.monitors.score import (
     Composite,
     Decisions,
     FailedClosed,
+    Labels,
     Rationale,
     StatementDecision,
     SuspicionScore,
@@ -103,6 +104,28 @@ STORED_DECIDED: dict[str, JSON] = {
             },
         ],
         "hidden_reasoning": ["Compared the two statements."],
+    },
+}
+# Two of five replies are suspicious votes: the unsafe label, and the reply with no label.
+LABELLED = SuspicionScore(
+    value=0.4,
+    explanation="The guard model labelled the action 'unsafe', finding that it breaks the policy.",
+    evidence=Labels(
+        model="llama-guard-4",
+        labels=("unsafe", None, "safe", "safe", "safe"),
+        hidden_reasoning=("reasoning.encrypted",),
+    ),
+)
+STORED_LABELLED: dict[str, JSON] = {
+    "value": 0.4,
+    "explanation": (
+        "The guard model labelled the action 'unsafe', finding that it breaks the policy."
+    ),
+    "evidence": {
+        "kind": "labels",
+        "model": "llama-guard-4",
+        "labels": ["unsafe", None, "safe", "safe", "safe"],
+        "hidden_reasoning": ["reasoning.encrypted"],
     },
 }
 REFUSED = SuspicionScore(
@@ -474,13 +497,14 @@ def build_failed_closed_case(
     return score, stored
 
 
-SCORE_CASES: list[tuple[SuspicionScore, dict[str, JSON]]] = [
+SCORE_CASES = [
     (READS_THE_FILE, STORED_READS_THE_FILE),
     (DECIDED, STORED_DECIDED),
+    pytest.param(LABELLED, STORED_LABELLED, marks=pytest.mark.xfail(strict=True)),
     (COMBINED, STORED_COMBINED),
     *[build_failed_closed_case(cause, stored) for cause, stored in CAUSES_STORED],
 ]
-SCORE_IDS = ["rationale", "decisions", "composite", *CAUSE_IDS]
+SCORE_IDS = ["rationale", "decisions", "labels", "composite", *CAUSE_IDS]
 
 
 @pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
@@ -668,6 +692,36 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             build_decision_payload({"probability": 0.9, "confidence": -0.1}),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="confidence-below-zero",
+        ),
+        pytest.param(
+            build_evidence_payload({"kind": "labels", "labels": [], "hidden_reasoning": []}),
+            EVIDENCE_PATH,
+            id="labels-without-a-model",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {"kind": "labels", "model": "m", "labels": "unsafe", "hidden_reasoning": []}
+            ),
+            EVIDENCE_PATH,
+            id="labels-not-a-list",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {"kind": "labels", "model": "m", "labels": ["unsafe", 5], "hidden_reasoning": []}
+            ),
+            "$.ratings[0].score.evidence.labels[1]",
+            id="label-not-text-or-null",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {"kind": "labels", "model": "m", "labels": [None], "hidden_reasoning": [5]}
+            ),
+            "$.ratings[0].score.evidence.hidden_reasoning[0]",
+            id="labels-hidden-reasoning-not-text",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload({"kind": "composite", "parts": []}),
