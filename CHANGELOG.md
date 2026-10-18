@@ -42,7 +42,8 @@ minor version.
   `DecisionModel.from_typesafe` (TypeSafe's Jev, `hyoshigi[typesafe]`).
 - `Monitor` and `AsyncMonitor`, which `rate(action, *, trajectory)` an action
   the agent proposes and always return a `SuspicionScore`: a value from 0 to 1,
-  an explanation with no numbers, and typed evidence (`Rationale`, `Decisions`,
+  an explanation, the only part an agent may see (the default prompt asks the
+  model to keep its score out of it), and typed evidence (`Rationale`, `Decisions`,
   `Composite` or `FailedClosed`). A reply the monitor cannot read, content it
   cannot perceive, and a model that refuses or is unavailable fail closed, at
   1.0.
