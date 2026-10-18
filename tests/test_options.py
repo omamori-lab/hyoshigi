@@ -285,7 +285,7 @@ def test_an_instance_of_the_expected_class_is_accepted() -> None:
             "model must be an Ordinary, got an instance of test_options.AnotherOrdinary. Use the "
             "async class for an async model.",
         ),
-        (3, Decimal, "", "model must be a Decimal, got 3"),
+        (3, Decimal, "", "model must be a Decimal, got an instance of int"),
     ],
     ids=["another-class", "the-class-itself", "with-a-hint", "a-consonant"],
 )
@@ -298,7 +298,6 @@ def test_a_value_that_is_not_an_instance_of_the_expected_class_raises_naming_bot
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("value", "message"),
     [

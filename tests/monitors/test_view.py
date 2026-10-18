@@ -61,8 +61,8 @@ def test_a_view_keeps_the_count_of_recent_entries_as_an_int() -> None:
 @pytest.mark.parametrize(
     ("channels", "message"),
     [
-        (123, "channels must be a Channel, got 123"),
-        ("TASK", "channels must be a Channel, got 'TASK'"),
+        (123, "channels must be a Channel, got an instance of int"),
+        ("TASK", "channels must be a Channel, got an instance of str"),
         (None, "channels must be a Channel, got None"),
         (Channel, "channels must be a Channel, got the class Channel; pass an instance"),
     ],
@@ -97,7 +97,7 @@ def test_a_view_whose_delegation_tools_hold_a_non_string_raises_naming_its_posit
     with pytest.raises(ConfigurationError) as raised:
         View(delegation_tools=("task", 5))  # ty: ignore[invalid-argument-type]
 
-    assert str(raised.value) == "delegation_tools[1] must be a str, got 5"
+    assert str(raised.value) == "delegation_tools[1] must be a str, got an instance of int"
 
 
 # Each case builds its iterable anew, since a generator is spent once it has been read.
