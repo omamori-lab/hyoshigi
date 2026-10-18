@@ -53,10 +53,11 @@ _VERDICT_KEY = re.compile(
 )
 _KEY_WORD = re.compile(r"[A-Za-z]+")
 # A line that opens with a verdict key and a label, then more text, as in "Label: violation
-# (...". No syntax tells "Label: violation because ..." from "Result: violation of the policy
-# ...", so both name the label.
+# (...". Any markup may stand between the key and the label, as in "Label = violation" or
+# "<label>violation</label>". No syntax tells "Label: violation because ..." from "Result:
+# violation of the policy ...", so both name the label.
 _KEYED_LABEL_START = re.compile(
-    rf"{_LINE_OPENING}(?P<key>{_VERDICT_KEY.pattern}){_KEY_END}{_MARKUP}{_LABEL}",
+    rf"{_LINE_OPENING}(?P<key>{_VERDICT_KEY.pattern})[\W_]++{_LABEL}",
     flags=re.IGNORECASE,
 )
 # A line that opens with a label and then a mark, as in "violation (the note asks ...", and
@@ -219,10 +220,11 @@ def read_label(
 
     A reply in which two lines name different labels is unreadable: a guard that quotes a
     label the agent planted must not have the quote read as its verdict. A suspicious label
-    at the start of a line before a mark, after a verdict key at the start, or after a line's
-    last colon counts as named, since it may be the guard's own label written off format; a
-    guard that gives its verdict only in prose and then quotes a planted label alone on the
-    last line cannot be told from one that gives that label.
+    at the start of a line before a mark, after a verdict key at the start with any markup
+    between them, or after a line's last colon counts as named, since it may be the guard's
+    own label written off format; a guard that gives its verdict only in prose and then
+    quotes a planted label alone on the last line cannot be told from one that gives that
+    label.
     """
     lines = list(_NON_EMPTY_LINE.finditer(text))
     if labels.key is not None:

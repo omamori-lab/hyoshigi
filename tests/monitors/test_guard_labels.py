@@ -400,7 +400,6 @@ def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
     assert read == "no_violation"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "own_line",
     [
