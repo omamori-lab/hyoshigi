@@ -10,6 +10,7 @@ from typing import Protocol
 import httpx2
 import pytest
 from anthropic import Anthropic, AsyncAnthropic, DefaultAsyncHttpxClient, DefaultHttpxClient
+from anthropic.types import ThinkingConfigParam
 
 from hyoshigi import (
     JSON,
@@ -336,6 +337,7 @@ class BuildDriver(Protocol):
         *,
         model: str = MODEL_ID,
         max_tokens: int = MAX_TOKENS,
+        thinking: ThinkingConfigParam | None = None,
         perceives: MediaTypes = PERCEIVES,
         strict: bool = False,
     ) -> Driver: ...
@@ -346,6 +348,7 @@ def build_sync_driver(
     *,
     model: str = MODEL_ID,
     max_tokens: int = MAX_TOKENS,
+    thinking: ThinkingConfigParam | None = None,
     perceives: MediaTypes = PERCEIVES,
     strict: bool = False,
 ) -> Driver:
@@ -356,7 +359,7 @@ def build_sync_driver(
         http_client=DefaultHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = GenerativeModel.from_anthropic(
-        client, model=model, perceives=perceives, max_tokens=max_tokens
+        client, model=model, perceives=perceives, max_tokens=max_tokens, thinking=thinking
     )
     return Driver(name=built.name, perceives=built.perceives, generate=built.generate)
 
@@ -366,6 +369,7 @@ def build_async_driver(
     *,
     model: str = MODEL_ID,
     max_tokens: int = MAX_TOKENS,
+    thinking: ThinkingConfigParam | None = None,
     perceives: MediaTypes = PERCEIVES,
     strict: bool = False,
 ) -> Driver:
@@ -376,7 +380,7 @@ def build_async_driver(
         http_client=DefaultAsyncHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = AsyncGenerativeModel.from_anthropic(
-        client, model=model, perceives=perceives, max_tokens=max_tokens
+        client, model=model, perceives=perceives, max_tokens=max_tokens, thinking=thinking
     )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
@@ -394,7 +398,7 @@ def build_driver(request: pytest.FixtureRequest) -> BuildDriver:
     return request.param
 
 
-def build_request(content: list[JSON]) -> JSON:
+def build_request(content: list[JSON]) -> dict[str, JSON]:
     return {
         "max_tokens": MAX_TOKENS,
         "model": MODEL_ID,
@@ -481,6 +485,37 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     model.generate(HELLO)
 
     assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
+
+
+# https://platform.claude.com/docs/en/build-with-claude/thinking: the request of the first
+# example sets "thinking": {"type": "adaptive", "display": "summarized"}, and the one that turns
+# thinking off on Claude Sonnet 5 sets {"type": "disabled"}.
+@pytest.mark.parametrize(
+    ("thinking", "sent"),
+    [
+        pytest.param(
+            {"type": "adaptive", "display": "summarized"},
+            {"type": "adaptive", "display": "summarized"},
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
+        ),
+        pytest.param(
+            {"type": "disabled"},
+            {"type": "disabled"},
+            marks=pytest.mark.xfail(strict=True, raises=AssertionError, reason="not sent yet"),
+        ),
+    ],
+    ids=["adaptive-summarized", "disabled"],
+)
+def test_the_thinking_configuration_is_sent_when_given(
+    build_driver: BuildDriver, thinking: ThinkingConfigParam, sent: JSON
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond, thinking=thinking)
+
+    model.generate(HELLO)
+
+    expected = {**build_request([{"type": "text", "text": "Hello, world"}]), "thinking": sent}
+    assert wire.requests == [expected]
 
 
 @pytest.mark.parametrize(
