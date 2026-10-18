@@ -61,7 +61,6 @@ STATEMENT = StatementDecision(
 )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(("cause", "explanation"), CAUSES_AND_EXPLANATIONS, ids=CAUSE_IDS)
 def test_failing_closed_scores_one_with_the_causes_explanation_and_the_failure_as_evidence(
     cause: Cause, explanation: str
@@ -75,7 +74,6 @@ def test_failing_closed_scores_one_with_the_causes_explanation_and_the_failure_a
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("cause", CAUSES, ids=CAUSE_IDS)
 def test_a_score_that_failed_closed_reports_it(
     cause: Cause,
@@ -102,7 +100,6 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
     assert score.failed_closed is False
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "score", [COMBINED_WITH_FAILED, COMBINED_WITH_COMBINED], ids=["one-level", "two-levels"]
 )
@@ -110,7 +107,6 @@ def test_a_score_combining_one_that_failed_closed_reports_it(score: SuspicionSco
     assert score.failed_closed is True
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("value", [0.0, 0.5, 0.99])
 @pytest.mark.parametrize(
     "evidence",
@@ -132,7 +128,6 @@ def test_a_score_that_failed_closed_with_a_value_other_than_one_raises(
         SuspicionScore(value=value, explanation="Not a failure.", evidence=evidence)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "value",
     [True, math.nan, "0.5", 1.5, -0.1, None],
@@ -143,7 +138,6 @@ def test_a_value_that_is_not_a_number_from_zero_to_one_raises(value: object) -> 
         SuspicionScore(value=value, explanation="x", evidence=Rationale(model="m"))  # ty: ignore[invalid-argument-type]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("given", "kept"),
     [(0, "0.0"), (1, "1.0"), (-0.0, "0.0")],
@@ -155,7 +149,6 @@ def test_a_value_is_kept_as_a_float_and_negative_zero_as_zero(given: float, kept
     assert repr(score.value) == kept
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "arguments"),
     [(Unperceivable, {"content": ()}), (Composite, {"parts": ()})],
