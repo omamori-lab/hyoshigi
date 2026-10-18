@@ -28,7 +28,7 @@ VERSION = 1
 _AUTHORS = ", ".join(Author)
 _MEDIA_PART = "a media part with an IANA media type and exactly one of url and data"
 _SCORE = "a score with a value from 0 to 1, an explanation and evidence"
-_EVIDENCE = "rationale, decisions, composite or failed-closed evidence"
+_EVIDENCE = "rationale, decisions, labels, composite or failed-closed evidence"
 _DECISION = "a decision with a probability from 0 to 1 and a confidence from 0 to 1, or null"
 _CAUSE = "a cause: unreadable, unperceivable, truncated, refused or unavailable"
 
@@ -246,7 +246,12 @@ def dump_evidence(evidence: Evidence) -> JSON:
                 "hidden_reasoning": [*evidence.hidden_reasoning],
             }
         case Labels():
-            return {"kind": "labels"}
+            return {
+                "kind": "labels",
+                "model": evidence.model,
+                "labels": [*evidence.labels],
+                "hidden_reasoning": [*evidence.hidden_reasoning],
+            }
         case Composite():
             return {"kind": "composite", "parts": [dump_score(part) for part in evidence.parts]}
         case FailedClosed():
@@ -325,8 +330,20 @@ def load_evidence(data: JSON, *, path: str) -> Evidence:
                 ),
                 hidden_reasoning=load_texts(reasoning, path=f"{path}.hidden_reasoning"),
             )
-        case {"kind": "labels"}:
-            return Labels(model="", labels=())
+        case {
+            "kind": "labels",
+            "model": str(model),
+            "labels": list(labels),
+            "hidden_reasoning": list(reasoning),
+        }:
+            return Labels(
+                model=model,
+                labels=tuple(
+                    load_label(label, path=f"{path}.labels[{index}]")
+                    for index, label in enumerate(labels)
+                ),
+                hidden_reasoning=load_texts(reasoning, path=f"{path}.hidden_reasoning"),
+            )
         case {"kind": "composite", "parts": list(parts)}:
             return load_composite(parts, path=path)
         case {"kind": "failed_closed", "model": str(model), "cause": dict() as cause}:
@@ -400,6 +417,15 @@ def load_model_outcome(data: JSON, *, path: str) -> Truncated | Refused | Unavai
             return Unavailable(status=status)
         case _:
             raise FormatError(path=path, expected=_CAUSE)
+
+
+def load_label(data: JSON, *, path: str) -> str | None:
+    """Read a guard's label, or null for a reply with no readable label."""
+    match data:
+        case str() | None as label:
+            return label
+        case _:
+            raise FormatError(path=path, expected="a label or null")
 
 
 def load_texts(data: list[JSON], *, path: str) -> tuple[str, ...]:

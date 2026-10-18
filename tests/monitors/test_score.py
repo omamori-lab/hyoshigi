@@ -140,7 +140,6 @@ def test_a_value_that_is_not_a_number_from_zero_to_one_raises(value: object) -> 
         SuspicionScore(value=value, explanation="x", evidence=Rationale(model="m"))  # ty: ignore[invalid-argument-type]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("evidence", "described"),
     [
