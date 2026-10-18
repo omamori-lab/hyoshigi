@@ -1,4 +1,15 @@
-"""Monitors that wrap monitors: the mean of repeated ratings, a calibrated rank and a cascade."""
+"""Monitors that wrap monitors: the mean of repeated ratings, a calibrated rank and a cascade.
+
+A wrapper is a monitor itself, of the family of the monitors it holds: a wrapper of Monitors is
+a Monitor, and one of AsyncMonitors an AsyncMonitor. A monitor of the other family raises
+ConfigurationError when the wrapper is built. Wrappers stack around one another. A wrapper
+changes a score's value and passes on the explanation of a wrapped score word for word; the
+explanation is the only part of a score an agent may see, so it carries no numbers.
+
+A score that failed closed has the value 1.0 whatever the wrapper: repeated calls fail closed
+when any call did, a calibrated monitor returns a failed score unranked, and a cascade
+escalates from a failed fast score.
+"""
 
 import json
 import random
@@ -151,21 +162,22 @@ class CalibratedMonitor(Monitor):
     Control Setting for AI Agents in Live Production Software Environments",
     arXiv:2604.15384, section 5.1) break them. When the raw score is exchangeable with the
     honest scores, the p-value is uniform on [0, 1], so a threshold of 0.99 flags 1% of
-    such actions.
+    such actions on average.
 
     `honest_scores` are the wrapped monitor's scores on actions of runs the caller trusts,
-    from the same monitor with the same settings: any iterable but a string, read once, of
-    at least one score. Each is read as a threshold is, as a float from 0 to 1, so a float32
-    0.1 becomes 0.10000000149011612 and no longer ties with 0.1; they are kept sorted in
-    `sorted_honest_scores`. A RepeatedMonitor inside ranks the mean, the score the honest
-    scores measured; outside it would average p-values, and a mean of p-values is not a
-    p-value.
+    from the same monitor with the same settings: any iterable but a string or bytes, read
+    once, of at least one score. Each is read as a threshold is, as a float from 0 to 1, so
+    a float32 0.1 becomes 0.10000000149011612 and no longer ties with 0.1. They are kept
+    sorted in `sorted_honest_scores`. A RepeatedMonitor inside ranks the mean, the score the
+    honest scores measured; outside it would average p-values, and a mean of p-values is not
+    a p-value.
 
-    Without a `random_seed` the draw is `random.random()`. With one, it is
-    `random.Random(f"{seed}\n{key}").random()`, where the key is the JSON of the history's
-    events and of the action as `dump_event` writes them, with every action's id blanked
-    (ids are generated at random) and the trajectory's ratings left out, so the same action
-    against the same history always draws the same share, in every process.
+    Without a `random_seed` the draw is `random.random()`. With one, it is the first number
+    of a `random.Random` seeded with the seed, a line break and the key. The key is the JSON
+    of the history's events and of the action as `dump_event` writes them, with every
+    action's id blanked (ids are generated at random) and the trajectory's ratings left out,
+    so the same action against the same history always draws the same share, in every
+    process.
 
     A score that failed closed is returned as it is, unranked. Otherwise the explanation is
     the wrapped score's and the evidence is a Composite of it. `random_seed` is an integer or
@@ -363,9 +375,7 @@ def _check_escalation_threshold(cascade: CascadeMonitor | AsyncCascadeMonitor) -
 def plan_cascade[Rater](
     fast: Rater, *, careful: Rater, escalation_threshold: float
 ) -> Plan[Rater, SuspicionScore, SuspicionScore]:
-    """Plan the cascade: ask the fast monitor, and the careful one if its score reaches the
-    threshold.
-    """
+    """Plan the cascade: ask the fast monitor, then the careful one if the fast score escalates."""
     (fast_score,) = yield (fast,)
     if fast_score.value < escalation_threshold:
         return fast_score
