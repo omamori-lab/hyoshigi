@@ -51,6 +51,13 @@ UPLOAD = ToolCall(
     name="upload",
     arguments='{"image": "data:image/png;base64,iVBORw0KGgo=", "name": "q3.png"}',
 )
+LIFTED_PNG_UPLOAD = (
+    '<tool_call id="c2" name="upload">{"image": "[media 1]"}'
+    '<omitted_media type="image/png" ref="1"/></tool_call>'
+)
+PARAMETERS_AND_CASE_NOT_READ = pytest.mark.xfail(
+    strict=True, reason="the data URL pattern reads only data:type/subtype;base64,"
+)
 
 
 def render_history(
@@ -344,8 +351,61 @@ def test_media_in_tool_call_arguments_is_lifted_after_them(
             '<tool_call id="c2" name="upload">'
             '{"note": "see data:image/png;base64,iVBORw0KGgo="}</tool_call>',
         ),
+        (
+            '{"image": "data:image/png;base64,iVBORw0KGgo"}',
+            '<tool_call id="c2" name="upload">'
+            '{"image": "data:image/png;base64,iVBORw0KGgo"}</tool_call>',
+        ),
+        (
+            '{"image": "data:image/png;base64,-_8="}',
+            '<tool_call id="c2" name="upload">{"image": "data:image/png;base64,-_8="}</tool_call>',
+        ),
+        (
+            '{"image": "data:image/png;name;base64,iVBORw0KGgo="}',
+            '<tool_call id="c2" name="upload">'
+            '{"image": "data:image/png;name;base64,iVBORw0KGgo="}</tool_call>',
+        ),
+        (
+            '{"image": "data:image/png;base64;name=a.png,iVBORw0KGgo="}',
+            '<tool_call id="c2" name="upload">'
+            '{"image": "data:image/png;base64;name=a.png,iVBORw0KGgo="}</tool_call>',
+        ),
+        pytest.param(
+            '{"image": "data:image/png;name=a.png;base64,iVBORw0KGgo="}',
+            LIFTED_PNG_UPLOAD,
+            marks=PARAMETERS_AND_CASE_NOT_READ,
+        ),
+        pytest.param(
+            '{"image": "data:image/png;charset=binary;name=a%20b.png;base64,iVBORw0KGgo="}',
+            LIFTED_PNG_UPLOAD,
+            marks=PARAMETERS_AND_CASE_NOT_READ,
+        ),
+        pytest.param(
+            '{"image": "DATA:image/png;base64,iVBORw0KGgo="}',
+            LIFTED_PNG_UPLOAD,
+            marks=PARAMETERS_AND_CASE_NOT_READ,
+        ),
+        pytest.param(
+            '{"image": "data:image/png;BASE64,iVBORw0KGgo="}',
+            LIFTED_PNG_UPLOAD,
+            marks=PARAMETERS_AND_CASE_NOT_READ,
+        ),
     ],
-    ids=["numbered-in-order", "malformed-json", "not-base64", "not-a-media-type", "not-whole"],
+    ids=[
+        "numbered-in-order",
+        "malformed-json",
+        "not-base64",
+        "not-a-media-type",
+        "not-whole",
+        "unpadded",
+        "url-safe-alphabet",
+        "parameter-without-a-value",
+        "parameter-after-base64",
+        "one-parameter",
+        "two-parameters",
+        "scheme-in-capitals",
+        "base64-in-capitals",
+    ],
 )
 def test_only_a_string_that_is_a_whole_data_url_is_lifted_from_tool_call_arguments(
     arguments: str, expected: str
