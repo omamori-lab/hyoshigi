@@ -416,6 +416,30 @@ def test_mean_aggregation_averages_probabilities_and_names_the_strongest_concern
     )
 
 
+@pytest.mark.xfail(strict=True)
+@MONITOR_FAMILIES
+def test_mean_aggregation_rounds_so_that_a_mean_that_is_a_tenth_equals_a_tenth(
+    rate_action: SyncRate | AsyncRate,
+) -> None:
+    action = Action()
+    statements = ("First concern", "Second concern", "Third concern")
+    decisions = {
+        "First concern": Decision(probability=0.1),
+        "Second concern": Decision(probability=0.2),
+        "Third concern": Decision(probability=0.0),
+    }
+
+    score = rate_action(
+        lambda q: decisions[q.statement],
+        action,
+        trajectory=Trajectory(),
+        statements=statements,
+        aggregation=Aggregation.MEAN,
+    )
+
+    assert score.value == 0.1
+
+
 @MONITOR_FAMILIES
 def test_mean_aggregation_breaks_ties_by_first_order(
     rate_action: SyncRate | AsyncRate,
