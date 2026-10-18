@@ -217,6 +217,14 @@ def test_the_default_prompts_system_text_names_exactly_the_tags_rendering_emits(
     }
 
 
+# A chat completions custom tool takes free text, so a call whose arguments are not JSON runs.
+@pytest.mark.xfail(strict=True)
+def test_the_default_prompt_never_says_a_call_whose_arguments_are_not_json_cannot_run() -> None:
+    system = DEFAULT_PROMPT.system
+
+    assert "not valid JSON" not in system
+
+
 def test_the_default_prompt_wraps_the_rendering_in_its_request() -> None:
     rendering = Rendering(
         trajectory=(TextPart(text="<user>Summarise q3.md</user>"),),
