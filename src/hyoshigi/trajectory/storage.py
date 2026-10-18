@@ -24,6 +24,9 @@ from hyoshigi.trajectory.parts import Author, Description, MediaPart, OpaquePart
 
 FORMAT = "hyoshigi.trajectory"
 VERSION = 1
+# How deep composite scores and subagents may each nest in the data load reads. Loading
+# recurses once a level, so deeper data raises FormatError well before Python's recursion limit.
+NESTING_LIMIT = 32
 
 _AUTHORS = ", ".join(Author)
 _MEDIA_PART = "a media part with an IANA media type and exactly one of url and data"
@@ -425,8 +428,9 @@ def load_score(
     data: JSON,
     *,
     path: str,
+    depth: int,
 ) -> SuspicionScore:
-    """Read a score that dump_score wrote."""
+    """Read a score that dump_score wrote, inside `depth` composite scores."""
     match data:
         case {
             "value": int() | float() as value,
@@ -436,6 +440,7 @@ def load_score(
             evidence = load_evidence(
                 raw,
                 path=f"{path}.evidence",
+                depth=depth,
             )
             try:
                 return SuspicionScore(
@@ -459,8 +464,9 @@ def load_evidence(
     data: JSON,
     *,
     path: str,
+    depth: int,
 ) -> Evidence:
-    """Read evidence that dump_evidence wrote."""
+    """Read evidence that dump_evidence wrote, of a score inside `depth` composite scores."""
     match data:
         case {
             "kind": "rationale",
@@ -518,6 +524,7 @@ def load_evidence(
             return load_composite(
                 parts,
                 path=path,
+                depth=depth,
             )
         case {
             "kind": "failed_closed",
@@ -542,12 +549,21 @@ def load_composite(
     parts: list[JSON],
     *,
     path: str,
+    depth: int,
 ) -> Composite:
-    """Read the parts of a composite that dump_evidence wrote."""
+    """Read the parts of a composite that dump_evidence wrote, of a score inside `depth`
+    composite scores. A composite inside NESTING_LIMIT others raises FormatError.
+    """
+    if depth == NESTING_LIMIT:
+        raise FormatError(
+            path=path,
+            expected=f"composite scores nested at most {NESTING_LIMIT} deep",
+        )
     scores = tuple(
         load_score(
             part,
             path=f"{path}.parts[{index}]",
+            depth=depth + 1,
         )
         for index, part in enumerate(parts)
     )
