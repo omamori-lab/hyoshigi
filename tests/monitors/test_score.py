@@ -124,8 +124,10 @@ def test_a_score_combining_one_that_failed_closed_reports_it(score: SuspicionSco
 def test_a_score_that_failed_closed_with_a_value_other_than_one_raises(
     value: float, evidence: FailedClosed | Composite
 ) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         SuspicionScore(value=value, explanation="Not a failure.", evidence=evidence)
+
+    assert str(raised.value) == "a score that failed closed has the value 1.0"
 
 
 @pytest.mark.parametrize(
@@ -150,12 +152,17 @@ def test_a_value_is_kept_as_a_float_and_negative_zero_as_zero(given: float, kept
 
 
 @pytest.mark.parametrize(
-    ("kind", "arguments"),
-    [(Unperceivable, {"content": ()}), (Composite, {"parts": ()})],
+    ("kind", "arguments", "message"),
+    [
+        (Unperceivable, {"content": ()}, "unperceivable content names at least one kind"),
+        (Composite, {"parts": ()}, "a composite holds at least one score"),
+    ],
     ids=["unperceivable-without-content", "composite-without-parts"],
 )
 def test_evidence_that_must_hold_something_raises_when_empty(
-    kind: type, arguments: dict[str, object]
+    kind: type, arguments: dict[str, object], message: str
 ) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         kind(**arguments)
+
+    assert str(raised.value) == message
