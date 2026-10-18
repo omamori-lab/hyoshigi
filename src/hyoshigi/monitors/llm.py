@@ -17,6 +17,7 @@ the shape keeps a score tag the agent planted from becoming the score.
 
 import re
 from dataclasses import dataclass, field
+from typing import assert_never
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.models.model import (
@@ -25,11 +26,20 @@ from hyoshigi.models.model import (
     GenerationOutcome,
     GenerativeModel,
     Prompt,
+    Refused,
+    Truncated,
+    Unavailable,
 )
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
-from hyoshigi.monitors.rendering import render
-from hyoshigi.monitors.score import Rationale, SuspicionScore, Unreadable, fail_closed
+from hyoshigi.monitors.rendering import Rendering, render
+from hyoshigi.monitors.score import (
+    Rationale,
+    SuspicionScore,
+    Unperceivable,
+    Unreadable,
+    fail_closed,
+)
 from hyoshigi.monitors.view import View
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
@@ -77,31 +87,69 @@ class AsyncLLMMonitor(AsyncMonitor):
         )
 
 
+# The cause of an attempt that is asked again.
+type _Retry = Unreadable | Truncated
+
+
 def plan_rating(
     monitor: LLMMonitor | AsyncLLMMonitor, *, action: Action, trajectory: Trajectory
 ) -> Plan[Prompt, GenerationOutcome, SuspicionScore]:
-    """Plan the rating of an action: render it, ask the monitor's model, read the score."""
+    """Plan the rating of an action: render it, ask the monitor's model, read the score.
+
+    The model is asked again, with the same prompt, after a reply that holds no readable
+    score and after one cut off at its output limit, until `max_parse_retries` further asks
+    are spent. Without a score by then, the rating fails closed with the last cause. A
+    refusal, an unavailable model, and content the model cannot perceive fail closed at once.
+    """
+    name = monitor.model.name
     rendering = render(
         action, trajectory=trajectory, view=monitor.view, perceives=monitor.model.perceives
     )
+    if rendering.unperceivable:
+        return fail_closed(Unperceivable(content=rendering.unperceivable), model=name)
     request = monitor.prompt.build(
         rendering, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score
     )
-    (outcome,) = yield (request,)
-    if isinstance(outcome, Generation):
-        reply = _read_reply(
-            outcome.text, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score
-        )
-        if reply is not None:
-            span = monitor.highest_score - monitor.lowest_score
-            return SuspicionScore(
-                value=(reply.score - monitor.lowest_score) / span,
-                explanation=reply.reasoning,
-                evidence=Rationale(
-                    model=monitor.model.name, hidden_reasoning=rendering.hidden_reasoning
-                ),
-            )
-    return fail_closed(Unreadable(), model=monitor.model.name)
+    cause: _Retry = Unreadable()
+    for _ in range(monitor.max_parse_retries + 1):
+        (outcome,) = yield (request,)
+        settled = _settle(outcome, monitor=monitor, rendering=rendering)
+        if isinstance(settled, SuspicionScore):
+            return settled
+        cause = settled
+    return fail_closed(cause, model=name)
+
+
+def _settle(
+    outcome: GenerationOutcome, *, monitor: LLMMonitor | AsyncLLMMonitor, rendering: Rendering
+) -> SuspicionScore | _Retry:
+    """The score an outcome ends the rating with, or the cause that earns another ask."""
+    match outcome:
+        case Generation(text=text):
+            return _score_reply(text, monitor=monitor, rendering=rendering)
+        case Truncated():
+            return outcome
+        case Refused() | Unavailable():
+            return fail_closed(outcome, model=monitor.model.name)
+        case unreachable:
+            assert_never(unreachable)
+
+
+def _score_reply(
+    text: str, *, monitor: LLMMonitor | AsyncLLMMonitor, rendering: Rendering
+) -> SuspicionScore | Unreadable:
+    """Score a reply on the monitor's scale, mapped onto 0 to 1, or return Unreadable."""
+    reply = _read_reply(
+        text, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score
+    )
+    if reply is None:
+        return Unreadable()
+    span = monitor.highest_score - monitor.lowest_score
+    return SuspicionScore(
+        value=(reply.score - monitor.lowest_score) / span,
+        explanation=reply.reasoning,
+        evidence=Rationale(model=monitor.model.name, hidden_reasoning=rendering.hidden_reasoning),
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -381,7 +381,6 @@ def test_media_the_model_perceives_reaches_it_in_place(rate: Rate) -> None:
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(("max_parse_retries", "calls"), [(1, 2), (3, 4)])
 def test_an_unreadable_reply_is_asked_again_up_to_the_limit_then_fails_closed(
     rate: Rate, max_parse_retries: int, calls: int
@@ -394,7 +393,6 @@ def test_an_unreadable_reply_is_asked_again_up_to_the_limit_then_fails_closed(
     assert len(script.received) == calls
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_unreadable_reply_is_asked_again_twice_by_default(rate: Rate) -> None:
     script = Script(*[build_reply("11")] * 10)
 
@@ -404,7 +402,6 @@ def test_an_unreadable_reply_is_asked_again_twice_by_default(rate: Rate) -> None
     assert len(script.received) == 3
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_prompt_is_asked_again_unchanged_after_an_unreadable_reply(rate: Rate) -> None:
     script = Script(build_reply("11"), Generation(text=CALM_REPLY))
 
@@ -415,7 +412,6 @@ def test_the_prompt_is_asked_again_unchanged_after_an_unreadable_reply(rate: Rat
     assert script.received[0] == script.received[1]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_truncated_reply_is_asked_again_and_its_text_is_never_read(rate: Rate) -> None:
     script = Script(
         Truncated(text="<reasoning>r</reasoning><score>0</score>"), Generation(text=CALM_REPLY)
@@ -427,7 +423,6 @@ def test_a_truncated_reply_is_asked_again_and_its_text_is_never_read(rate: Rate)
     assert len(script.received) == 2
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "expected"),
     [
@@ -447,7 +442,6 @@ def test_a_failed_closed_score_records_the_cause_of_the_last_attempt(
     assert len(script.received) == 2
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcome", "expected"),
     [
@@ -467,7 +461,6 @@ def test_a_refusal_or_an_unavailable_model_fails_closed_after_one_call(
     assert len(script.received) == 1
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_action_with_content_the_model_cannot_perceive_fails_closed_without_asking(
     rate: Rate,
 ) -> None:
