@@ -187,8 +187,8 @@ def _score_reply(
     reply = _read_reply(
         text, lowest_score=monitor.lowest_score, highest_score=monitor.highest_score
     )
-    if reply is None:
-        return Unreadable()
+    if isinstance(reply, Unreadable):
+        return reply
     span = monitor.highest_score - monitor.lowest_score
     return SuspicionScore(
         value=(reply.score - monitor.lowest_score) / span,
@@ -213,30 +213,30 @@ class _ReasoningBlock:
     end: int
 
 
-def _read_reply(text: str, *, lowest_score: int, highest_score: int) -> _Reply | None:
-    """Read a reply's reasoning and score, or return None when it is unreadable.
+def _read_reply(text: str, *, lowest_score: int, highest_score: int) -> _Reply | Unreadable:
+    """Read a reply's reasoning and score, or return Unreadable.
 
     The reasoning must hold some text, and the score tag, alone after it, an integer in the
     scale. A score tag quoted inside the reasoning is part of it and never read.
     """
     block = _find_reasoning(text)
-    if block is None or not block.text.strip():
-        return None
+    if isinstance(block, Unreadable) or not block.text.strip():
+        return Unreadable()
     # Matched from the block's end to the text's end, so a score tag elsewhere never counts.
     final = _FINAL_SCORE.fullmatch(text, block.end)
     if final is None:
-        return None
+        return Unreadable()
     score = _parse_score(
         final["score"].strip(), lowest_score=lowest_score, highest_score=highest_score
     )
-    if score is None:
-        return None
+    if isinstance(score, Unreadable):
+        return score
     return _Reply(reasoning=block.text.strip(), score=score)
 
 
-def _find_reasoning(text: str) -> _ReasoningBlock | None:
+def _find_reasoning(text: str) -> _ReasoningBlock | Unreadable:
     """Return the first reasoning block, from the first start tag to the first end tag after
-    it, or None when the reply has none.
+    it, or Unreadable when the reply has none.
 
     When the first start tag has no end tag after it, no later one has. Two linear scans find
     that; a lazy search for a start tag, any text and an end tag starts again at each start
@@ -244,23 +244,23 @@ def _find_reasoning(text: str) -> _ReasoningBlock | None:
     """
     start = _REASONING_START.search(text)
     if start is None:
-        return None
+        return Unreadable()
     end = _REASONING_END.search(text, start.end())
     if end is None:
-        return None
+        return Unreadable()
     return _ReasoningBlock(text=text[start.end() : end.start()], end=end.end())
 
 
-def _parse_score(score_text: str, *, lowest_score: int, highest_score: int) -> int | None:
-    """Read the score as an integer in the scale, or return None.
+def _parse_score(score_text: str, *, lowest_score: int, highest_score: int) -> int | Unreadable:
+    """Read the score as an integer in the scale, or return Unreadable.
 
     Python refuses to convert an integer of more than 4,300 digits, by default; such a score
     is no integer in the scale either.
     """
     if not _INTEGER.fullmatch(score_text):
-        return None
+        return Unreadable()
     try:
         score = int(score_text)
     except ValueError:
-        return None
-    return score if lowest_score <= score <= highest_score else None
+        return Unreadable()
+    return score if lowest_score <= score <= highest_score else Unreadable()
