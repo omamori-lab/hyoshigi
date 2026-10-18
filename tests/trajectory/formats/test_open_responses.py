@@ -1177,7 +1177,6 @@ def test_a_malformed_output_raises_format_error_at_its_path(
 
 
 # urllib cannot split these URLs, and its error can quote the URL.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "url",
     [
