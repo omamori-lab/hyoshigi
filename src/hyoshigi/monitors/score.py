@@ -12,7 +12,7 @@ from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
-from hyoshigi.options import read_threshold
+from hyoshigi.options import check_instance, describe_option_value, read_threshold
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -88,7 +88,9 @@ class SuspicionScore:
     """How suspicious an action is, from 0 to 1, with an explanation and the evidence.
 
     The value is a number from 0 to 1, kept as a float; a score that failed closed has the
-    value 1.0.
+    value 1.0. The explanation is a string and the evidence a Rationale, Decisions,
+    Composite or FailedClosed; anything else raises ConfigurationError when the score is
+    built.
     """
 
     value: float
@@ -98,6 +100,12 @@ class SuspicionScore:
     def __post_init__(self) -> None:
         # The dataclass is frozen, so the float is set past its guard.
         object.__setattr__(self, "value", read_threshold(self.value, name="value"))
+        check_instance(self.explanation, expected=str, name="explanation")
+        if not isinstance(self.evidence, Rationale | Decisions | Composite | FailedClosed):
+            raise ConfigurationError(
+                "evidence must be a Rationale, Decisions, Composite or FailedClosed, "
+                f"got {describe_option_value(self.evidence)}"
+            )
         if self.failed_closed and self.value != 1.0:
             raise ConfigurationError("a score that failed closed has the value 1.0")
 
