@@ -1,14 +1,26 @@
 """Monitors that wrap monitors: the mean of repeated ratings, a calibrated rank and a cascade."""
 
+import json
+import random
 import statistics
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field, replace
+from typing import assert_never
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
+from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.score import Composite, Rationale, SuspicionScore
-from hyoshigi.options import check_instance, read_count
-from hyoshigi.trajectory.history import Action
+from hyoshigi.options import (
+    check_instance,
+    describe_option_value,
+    read_count,
+    read_integer,
+    read_threshold,
+)
+from hyoshigi.trajectory.history import Action, Event, Observation
+from hyoshigi.trajectory.storage import dump_event
 from hyoshigi.trajectory.trajectory import Trajectory
 
 MEAN_DECIMAL_PLACES = 12
@@ -128,28 +140,164 @@ def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CalibratedMonitor(Monitor):
-    """Ranks a monitor's score among honest scores."""
+    """Reports a monitor's score as its smoothed conformal p-value among honest scores.
+
+    Control evaluations set thresholds as percentiles of honest-run scores, so an audit
+    budget of 1% flags the top 1% of honest actions. The p-value ranks the raw score among
+    the n honest scores as a share of n + 1, with its ties broken by a uniform random draw
+    u: (below + u * (tied + 1)) / (n + 1). That is the smoothed conformal p-value of Vovk et
+    al. ("Criteria of efficiency for conformal prediction", arXiv:1603.04416, section 2,
+    equation 2) with the raw score as the conformity score, and ties are broken at random as
+    Makins et al. ("Multi-Agent AI Control: Distributed Attacks Hamper Per-Instance
+    Monitors", arXiv:2607.07368, appendix G.4.1) and LinuxArena (Tracy et al., "LinuxArena: A
+    Control Setting for AI Agents in Live Production Software Environments",
+    arXiv:2604.15384, section 5.1) break them. When the raw score is exchangeable with the
+    honest scores, the p-value is uniform on [0, 1], so a threshold of 0.99 flags 1% of
+    such actions.
+
+    `honest_scores` are the wrapped monitor's scores on actions of runs the caller trusts,
+    from the same monitor with the same settings: any iterable but a string, read once, of
+    at least one score. Each is read as a threshold is, as a float from 0 to 1, so a float32
+    0.1 becomes 0.10000000149011612 and no longer ties with 0.1; they are kept sorted in
+    `sorted_honest_scores`. A RepeatedMonitor inside ranks the mean, the score the honest
+    scores measured; outside it would average p-values, and a mean of p-values is not a
+    p-value.
+
+    Without a `random_seed` the draw is `random.random()`. With one, it is
+    `random.Random(f"{seed}\n{key}").random()`, where the key is the JSON of the history's
+    events and of the action as `dump_event` writes them, with every action's id blanked
+    (ids are generated at random) and the trajectory's ratings left out, so the same action
+    against the same history always draws the same share, in every process.
+
+    A score that failed closed is returned as it is, unranked. Otherwise the explanation is
+    the wrapped score's and the evidence is a Composite of it. `random_seed` is an integer or
+    None; anything the monitor cannot work with raises ConfigurationError when it is built.
+    """
 
     monitor: Monitor
-    honest_scores: Iterable[float]
+    honest_scores: InitVar[Iterable[float]]
     random_seed: int | None = None
+    sorted_honest_scores: tuple[float, ...] = field(init=False)
+
+    def __post_init__(self, honest_scores: Iterable[float]) -> None:
+        _check_monitor(self.monitor, name="monitor", async_twin=AsyncCalibratedMonitor)
+        _check_calibration(self, honest_scores=honest_scores)
 
     def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
-        """Rate the action."""
-        return _UNRATED
+        """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
+        tie_share = draw_tie_share(self.random_seed, action=action, trajectory=trajectory)
+        plan = plan_calibration(
+            self.monitor, honest_scores=self.sorted_honest_scores, tie_share=tie_share
+        )
+        return drive(plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AsyncCalibratedMonitor(AsyncMonitor):
-    """Ranks the score of a monitor that is awaited among honest scores."""
+    """Ranks a score as CalibratedMonitor does, with the wrapped monitor awaited."""
 
     monitor: AsyncMonitor
-    honest_scores: Iterable[float]
+    honest_scores: InitVar[Iterable[float]]
     random_seed: int | None = None
+    sorted_honest_scores: tuple[float, ...] = field(init=False)
+
+    def __post_init__(self, honest_scores: Iterable[float]) -> None:
+        _check_async_monitor(self.monitor, name="monitor", twin=CalibratedMonitor)
+        _check_calibration(self, honest_scores=honest_scores)
 
     async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
-        """Rate the action."""
-        return _UNRATED
+        """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
+        tie_share = draw_tie_share(self.random_seed, action=action, trajectory=trajectory)
+        plan = plan_calibration(
+            self.monitor, honest_scores=self.sorted_honest_scores, tie_share=tie_share
+        )
+        return await drive_concurrently(
+            plan, ask=lambda monitor: monitor.rate(action, trajectory=trajectory)
+        )
+
+
+def _check_calibration(
+    calibrated: CalibratedMonitor | AsyncCalibratedMonitor, *, honest_scores: object
+) -> None:
+    """Keep the honest scores sorted and the seed as an int, or raise ConfigurationError."""
+    scores = _read_honest_scores(honest_scores)
+    seed = calibrated.random_seed
+    if seed is not None:
+        seed = read_integer(seed, name="random_seed")
+    # The dataclass is frozen, so the values are set past its guard.
+    object.__setattr__(calibrated, "sorted_honest_scores", scores)
+    object.__setattr__(calibrated, "random_seed", seed)
+
+
+def _read_honest_scores(honest_scores: object) -> tuple[float, ...]:
+    """Read the honest scores once, each as a threshold named by its position, sorted."""
+    if isinstance(honest_scores, str | bytes) or not isinstance(honest_scores, Iterable):
+        raise ConfigurationError(
+            "honest_scores must be an iterable of numbers between 0 and 1, "
+            f"got {describe_option_value(honest_scores)}"
+        )
+    scores = sorted(
+        read_threshold(score, name=f"honest_scores[{position}]")
+        for position, score in enumerate(honest_scores)
+    )
+    if not scores:
+        raise ConfigurationError("honest_scores must hold at least one score")
+    return tuple(scores)
+
+
+def plan_calibration[Rater](
+    monitor: Rater, *, honest_scores: tuple[float, ...], tie_share: float
+) -> Plan[Rater, SuspicionScore, SuspicionScore]:
+    """Plan the calibrated rating: ask the monitor once, then rank its score unless it failed."""
+    (wrapped,) = yield (monitor,)
+    if wrapped.failed_closed:
+        return wrapped
+    return build_calibrated_score(wrapped, honest_scores=honest_scores, tie_share=tie_share)
+
+
+def build_calibrated_score(
+    wrapped: SuspicionScore, *, honest_scores: tuple[float, ...], tie_share: float
+) -> SuspicionScore:
+    """Rank a score among the sorted honest scores: its smoothed conformal p-value."""
+    below = bisect_left(honest_scores, wrapped.value)
+    tied = bisect_right(honest_scores, wrapped.value) - below
+    return SuspicionScore(
+        value=(below + tie_share * (tied + 1)) / (len(honest_scores) + 1),
+        explanation=wrapped.explanation,
+        evidence=Composite(parts=(wrapped,)),
+    )
+
+
+def draw_tie_share(random_seed: int | None, *, action: Action, trajectory: Trajectory) -> float:
+    """Draw the tie share u, uniform on [0, 1): from the seed and the content when seeded.
+
+    A string seed goes through SHA-512 in Python's `random`, so the draw is the same in
+    every process.
+    """
+    if random_seed is None:
+        return random.random()
+    key = render_tie_break_key(action, trajectory=trajectory)
+    return random.Random(f"{random_seed}\n{key}").random()
+
+
+def render_tie_break_key(action: Action, *, trajectory: Trajectory) -> str:
+    """Render the history and the action as JSON, without the ids and ratings.
+
+    Action ids are blanked because they are generated at random: the same action has a
+    different id in every run.
+    """
+    events = (*trajectory.history, action)
+    return json.dumps([dump_event(_blank_action_id(event)) for event in events])
+
+
+def _blank_action_id(event: Event) -> Event:
+    match event:
+        case Action():
+            return replace(event, id="")
+        case Observation():
+            return event
+        case unreachable:
+            assert_never(unreachable)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

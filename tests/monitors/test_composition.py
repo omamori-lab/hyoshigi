@@ -371,17 +371,15 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use RepeatedMonitor for a Monitor.",
         ),
-        pytest.param(
+        (
             partial(CalibratedMonitor, monitor=ASYNCHRONOUS_LLM, honest_scores=[0.5]),
             "monitor must be a Monitor, got an instance of AsyncLLMMonitor. "
             "Use AsyncCalibratedMonitor for an AsyncMonitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             partial(AsyncCalibratedMonitor, monitor=SYNCHRONOUS_LLM, honest_scores=[0.5]),
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CalibratedMonitor for a Monitor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -400,7 +398,6 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize("random_seed", [None, 7], ids=["unseeded", "seeded"])
 @pytest.mark.parametrize(
     ("reply", "lower", "midpoint", "upper"),
@@ -444,7 +441,6 @@ def test_a_score_lands_uniformly_in_its_place_among_the_honest_scores(
     assert min(values) < midpoint <= max(values)
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_explanation_is_the_wrapped_scores_and_the_evidence_holds_it(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -458,7 +454,6 @@ def test_the_explanation_is_the_wrapped_scores_and_the_evidence_holds_it(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("failure", "failed_score"),
     [
@@ -479,7 +474,6 @@ def test_a_score_that_failed_closed_is_returned_unchanged_and_not_ranked(
     assert score == failed_score
 
 
-@pytest.mark.xfail(strict=True)
 def test_honest_scores_given_as_a_generator_are_all_ranked_among(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -508,7 +502,6 @@ def rate_seeded(
     ).value
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_seeded_draw_is_the_same_for_the_same_action_and_history_whatever_their_ids(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -521,7 +514,6 @@ def test_a_seeded_draw_is_the_same_for_the_same_action_and_history_whatever_thei
     assert values[0] == values[1]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_seeded_draw_ignores_the_ratings_attached_to_the_history(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
@@ -535,7 +527,6 @@ def test_a_seeded_draw_ignores_the_ratings_attached_to_the_history(
     assert values[0] == values[1]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("first", "second"),
     [
@@ -563,7 +554,6 @@ def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
     assert values[0] != values[1]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("honest_scores", "message"),
     [
@@ -608,7 +598,6 @@ def test_honest_scores_that_cannot_be_ranked_among_are_refused_naming_the_proble
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("random_seed", "message"),
     [
@@ -629,7 +618,6 @@ def test_a_random_seed_that_is_not_an_integer_is_refused_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "build",
     [
