@@ -2,6 +2,7 @@
 
 import itertools
 from dataclasses import dataclass
+from typing import cast
 
 import pytest
 from opentelemetry import trace
@@ -51,18 +52,29 @@ class Tracing:
 def tracing() -> Tracing:
     # OpenTelemetry sets the global tracer provider once per process: a second
     # set_tracer_provider is ignored with a warning (opentelemetry/trace/__init__.py,
-    # _set_tracer_provider), and hyoshigi takes its tracer from the global provider. So a test
-    # run installs one provider, and each test clears its spans and restarts its ids.
-    ids = CountedIds()
+    # _set_tracer_provider), and hyoshigi takes its tracer from the global provider. So the
+    # first test run in a process installs one provider, a later run in the same process (as
+    # mutmut makes) records with it too, and each test clears its spans and restarts its ids.
+    installed = trace.get_tracer_provider()
+    if isinstance(
+        installed,
+        TracerProvider,
+    ):
+        provider = installed
+    else:
+        provider = TracerProvider(
+            sampler=ParentBased(ALWAYS_ON),
+            id_generator=CountedIds(),
+        )
+        trace.set_tracer_provider(provider)
     exporter = InMemorySpanExporter()
-    provider = TracerProvider(
-        sampler=ParentBased(ALWAYS_ON),
-        id_generator=ids,
-    )
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
     return Tracing(
-        ids=ids,
+        # The provider's own generator, which a later run's module did not define.
+        ids=cast(
+            CountedIds,
+            provider.id_generator,
+        ),
         exporter=exporter,
     )
 

@@ -41,6 +41,7 @@ from hyoshigi.monitors.score import (
     Unreadable,
     fail_closed,
 )
+from hyoshigi.monitors.tracing import record_rating, trace_rating
 from hyoshigi.monitors.view import View
 from hyoshigi.options import check_instance, read_count, read_integer
 from hyoshigi.trajectory.history import Action
@@ -100,14 +101,18 @@ class LLMMonitor(Monitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
-        return drive(
-            plan_rating(
-                self,
-                action=action,
-                trajectory=trajectory,
-            ),
-            ask=self.model.generate,
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                drive(
+                    plan_rating(
+                        self,
+                        action=action,
+                        trajectory=trajectory,
+                    ),
+                    ask=self.model.generate,
+                ),
+                span=span,
+            )
 
 
 @dataclass(
@@ -141,14 +146,18 @@ class AsyncLLMMonitor(AsyncMonitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the model's score, which fails closed when it gives none."""
-        return await drive_concurrently(
-            plan_rating(
-                self,
-                action=action,
-                trajectory=trajectory,
-            ),
-            ask=self.model.generate,
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                await drive_concurrently(
+                    plan_rating(
+                        self,
+                        action=action,
+                        trajectory=trajectory,
+                    ),
+                    ask=self.model.generate,
+                ),
+                span=span,
+            )
 
 
 def _check_options(monitor: LLMMonitor | AsyncLLMMonitor) -> None:

@@ -22,6 +22,7 @@ from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.score import Composite, SuspicionScore, average_values
+from hyoshigi.monitors.tracing import record_rating, trace_rating
 from hyoshigi.options import (
     check_instance,
     describe_option_value,
@@ -81,16 +82,20 @@ class RepeatedMonitor(Monitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with each call in turn, and combine the scores."""
-        return drive(
-            plan_repetition(
-                self.monitor,
-                ensemble_size=self.ensemble_size,
-            ),
-            ask=lambda monitor: monitor.rate(
-                action,
-                trajectory=trajectory,
-            ),
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                drive(
+                    plan_repetition(
+                        self.monitor,
+                        ensemble_size=self.ensemble_size,
+                    ),
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 @dataclass(
@@ -122,16 +127,20 @@ class AsyncRepeatedMonitor(AsyncMonitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with all the calls at once, and combine the scores."""
-        return await drive_concurrently(
-            plan_repetition(
-                self.monitor,
-                ensemble_size=self.ensemble_size,
-            ),
-            ask=lambda monitor: monitor.rate(
-                action,
-                trajectory=trajectory,
-            ),
-        )
+        with trace_rating(self) as span:
+            return record_rating(
+                await drive_concurrently(
+                    plan_repetition(
+                        self.monitor,
+                        ensemble_size=self.ensemble_size,
+                    ),
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 def _check_monitor(
@@ -280,23 +289,27 @@ class CalibratedMonitor(Monitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
-        tie_share = draw_tie_share(
-            self.random_seed,
-            action=action,
-            trajectory=trajectory,
-        )
-        plan = plan_calibration(
-            self.monitor,
-            honest_scores=self.sorted_honest_scores,
-            tie_share=tie_share,
-        )
-        return drive(
-            plan,
-            ask=lambda monitor: monitor.rate(
-                action,
+        with trace_rating(self) as span:
+            tie_share = draw_tie_share(
+                self.random_seed,
+                action=action,
                 trajectory=trajectory,
-            ),
-        )
+            )
+            plan = plan_calibration(
+                self.monitor,
+                honest_scores=self.sorted_honest_scores,
+                tie_share=tie_share,
+            )
+            return record_rating(
+                drive(
+                    plan,
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 @dataclass(
@@ -333,23 +346,27 @@ class AsyncCalibratedMonitor(AsyncMonitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the wrapped monitor, then rank its score among the honest ones."""
-        tie_share = draw_tie_share(
-            self.random_seed,
-            action=action,
-            trajectory=trajectory,
-        )
-        plan = plan_calibration(
-            self.monitor,
-            honest_scores=self.sorted_honest_scores,
-            tie_share=tie_share,
-        )
-        return await drive_concurrently(
-            plan,
-            ask=lambda monitor: monitor.rate(
-                action,
+        with trace_rating(self) as span:
+            tie_share = draw_tie_share(
+                self.random_seed,
+                action=action,
                 trajectory=trajectory,
-            ),
-        )
+            )
+            plan = plan_calibration(
+                self.monitor,
+                honest_scores=self.sorted_honest_scores,
+                tie_share=tie_share,
+            )
+            return record_rating(
+                await drive_concurrently(
+                    plan,
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 def _check_calibration(
@@ -538,18 +555,22 @@ class CascadeMonitor(Monitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the fast monitor, and with the careful one if that escalates."""
-        plan = plan_cascade(
-            self.fast,
-            careful=self.careful,
-            escalation_threshold=self.escalation_threshold,
-        )
-        return drive(
-            plan,
-            ask=lambda monitor: monitor.rate(
-                action,
-                trajectory=trajectory,
-            ),
-        )
+        with trace_rating(self) as span:
+            plan = plan_cascade(
+                self.fast,
+                careful=self.careful,
+                escalation_threshold=self.escalation_threshold,
+            )
+            return record_rating(
+                drive(
+                    plan,
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 @dataclass(
@@ -584,18 +605,22 @@ class AsyncCascadeMonitor(AsyncMonitor):
         trajectory: Trajectory,
     ) -> SuspicionScore:
         """Rate the action with the fast monitor, and with the careful one if that escalates."""
-        plan = plan_cascade(
-            self.fast,
-            careful=self.careful,
-            escalation_threshold=self.escalation_threshold,
-        )
-        return await drive_concurrently(
-            plan,
-            ask=lambda monitor: monitor.rate(
-                action,
-                trajectory=trajectory,
-            ),
-        )
+        with trace_rating(self) as span:
+            plan = plan_cascade(
+                self.fast,
+                careful=self.careful,
+                escalation_threshold=self.escalation_threshold,
+            )
+            return record_rating(
+                await drive_concurrently(
+                    plan,
+                    ask=lambda monitor: monitor.rate(
+                        action,
+                        trajectory=trajectory,
+                    ),
+                ),
+                span=span,
+            )
 
 
 def _check_escalation_threshold(cascade: CascadeMonitor | AsyncCascadeMonitor) -> None:
