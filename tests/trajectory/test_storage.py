@@ -83,6 +83,7 @@ DECIDED = SuspicionScore(
                 statement="The action deletes a file.", decision=Decision(probability=0.1)
             ),
         ),
+        hidden_reasoning=("Compared the two statements.",),
     ),
 )
 STORED_DECIDED: dict[str, JSON] = {
@@ -101,7 +102,7 @@ STORED_DECIDED: dict[str, JSON] = {
                 "decision": {"probability": 0.1, "confidence": None},
             },
         ],
-        "hidden_reasoning": [],
+        "hidden_reasoning": ["Compared the two statements."],
     },
 }
 REFUSED = SuspicionScore(
@@ -608,6 +609,18 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             build_evidence_payload({**EVIDENCE, "hidden_reasoning": [5]}),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="hidden-reasoning-not-text",
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "decisions",
+                    "model": "jev-1.14",
+                    "decisions": [],
+                    "hidden_reasoning": [5],
+                }
+            ),
+            "$.ratings[0].score.evidence.hidden_reasoning[0]",
+            id="decisions-hidden-reasoning-not-text",
         ),
         pytest.param(
             build_evidence_payload(

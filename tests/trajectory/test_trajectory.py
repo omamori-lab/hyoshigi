@@ -162,8 +162,10 @@ def test_a_second_score_of_one_action_is_kept_after_the_first(reading: Trajector
 
 
 def test_attaching_a_score_to_an_action_not_in_the_history_raises(reading: Trajectory) -> None:
-    with pytest.raises(ConfigurationError):
+    with pytest.raises(ConfigurationError) as raised:
         reading.attach(READS_THE_FILE, to=Action(id="a2"))
+
+    assert str(raised.value) == "attach takes an action in this trajectory"
 
 
 def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> None:
