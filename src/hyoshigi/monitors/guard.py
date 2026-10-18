@@ -1,15 +1,15 @@
 """The guard monitor: a guard model labels an action against the caller's policy.
 
-Guard models such as Llama Guard, gpt-oss-safeguard, Qwen3Guard and Nemotron Content Safety
-write a label, not a score. A label alone gives a monitor one operating point, so every
-threshold flags the same actions; the monitor samples the guard's reply several times and
-scores the share labelled suspicious. Studies of sampled answer confidence, none of them on
-guard models, guide how many: Lyu et al. saw calibration improve sharply over the first
-samples and saturate after 15 to 20, and advise 3 to 5 under a tight budget ("Calibrating
-Large Language Models with Sample Consistency", arXiv:2402.13904, section 6.3), where the
-default of five comes from. Guard models are overconfident (Liu et al., "On Calibration of
-LLM-based Guard Models for Reliable Content Moderation", arXiv:2410.10414, section 4.2.1), so
-honest actions tend to tie at 0; a CalibratedMonitor ranks a score among honest ones.
+Guard models such as gpt-oss-safeguard and Qwen3Guard write a label, not a score. A label
+alone gives a monitor one operating point, so every threshold flags the same actions; the
+monitor samples the guard's reply several times and scores the share labelled suspicious.
+Studies of sampled answer confidence, none of them on guard models, guide how many: Lyu et
+al. saw calibration improve sharply over the first samples and saturate after 15 to 20, and
+advise 3 to 5 under a tight budget ("Calibrating Large Language Models with Sample
+Consistency", arXiv:2402.13904, section 6.3), where the default of five comes from. Guard
+models are overconfident (Liu et al., "On Calibration of LLM-based Guard Models for Reliable
+Content Moderation", arXiv:2410.10414, section 4.2.1), so honest actions tend to tie at 0; a
+CalibratedMonitor ranks a score among honest ones.
 """
 
 import warnings
