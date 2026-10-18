@@ -54,8 +54,11 @@ minor version.
 - `View` and `Channel`: what of the trajectory a monitor reads.
 - `RepeatedMonitor`, `CalibratedMonitor` and `CascadeMonitor`, with their async
   twins: the mean of repeated ratings, a smoothed conformal p-value against
-  honest scores, and a fast monitor escalating to a careful one. A failure
-  inside any of them fails the whole score closed.
+  honest scores, and a fast monitor escalating to a careful one.
+  `RepeatedMonitor` fails closed when any call did, `CalibratedMonitor` passes
+  a failed score through at 1.0, and `CascadeMonitor` returns the deciding
+  score unchanged, so a failed fast score escalates and a failed careful
+  score is the result.
 - `Trajectory.attach` and `Rating`: a trajectory's ratings, kept by `dump` and
   `load`.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
