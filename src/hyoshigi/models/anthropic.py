@@ -15,6 +15,7 @@ try:
         RefusalStopDetails,
         TextBlock,
         TextBlockParam,
+        ThinkingConfigParam,
     )
     from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
 except ModuleNotFoundError as error:
@@ -58,19 +59,25 @@ CARRIED_MEDIA = MediaTypes(
 
 
 def build_model(
-    client: Anthropic, *, model: str, max_tokens: int, perceives: MediaTypes
+    client: Anthropic,
+    *,
+    model: str,
+    max_tokens: int,
+    thinking: ThinkingConfigParam | None,
+    perceives: MediaTypes,
 ) -> GenerativeModel:
     """A model on the Messages API, through the caller's client.
 
-    Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
-    media the API cannot carry. Generating raises ConfigurationError if the SDK refuses the
-    request's arguments before sending them, as it does for a max_tokens that may take longer
-    than ten minutes without streaming.
+    The thinking configuration is sent only when given. Raise ConfigurationError if the model
+    id is empty, max_tokens is below 1 or perceives names media the API cannot carry.
+    Generating raises ConfigurationError if the SDK refuses the request's arguments before
+    sending them, as it does for a max_tokens that may take longer than ten minutes without
+    streaming.
     """
     check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
     def generate(prompt: Prompt) -> GenerationOutcome:
-        request = build_request(prompt, model=model, max_tokens=max_tokens)
+        request = build_request(prompt, model=model, max_tokens=max_tokens, thinking=thinking)
         if request is None:
             return Unavailable()
         try:
@@ -83,19 +90,25 @@ def build_model(
 
 
 def build_async_model(
-    client: AsyncAnthropic, *, model: str, max_tokens: int, perceives: MediaTypes
+    client: AsyncAnthropic,
+    *,
+    model: str,
+    max_tokens: int,
+    thinking: ThinkingConfigParam | None,
+    perceives: MediaTypes,
 ) -> AsyncGenerativeModel:
     """A model on the Messages API, through the caller's async client.
 
-    Raise ConfigurationError if the model id is empty, max_tokens is below 1 or perceives names
-    media the API cannot carry. Generating raises ConfigurationError if the SDK refuses the
-    request's arguments before sending them, as it does for a max_tokens that may take longer
-    than ten minutes without streaming.
+    The thinking configuration is sent only when given. Raise ConfigurationError if the model
+    id is empty, max_tokens is below 1 or perceives names media the API cannot carry.
+    Generating raises ConfigurationError if the SDK refuses the request's arguments before
+    sending them, as it does for a max_tokens that may take longer than ten minutes without
+    streaming.
     """
     check_arguments(model=model, max_tokens=max_tokens, perceives=perceives)
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
-        request = build_request(prompt, model=model, max_tokens=max_tokens)
+        request = build_request(prompt, model=model, max_tokens=max_tokens, thinking=thinking)
         if request is None:
             return Unavailable()
         try:
@@ -118,9 +131,10 @@ def check_arguments(*, model: str, max_tokens: int, perceives: MediaTypes) -> No
 
 
 def build_request(
-    prompt: Prompt, *, model: str, max_tokens: int
+    prompt: Prompt, *, model: str, max_tokens: int, thinking: ThinkingConfigParam | None
 ) -> MessageCreateParamsNonStreaming | None:
-    """The prompt as one user message and a system prompt; None if there is nothing to send.
+    """The prompt as one user message and a system prompt, with the thinking configuration if
+    there is one; None if there is nothing to send.
 
     Text with no non-whitespace character is left out, and the prompt is not sent if a part
     cannot be taken in its form.
@@ -128,12 +142,15 @@ def build_request(
     blocks = collect([translate_part(part) for part in prompt.content if not is_blank(part)])
     if not blocks:
         return None
-    return {
+    request: MessageCreateParamsNonStreaming = {
         "model": model,
         "max_tokens": max_tokens,
         "system": prompt.system,
         "messages": [{"role": "user", "content": blocks}],
     }
+    if thinking is not None:
+        request["thinking"] = thinking
+    return request
 
 
 def is_blank(part: PromptPart) -> bool:
