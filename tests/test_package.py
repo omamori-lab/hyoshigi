@@ -14,8 +14,17 @@ print(sorted(loaded - sys.stdlib_module_names))
 
 
 def test_importing_the_package_loads_only_the_standard_library() -> None:
-    command = [sys.executable, "-c", IMPORT_REPORT]
+    command = [
+        sys.executable,
+        "-c",
+        IMPORT_REPORT,
+    ]
 
-    report = subprocess.run(command, capture_output=True, text=True, check=True)
+    report = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
 
     assert report.stdout.strip() == "['hyoshigi']"

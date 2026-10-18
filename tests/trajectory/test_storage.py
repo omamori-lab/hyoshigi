@@ -33,12 +33,24 @@ from hyoshigi.monitors.score import (
 )
 from hyoshigi.trajectory.trajectory import Rating
 
-TASK = Observation(author=Author.USER, parts=(TextPart(text="Plot q3.csv"),))
+TASK = Observation(
+    author=Author.USER,
+    parts=(TextPart(text="Plot q3.csv"),),
+)
 READ_FILE = Action(
     id="a1",
-    thought=(TextPart(text="I should read the file first."), OpaquePart(kind="redacted_thinking")),
+    thought=(
+        TextPart(text="I should read the file first."),
+        OpaquePart(kind="redacted_thinking"),
+    ),
     parts=(TextPart(text="Reading q3.csv."),),
-    tool_calls=(ToolCall(id="call_1", name="read_file", arguments='{"path": "q3.csv"}'),),
+    tool_calls=(
+        ToolCall(
+            id="call_1",
+            name="read_file",
+            arguments='{"path": "q3.csv"}',
+        ),
+    ),
 )
 CHART = ToolObservation(
     call_id="call_1",
@@ -46,7 +58,10 @@ CHART = ToolObservation(
         MediaPart(
             media_type="image/png",
             data=b"\x89PNG",
-            description=Description(text="A bar chart of q3 revenue", author=Author.TOOL),
+            description=Description(
+                text="A bar chart of q3 revenue",
+                author=Author.TOOL,
+            ),
         ),
     ),
 )
@@ -59,7 +74,10 @@ MEMORY = Observation(
 READS_THE_FILE = SuspicionScore(
     value=0.25,
     explanation="It reads the file the task names.",
-    evidence=Rationale(model="trusted-1", hidden_reasoning=("The file is the task's.",)),
+    evidence=Rationale(
+        model="trusted-1",
+        hidden_reasoning=("The file is the task's.",),
+    ),
 )
 STORED_READS_THE_FILE: dict[str, JSON] = {
     "value": 0.25,
@@ -78,10 +96,14 @@ DECIDED = SuspicionScore(
         decisions=(
             StatementDecision(
                 statement="The action reads a file.",
-                decision=Decision(probability=0.9, confidence=0.8),
+                decision=Decision(
+                    probability=0.9,
+                    confidence=0.8,
+                ),
             ),
             StatementDecision(
-                statement="The action deletes a file.", decision=Decision(probability=0.1)
+                statement="The action deletes a file.",
+                decision=Decision(probability=0.1),
             ),
         ),
         hidden_reasoning=("Compared the two statements.",),
@@ -96,11 +118,17 @@ STORED_DECIDED: dict[str, JSON] = {
         "decisions": [
             {
                 "statement": "The action reads a file.",
-                "decision": {"probability": 0.9, "confidence": 0.8},
+                "decision": {
+                    "probability": 0.9,
+                    "confidence": 0.8,
+                },
             },
             {
                 "statement": "The action deletes a file.",
-                "decision": {"probability": 0.1, "confidence": None},
+                "decision": {
+                    "probability": 0.1,
+                    "confidence": None,
+                },
             },
         ],
         "hidden_reasoning": ["Compared the two statements."],
@@ -131,7 +159,10 @@ STORED_LABELLED: dict[str, JSON] = {
 REFUSED = SuspicionScore(
     value=1.0,
     explanation="The monitor's model refused to rate the action.",
-    evidence=FailedClosed(model="trusted-1", cause=Refused()),
+    evidence=FailedClosed(
+        model="trusted-1",
+        cause=Refused(),
+    ),
 )
 STORED_REFUSED: dict[str, JSON] = {
     "value": 1.0,
@@ -139,38 +170,82 @@ STORED_REFUSED: dict[str, JSON] = {
     "evidence": {
         "kind": "failed_closed",
         "model": "trusted-1",
-        "cause": {"kind": "refused", "explanation": None},
+        "cause": {
+            "kind": "refused",
+            "explanation": None,
+        },
     },
 }
 COMBINED = SuspicionScore(
     value=1.0,
     explanation="A part failed.",
-    evidence=Composite(parts=(READS_THE_FILE, REFUSED)),
+    evidence=Composite(
+        parts=(
+            READS_THE_FILE,
+            REFUSED,
+        ),
+    ),
 )
 STORED_COMBINED: dict[str, JSON] = {
     "value": 1.0,
     "explanation": "A part failed.",
-    "evidence": {"kind": "composite", "parts": [STORED_READS_THE_FILE, STORED_REFUSED]},
+    "evidence": {
+        "kind": "composite",
+        "parts": [
+            STORED_READS_THE_FILE,
+            STORED_REFUSED,
+        ],
+    },
 }
 
 # Each cause a score can fail closed with, in its stored form.
 CAUSES_STORED: list[tuple[Cause, dict[str, JSON]]] = [
-    (Unreadable(), {"kind": "unreadable"}),
+    (
+        Unreadable(),
+        {"kind": "unreadable"},
+    ),
     (
         Unperceivable(content=("audio", "image/tiff")),
-        {"kind": "unperceivable", "content": ["audio", "image/tiff"]},
+        {
+            "kind": "unperceivable",
+            "content": ["audio", "image/tiff"],
+        },
     ),
     (
         Truncated(text="The action is suspicious because"),
-        {"kind": "truncated", "text": "The action is suspicious because"},
+        {
+            "kind": "truncated",
+            "text": "The action is suspicious because",
+        },
     ),
     (
         Refused(explanation="I cannot assess this."),
-        {"kind": "refused", "explanation": "I cannot assess this."},
+        {
+            "kind": "refused",
+            "explanation": "I cannot assess this.",
+        },
     ),
-    (Refused(), {"kind": "refused", "explanation": None}),
-    (Unavailable(status=503), {"kind": "unavailable", "status": 503}),
-    (Unavailable(), {"kind": "unavailable", "status": None}),
+    (
+        Refused(),
+        {
+            "kind": "refused",
+            "explanation": None,
+        },
+    ),
+    (
+        Unavailable(status=503),
+        {
+            "kind": "unavailable",
+            "status": 503,
+        },
+    ),
+    (
+        Unavailable(),
+        {
+            "kind": "unavailable",
+            "status": None,
+        },
+    ),
 ]
 CAUSE_IDS = [
     "unreadable",
@@ -191,18 +266,38 @@ STORED: dict[str, JSON] = {
             "kind": "observation",
             "author": "user",
             "source": None,
-            "parts": [{"kind": "text", "text": "Plot q3.csv"}],
+            "parts": [
+                {
+                    "kind": "text",
+                    "text": "Plot q3.csv",
+                },
+            ],
         },
         {
             "kind": "action",
             "id": "a1",
             "thought": [
-                {"kind": "text", "text": "I should read the file first."},
-                {"kind": "opaque", "opaque_kind": "redacted_thinking"},
+                {
+                    "kind": "text",
+                    "text": "I should read the file first.",
+                },
+                {
+                    "kind": "opaque",
+                    "opaque_kind": "redacted_thinking",
+                },
             ],
-            "parts": [{"kind": "text", "text": "Reading q3.csv."}],
+            "parts": [
+                {
+                    "kind": "text",
+                    "text": "Reading q3.csv.",
+                },
+            ],
             "tool_calls": [
-                {"id": "call_1", "name": "read_file", "arguments": '{"path": "q3.csv"}'}
+                {
+                    "id": "call_1",
+                    "name": "read_file",
+                    "arguments": '{"path": "q3.csv"}',
+                },
             ],
         },
         {
@@ -216,7 +311,10 @@ STORED: dict[str, JSON] = {
                     "media_type": "image/png",
                     "url": None,
                     "data": "iVBORw==",
-                    "description": {"text": "A bar chart of q3 revenue", "author": "tool"},
+                    "description": {
+                        "text": "A bar chart of q3 revenue",
+                        "author": "tool",
+                    },
                 },
             ],
         },
@@ -224,7 +322,12 @@ STORED: dict[str, JSON] = {
             "kind": "observation",
             "author": "scaffold",
             "source": "memory",
-            "parts": [{"kind": "text", "text": "The user prefers charts."}],
+            "parts": [
+                {
+                    "kind": "text",
+                    "text": "The user prefers charts.",
+                },
+            ],
         },
     ],
     "ratings": [],
@@ -240,19 +343,36 @@ DELEGATING: dict[str, JSON] = {
             "id": "a1",
             "thought": [],
             "parts": [],
-            "tool_calls": [{"id": "call_7", "name": "task", "arguments": "{}"}],
+            "tool_calls": [
+                {
+                    "id": "call_7",
+                    "name": "task",
+                    "arguments": "{}",
+                },
+            ],
         },
         {
             "kind": "tool_observation",
             "call_id": "call_7",
             "is_error": True,
             "source": "subagent",
-            "parts": [{"kind": "text", "text": "The subagent stopped: no access to q3.csv."}],
+            "parts": [
+                {
+                    "kind": "text",
+                    "text": "The subagent stopped: no access to q3.csv.",
+                },
+            ],
         },
     ],
     "ratings": [
-        {"action_id": "a1", "score": STORED_DECIDED},
-        {"action_id": "a1", "score": STORED_READS_THE_FILE},
+        {
+            "action_id": "a1",
+            "score": STORED_DECIDED,
+        },
+        {
+            "action_id": "a1",
+            "score": STORED_READS_THE_FILE,
+        },
     ],
     "subagents": {
         "call_7": {
@@ -263,7 +383,12 @@ DELEGATING: dict[str, JSON] = {
                     "kind": "observation",
                     "author": "delegator",
                     "source": None,
-                    "parts": [{"kind": "text", "text": "Find the q3 revenue"}],
+                    "parts": [
+                        {
+                            "kind": "text",
+                            "text": "Find the q3 revenue",
+                        },
+                    ],
                 },
                 {
                     "kind": "action",
@@ -276,12 +401,17 @@ DELEGATING: dict[str, JSON] = {
                             "url": "https://example.com/q3.png",
                             "data": None,
                             "description": None,
-                        }
+                        },
                     ],
                     "tool_calls": [],
                 },
             ],
-            "ratings": [{"action_id": "b1", "score": STORED_COMBINED}],
+            "ratings": [
+                {
+                    "action_id": "b1",
+                    "score": STORED_COMBINED,
+                },
+            ],
             "subagents": {},
         },
     },
@@ -318,7 +448,10 @@ TOOL_OBSERVATION: dict[str, JSON] = {
     "source": None,
     "parts": [],
 }
-TEXT: dict[str, JSON] = {"kind": "text", "text": "Plot q3.csv"}
+TEXT: dict[str, JSON] = {
+    "kind": "text",
+    "text": "Plot q3.csv",
+}
 MEDIA: dict[str, JSON] = {
     "kind": "media",
     "media_type": "image/png",
@@ -327,7 +460,11 @@ MEDIA: dict[str, JSON] = {
     "description": None,
 }
 AUDIO: dict[str, JSON] = {"kind": "audio"}
-TASK_CALL: dict[str, JSON] = {"id": "call_7", "name": "task", "arguments": "{}"}
+TASK_CALL: dict[str, JSON] = {
+    "id": "call_7",
+    "name": "task",
+    "arguments": "{}",
+}
 
 
 @pytest.fixture
@@ -349,7 +486,12 @@ def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None
 def test_loading_the_stored_format_restores_the_history() -> None:
     loaded = Trajectory.load(STORED)
 
-    assert loaded.history == (TASK, READ_FILE, CHART, MEMORY)
+    assert loaded.history == (
+        TASK,
+        READ_FILE,
+        CHART,
+        MEMORY,
+    )
 
 
 def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
@@ -361,52 +503,190 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
-        ([], "$"),
-        ({**ENVELOPE, "version": 2, "history": []}, "$"),
-        ({**ENVELOPE, "version": True, "history": []}, "$"),
-        ({**ENVELOPE, "history": [{"kind": "decision"}]}, "$.history[0]"),
-        pytest.param(
-            {**ENVELOPE, "history": [ACTION, {**ACTION, "parts": [TEXT]}]},
-            "$.history[1]",
+        (
+            [],
+            "$",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "version": 2,
+                "history": [],
+            },
+            "$",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "version": True,
+                "history": [],
+            },
+            "$",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [{"kind": "decision"}],
+            },
+            "$.history[0]",
         ),
         pytest.param(
             {
                 **ENVELOPE,
                 "history": [
-                    {**ACTION, "tool_calls": [TASK_CALL]},
-                    {**ACTION, "id": "a2", "tool_calls": [{**TASK_CALL, "name": "review"}]},
+                    ACTION,
+                    {
+                        **ACTION,
+                        "parts": [TEXT],
+                    },
                 ],
             },
             "$.history[1]",
         ),
-        ({**ENVELOPE, "history": [{**ACTION, "thought": [AUDIO]}]}, "$.history[0].thought[0]"),
-        ({**ENVELOPE, "history": [{**ACTION, "parts": [AUDIO]}]}, "$.history[0].parts[0]"),
-        (
-            {**ENVELOPE, "history": [{**ACTION, "tool_calls": [{"id": "c1"}]}]},
-            "$.history[0].tool_calls[0]",
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [TASK_CALL],
+                    },
+                    {
+                        **ACTION,
+                        "id": "a2",
+                        "tool_calls": [
+                            {
+                                **TASK_CALL,
+                                "name": "review",
+                            },
+                        ],
+                    },
+                ],
+            },
+            "$.history[1]",
         ),
-        ({**ENVELOPE, "history": [{**OBSERVATION, "author": "admin"}]}, "$.history[0].author"),
         (
-            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [TEXT, AUDIO]}]},
-            "$.history[0].parts[1]",
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "thought": [AUDIO],
+                    },
+                ],
+            },
+            "$.history[0].thought[0]",
         ),
         (
-            {**ENVELOPE, "history": [{**TOOL_OBSERVATION, "parts": [AUDIO]}]},
-            "$.history[0].parts[0]",
-        ),
-        (
-            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [{**MEDIA, "data": "iVBO*Rw=="}]}]},
-            "$.history[0].parts[0].data",
-        ),
-        (
-            {**ENVELOPE, "history": [{**OBSERVATION, "parts": [{**MEDIA, "media_type": "png"}]}]},
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "parts": [AUDIO],
+                    },
+                ],
+            },
             "$.history[0].parts[0]",
         ),
         (
             {
                 **ENVELOPE,
                 "history": [
-                    {**OBSERVATION, "parts": [{**MEDIA, "description": {"text": "A chart"}}]}
+                    {
+                        **ACTION,
+                        "tool_calls": [{"id": "c1"}],
+                    },
+                ],
+            },
+            "$.history[0].tool_calls[0]",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "author": "admin",
+                    },
+                ],
+            },
+            "$.history[0].author",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "parts": [
+                            TEXT,
+                            AUDIO,
+                        ],
+                    },
+                ],
+            },
+            "$.history[0].parts[1]",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **TOOL_OBSERVATION,
+                        "parts": [AUDIO],
+                    },
+                ],
+            },
+            "$.history[0].parts[0]",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "parts": [
+                            {
+                                **MEDIA,
+                                "data": "iVBO*Rw==",
+                            },
+                        ],
+                    },
+                ],
+            },
+            "$.history[0].parts[0].data",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "parts": [
+                            {
+                                **MEDIA,
+                                "media_type": "png",
+                            },
+                        ],
+                    },
+                ],
+            },
+            "$.history[0].parts[0]",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **OBSERVATION,
+                        "parts": [
+                            {
+                                **MEDIA,
+                                "description": {"text": "A chart"},
+                            },
+                        ],
+                    },
                 ],
             },
             "$.history[0].parts[0].description",
@@ -417,8 +697,16 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 "history": [
                     {
                         **OBSERVATION,
-                        "parts": [{**MEDIA, "description": {"text": "A chart", "author": "admin"}}],
-                    }
+                        "parts": [
+                            {
+                                **MEDIA,
+                                "description": {
+                                    "text": "A chart",
+                                    "author": "admin",
+                                },
+                            },
+                        ],
+                    },
                 ],
             },
             "$.history[0].parts[0].description.author",
@@ -426,13 +714,32 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         (
             {
                 **ENVELOPE,
-                "history": [{**ACTION, "tool_calls": [TASK_CALL]}],
-                "subagents": {"call_7": {**ENVELOPE, "history": [AUDIO]}},
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [TASK_CALL],
+                    },
+                ],
+                "subagents": {
+                    "call_7": {
+                        **ENVELOPE,
+                        "history": [AUDIO],
+                    },
+                },
             },
             "$.subagents[0].history[0]",
         ),
         pytest.param(
-            {**ENVELOPE, "history": [], "subagents": {"call_7": {**ENVELOPE, "history": []}}},
+            {
+                **ENVELOPE,
+                "history": [],
+                "subagents": {
+                    "call_7": {
+                        **ENVELOPE,
+                        "history": [],
+                    },
+                },
+            },
             "$.subagents[0]",
         ),
     ],
@@ -458,7 +765,8 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
     ],
 )
 def test_loading_a_malformed_payload_raises_format_error_at_its_path(
-    payload: JSON, path: str
+    payload: JSON,
+    path: str,
 ) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
@@ -468,13 +776,26 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
 
 def test_a_format_error_names_its_path_in_its_message() -> None:
     with pytest.raises(FormatError) as raised:
-        Trajectory.load({**ENVELOPE, "history": [AUDIO]})
+        Trajectory.load(
+            {
+                **ENVELOPE,
+                "history": [AUDIO],
+            },
+        )
 
     assert str(raised.value).startswith("$.history[0]: ")
 
 
 def test_a_format_error_never_quotes_the_payload() -> None:
-    payload: JSON = {**ENVELOPE, "history": [{**OBSERVATION, "author": "s3cret-0f3c"}]}
+    payload: JSON = {
+        **ENVELOPE,
+        "history": [
+            {
+                **OBSERVATION,
+                "author": "s3cret-0f3c",
+            },
+        ],
+    }
 
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
@@ -483,68 +804,147 @@ def test_a_format_error_never_quotes_the_payload() -> None:
 
 
 def build_failed_closed_case(
-    cause: Cause, stored_cause: dict[str, JSON]
+    cause: Cause,
+    stored_cause: dict[str, JSON],
 ) -> tuple[SuspicionScore, dict[str, JSON]]:
     evidence: dict[str, JSON] = {
         "kind": "failed_closed",
         "model": "trusted-1",
         "cause": stored_cause,
     }
-    stored: dict[str, JSON] = {"value": 1.0, "explanation": "Failed.", "evidence": evidence}
+    stored: dict[str, JSON] = {
+        "value": 1.0,
+        "explanation": "Failed.",
+        "evidence": evidence,
+    }
     score = SuspicionScore(
-        value=1.0, explanation="Failed.", evidence=FailedClosed(model="trusted-1", cause=cause)
+        value=1.0,
+        explanation="Failed.",
+        evidence=FailedClosed(
+            model="trusted-1",
+            cause=cause,
+        ),
     )
     return score, stored
 
 
 SCORE_CASES = [
-    (READS_THE_FILE, STORED_READS_THE_FILE),
-    (DECIDED, STORED_DECIDED),
-    pytest.param(LABELLED, STORED_LABELLED),
-    (COMBINED, STORED_COMBINED),
-    *[build_failed_closed_case(cause, stored) for cause, stored in CAUSES_STORED],
+    (
+        READS_THE_FILE,
+        STORED_READS_THE_FILE,
+    ),
+    (
+        DECIDED,
+        STORED_DECIDED,
+    ),
+    pytest.param(
+        LABELLED,
+        STORED_LABELLED,
+    ),
+    (
+        COMBINED,
+        STORED_COMBINED,
+    ),
+    *[
+        build_failed_closed_case(
+            cause,
+            stored,
+        )
+        for cause, stored in CAUSES_STORED
+    ],
 ]
-SCORE_IDS = ["rationale", "decisions", "labels", "composite", *CAUSE_IDS]
+SCORE_IDS = [
+    "rationale",
+    "decisions",
+    "labels",
+    "composite",
+    *CAUSE_IDS,
+]
 
 
-@pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
+@pytest.mark.parametrize(
+    ("score", "stored"),
+    SCORE_CASES,
+    ids=SCORE_IDS,
+)
 def test_a_rating_dumps_to_the_stored_format(
-    trajectory: Trajectory, score: SuspicionScore, stored: dict[str, JSON]
+    trajectory: Trajectory,
+    score: SuspicionScore,
+    stored: dict[str, JSON],
 ) -> None:
-    trajectory.attach(score, to=READ_FILE)
+    trajectory.attach(
+        score,
+        to=READ_FILE,
+    )
 
     dumped = trajectory.dump()
 
-    assert dumped.get("ratings") == [{"action_id": "a1", "score": stored}]
+    assert dumped.get("ratings") == [
+        {
+            "action_id": "a1",
+            "score": stored,
+        },
+    ]
 
 
-@pytest.mark.parametrize(("score", "stored"), SCORE_CASES, ids=SCORE_IDS)
+@pytest.mark.parametrize(
+    ("score", "stored"),
+    SCORE_CASES,
+    ids=SCORE_IDS,
+)
 def test_loading_a_stored_rating_restores_the_score(
-    score: SuspicionScore, stored: dict[str, JSON]
+    score: SuspicionScore,
+    stored: dict[str, JSON],
 ) -> None:
     payload: dict[str, JSON] = {
         **ENVELOPE,
         "history": [ACTION],
-        "ratings": [{"action_id": "a1", "score": stored}],
+        "ratings": [
+            {
+                "action_id": "a1",
+                "score": stored,
+            },
+        ],
     }
 
     loaded = Trajectory.load(payload)
 
-    assert loaded.ratings == (Rating(action_id="a1", score=score),)
+    assert loaded.ratings == (
+        Rating(
+            action_id="a1",
+            score=score,
+        ),
+    )
 
 
-EVIDENCE: dict[str, JSON] = {"kind": "rationale", "model": "trusted-1", "hidden_reasoning": []}
+EVIDENCE: dict[str, JSON] = {
+    "kind": "rationale",
+    "model": "trusted-1",
+    "hidden_reasoning": [],
+}
 SCORE_PATH = "$.ratings[0].score"
 EVIDENCE_PATH = "$.ratings[0].score.evidence"
 CAUSE_PATH = "$.ratings[0].score.evidence.cause"
 
 
 def build_rating_payload(rating: JSON) -> dict[str, JSON]:
-    return {**ENVELOPE, "history": [ACTION], "ratings": [rating]}
+    return {
+        **ENVELOPE,
+        "history": [ACTION],
+        "ratings": [rating],
+    }
 
 
 def build_score_payload(**fields: JSON) -> dict[str, JSON]:
-    return build_rating_payload({"action_id": "a1", "score": {**STORED_READS_THE_FILE, **fields}})
+    return build_rating_payload(
+        {
+            "action_id": "a1",
+            "score": {
+                **STORED_READS_THE_FILE,
+                **fields,
+            },
+        },
+    )
 
 
 def build_evidence_payload(evidence: JSON) -> dict[str, JSON]:
@@ -556,58 +956,135 @@ def build_decision_payload(decision: JSON) -> dict[str, JSON]:
         {
             "kind": "decisions",
             "model": "jev-1.14",
-            "decisions": [{"statement": "The action reads a file.", "decision": decision}],
+            "decisions": [
+                {
+                    "statement": "The action reads a file.",
+                    "decision": decision,
+                },
+            ],
             "hidden_reasoning": [],
-        }
+        },
     )
 
 
 def build_cause_payload(cause: JSON) -> dict[str, JSON]:
     return build_score_payload(
-        value=1.0, evidence={"kind": "failed_closed", "model": "trusted-1", "cause": cause}
+        value=1.0,
+        evidence={
+            "kind": "failed_closed",
+            "model": "trusted-1",
+            "cause": cause,
+        },
     )
 
 
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
-        pytest.param({**UNRATED_ENVELOPE, "history": []}, "$", id="ratings-missing"),
-        pytest.param({**ENVELOPE, "history": [], "ratings": {}}, "$", id="ratings-not-a-list"),
+        pytest.param(
+            {
+                **UNRATED_ENVELOPE,
+                "history": [],
+            },
+            "$",
+            id="ratings-missing",
+        ),
         pytest.param(
             {
                 **ENVELOPE,
-                "history": [{**ACTION, "tool_calls": [TASK_CALL]}],
-                "subagents": {"call_7": {**UNRATED_ENVELOPE, "history": []}},
+                "history": [],
+                "ratings": {},
+            },
+            "$",
+            id="ratings-not-a-list",
+        ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [TASK_CALL],
+                    },
+                ],
+                "subagents": {
+                    "call_7": {
+                        **UNRATED_ENVELOPE,
+                        "history": [],
+                    },
+                },
             },
             "$.subagents[0]",
             id="subagent-ratings-missing",
         ),
-        pytest.param(build_rating_payload("a1"), "$.ratings[0]", id="rating-not-a-mapping"),
         pytest.param(
-            build_rating_payload({"action_id": "a1"}), "$.ratings[0]", id="rating-no-score"
+            build_rating_payload("a1"),
+            "$.ratings[0]",
+            id="rating-not-a-mapping",
         ),
         pytest.param(
-            build_rating_payload({"action_id": 1, "score": STORED_READS_THE_FILE}),
+            build_rating_payload({"action_id": "a1"}),
+            "$.ratings[0]",
+            id="rating-no-score",
+        ),
+        pytest.param(
+            build_rating_payload(
+                {
+                    "action_id": 1,
+                    "score": STORED_READS_THE_FILE,
+                },
+            ),
             "$.ratings[0]",
             id="action-id-not-text",
         ),
         pytest.param(
-            build_rating_payload({"action_id": "a9", "score": STORED_READS_THE_FILE}),
+            build_rating_payload(
+                {
+                    "action_id": "a9",
+                    "score": STORED_READS_THE_FILE,
+                },
+            ),
             "$.ratings[0].action_id",
             id="action-not-in-the-history",
         ),
         pytest.param(
             build_rating_payload(
-                {"action_id": "a1", "score": {"value": 0.25, "evidence": EVIDENCE}}
+                {
+                    "action_id": "a1",
+                    "score": {
+                        "value": 0.25,
+                        "evidence": EVIDENCE,
+                    },
+                },
             ),
             SCORE_PATH,
             id="score-without-explanation",
         ),
-        pytest.param(build_score_payload(explanation=5), SCORE_PATH, id="explanation-not-text"),
-        pytest.param(build_score_payload(value=True), SCORE_PATH, id="value-a-bool"),
-        pytest.param(build_score_payload(value=1.5), SCORE_PATH, id="value-above-one"),
-        pytest.param(build_score_payload(value="0.5"), SCORE_PATH, id="value-text"),
-        pytest.param(build_score_payload(value=None), SCORE_PATH, id="value-null"),
+        pytest.param(
+            build_score_payload(explanation=5),
+            SCORE_PATH,
+            id="explanation-not-text",
+        ),
+        pytest.param(
+            build_score_payload(value=True),
+            SCORE_PATH,
+            id="value-a-bool",
+        ),
+        pytest.param(
+            build_score_payload(value=1.5),
+            SCORE_PATH,
+            id="value-above-one",
+        ),
+        pytest.param(
+            build_score_payload(value="0.5"),
+            SCORE_PATH,
+            id="value-text",
+        ),
+        pytest.param(
+            build_score_payload(value=None),
+            SCORE_PATH,
+            id="value-null",
+        ),
         pytest.param(
             build_score_payload(
                 value=0.5,
@@ -617,20 +1094,37 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             id="failed-closed-with-a-value-below-one",
         ),
         pytest.param(
-            build_evidence_payload({"kind": "audit"}), EVIDENCE_PATH, id="unknown-evidence"
+            build_evidence_payload({"kind": "audit"}),
+            EVIDENCE_PATH,
+            id="unknown-evidence",
         ),
         pytest.param(
-            build_evidence_payload({"kind": "rationale", "hidden_reasoning": []}),
+            build_evidence_payload(
+                {
+                    "kind": "rationale",
+                    "hidden_reasoning": [],
+                },
+            ),
             EVIDENCE_PATH,
             id="rationale-without-a-model",
         ),
         pytest.param(
-            build_evidence_payload({**EVIDENCE, "hidden_reasoning": "text"}),
+            build_evidence_payload(
+                {
+                    **EVIDENCE,
+                    "hidden_reasoning": "text",
+                },
+            ),
             EVIDENCE_PATH,
             id="hidden-reasoning-not-a-list",
         ),
         pytest.param(
-            build_evidence_payload({**EVIDENCE, "hidden_reasoning": [5]}),
+            build_evidence_payload(
+                {
+                    **EVIDENCE,
+                    "hidden_reasoning": [5],
+                },
+            ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="hidden-reasoning-not-text",
         ),
@@ -641,7 +1135,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "model": "jev-1.14",
                     "decisions": [],
                     "hidden_reasoning": [5],
-                }
+                },
             ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="decisions-hidden-reasoning-not-text",
@@ -653,86 +1147,157 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "model": "jev-1.14",
                     "decisions": [{}],
                     "hidden_reasoning": [],
-                }
+                },
             ),
             "$.ratings[0].score.evidence.decisions[0]",
             id="decision-without-a-statement",
         ),
         pytest.param(
-            build_decision_payload({"probability": True, "confidence": None}),
+            build_decision_payload(
+                {
+                    "probability": True,
+                    "confidence": None,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="probability-a-bool",
         ),
         pytest.param(
-            build_decision_payload({"probability": "0.9", "confidence": None}),
+            build_decision_payload(
+                {
+                    "probability": "0.9",
+                    "confidence": None,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="probability-text",
         ),
         pytest.param(
-            build_decision_payload({"probability": 1.5, "confidence": None}),
+            build_decision_payload(
+                {
+                    "probability": 1.5,
+                    "confidence": None,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="probability-above-one",
         ),
         pytest.param(
-            build_decision_payload({"probability": math.nan, "confidence": None}),
+            build_decision_payload(
+                {
+                    "probability": math.nan,
+                    "confidence": None,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="probability-not-a-number",
         ),
         pytest.param(
-            build_decision_payload({"probability": 0.9, "confidence": "high"}),
+            build_decision_payload(
+                {
+                    "probability": 0.9,
+                    "confidence": "high",
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="confidence-text",
         ),
         pytest.param(
-            build_decision_payload({"probability": 0.9, "confidence": True}),
+            build_decision_payload(
+                {
+                    "probability": 0.9,
+                    "confidence": True,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="confidence-a-bool",
         ),
         pytest.param(
-            build_decision_payload({"probability": 0.9, "confidence": -0.1}),
+            build_decision_payload(
+                {
+                    "probability": 0.9,
+                    "confidence": -0.1,
+                },
+            ),
             "$.ratings[0].score.evidence.decisions[0].decision",
             id="confidence-below-zero",
         ),
         pytest.param(
-            build_evidence_payload({"kind": "labels", "labels": [], "hidden_reasoning": []}),
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "labels": [],
+                    "hidden_reasoning": [],
+                },
+            ),
             EVIDENCE_PATH,
             id="labels-without-a-model",
         ),
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": "unsafe", "hidden_reasoning": []}
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": "unsafe",
+                    "hidden_reasoning": [],
+                },
             ),
             EVIDENCE_PATH,
             id="labels-not-a-list",
         ),
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": ["unsafe", 5], "hidden_reasoning": []}
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["unsafe", 5],
+                    "hidden_reasoning": [],
+                },
             ),
             "$.ratings[0].score.evidence.labels[1]",
             id="label-not-text",
         ),
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": ["unsafe", None], "hidden_reasoning": []}
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["unsafe", None],
+                    "hidden_reasoning": [],
+                },
             ),
             "$.ratings[0].score.evidence.labels[1]",
             id="label-null",
         ),
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": [], "hidden_reasoning": [5]}
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": [],
+                    "hidden_reasoning": [5],
+                },
             ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="labels-hidden-reasoning-not-text",
         ),
         pytest.param(
-            build_evidence_payload({"kind": "composite", "parts": []}),
+            build_evidence_payload(
+                {
+                    "kind": "composite",
+                    "parts": [],
+                },
+            ),
             EVIDENCE_PATH,
             id="composite-without-parts",
         ),
         pytest.param(
-            build_evidence_payload({"kind": "composite", "parts": [{"value": 0.5}]}),
+            build_evidence_payload(
+                {
+                    "kind": "composite",
+                    "parts": [{"value": 0.5}],
+                },
+            ),
             "$.ratings[0].score.evidence.parts[0]",
             id="composite-part-malformed",
         ),
@@ -740,8 +1305,13 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             build_evidence_payload(
                 {
                     "kind": "composite",
-                    "parts": [{**STORED_READS_THE_FILE, "evidence": {"kind": "audit"}}],
-                }
+                    "parts": [
+                        {
+                            **STORED_READS_THE_FILE,
+                            "evidence": {"kind": "audit"},
+                        },
+                    ],
+                },
             ),
             "$.ratings[0].score.evidence.parts[0].evidence",
             id="composite-part-with-unknown-evidence",
@@ -749,44 +1319,80 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
         pytest.param(
             build_score_payload(
                 value=1.0,
-                evidence={"kind": "failed_closed", "model": 5, "cause": {"kind": "unreadable"}},
+                evidence={
+                    "kind": "failed_closed",
+                    "model": 5,
+                    "cause": {"kind": "unreadable"},
+                },
             ),
             EVIDENCE_PATH,
             id="failed-closed-model-not-text",
         ),
-        pytest.param(build_cause_payload({"kind": "audit"}), CAUSE_PATH, id="unknown-cause"),
         pytest.param(
-            build_cause_payload({"kind": "unperceivable", "content": []}),
+            build_cause_payload({"kind": "audit"}),
+            CAUSE_PATH,
+            id="unknown-cause",
+        ),
+        pytest.param(
+            build_cause_payload(
+                {
+                    "kind": "unperceivable",
+                    "content": [],
+                },
+            ),
             CAUSE_PATH,
             id="unperceivable-without-content",
         ),
         pytest.param(
-            build_cause_payload({"kind": "unperceivable", "content": [5]}),
+            build_cause_payload(
+                {
+                    "kind": "unperceivable",
+                    "content": [5],
+                },
+            ),
             "$.ratings[0].score.evidence.cause.content[0]",
             id="unperceivable-content-not-text",
         ),
         pytest.param(
-            build_cause_payload({"kind": "truncated"}), CAUSE_PATH, id="truncated-without-text"
+            build_cause_payload({"kind": "truncated"}),
+            CAUSE_PATH,
+            id="truncated-without-text",
         ),
         pytest.param(
-            build_cause_payload({"kind": "refused", "explanation": 5}),
+            build_cause_payload(
+                {
+                    "kind": "refused",
+                    "explanation": 5,
+                },
+            ),
             CAUSE_PATH,
             id="refused-explanation-not-text",
         ),
         pytest.param(
-            build_cause_payload({"kind": "unavailable", "status": "503"}),
+            build_cause_payload(
+                {
+                    "kind": "unavailable",
+                    "status": "503",
+                },
+            ),
             CAUSE_PATH,
             id="unavailable-status-text",
         ),
         pytest.param(
-            build_cause_payload({"kind": "unavailable", "status": True}),
+            build_cause_payload(
+                {
+                    "kind": "unavailable",
+                    "status": True,
+                },
+            ),
             CAUSE_PATH,
             id="unavailable-status-a-bool",
         ),
     ],
 )
 def test_loading_a_malformed_rating_raises_format_error_at_its_path(
-    payload: JSON, path: str
+    payload: JSON,
+    path: str,
 ) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
@@ -799,7 +1405,12 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
     [
         pytest.param(
             build_evidence_payload(
-                {"kind": "labels", "model": "m", "labels": [5], "hidden_reasoning": []}
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": [5],
+                    "hidden_reasoning": [],
+                },
             ),
             "$.ratings[0].score.evidence.labels[0]: expected text",
             id="label-not-text",
@@ -812,7 +1423,10 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
         ),
     ],
 )
-def test_a_format_error_for_evidence_says_what_was_expected(payload: JSON, message: str) -> None:
+def test_a_format_error_for_evidence_says_what_was_expected(
+    payload: JSON,
+    message: str,
+) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
 

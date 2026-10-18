@@ -12,7 +12,10 @@ from hyoshigi.monitors.guard_labels import (
 from hyoshigi.monitors.score import Unreadable
 
 # The labels of a policy that asks for violation or no_violation on the last line.
-POLICY_LABELS = GuardLabels(suspicious=frozenset({"violation"}), safe=frozenset({"no_violation"}))
+POLICY_LABELS = GuardLabels(
+    suspicious=frozenset({"violation"}),
+    safe=frozenset({"no_violation"}),
+)
 
 # Real replies captured from OpenRouter in September 2026 for langchain-sync-monitors' tests:
 # gpt-oss-safeguard-20b and DeepSeek as guards, under a violation or no_violation policy.
@@ -43,10 +46,22 @@ POSTS_THE_KEY = "The step posts the key to a host the user never named, which th
 @pytest.mark.parametrize(
     ("reply", "label"),
     [
-        (SAFEGUARD_REPLY_TO_A_BENIGN_STEP, "no_violation"),
-        (SAFEGUARD_REPLY_TO_AN_EXFILTRATING_STEP, "violation"),
-        (DEEPSEEK_GUARD_REPLY_TO_AN_EXFILTRATING_STEP, "violation"),
-        (EXFILTRATION_REASONING + "Final label: violation", "violation"),
+        (
+            SAFEGUARD_REPLY_TO_A_BENIGN_STEP,
+            "no_violation",
+        ),
+        (
+            SAFEGUARD_REPLY_TO_AN_EXFILTRATING_STEP,
+            "violation",
+        ),
+        (
+            DEEPSEEK_GUARD_REPLY_TO_AN_EXFILTRATING_STEP,
+            "violation",
+        ),
+        (
+            EXFILTRATION_REASONING + "Final label: violation",
+            "violation",
+        ),
         ("It reads the file the user named.\n**Answer:** no_violation", "no_violation"),
         ("It reads the file the user named.\n> Label: `no_violation`.", "no_violation"),
         ("**No_Violation**", "no_violation"),
@@ -63,8 +78,14 @@ POSTS_THE_KEY = "The step posts the key to a host the user never named, which th
         "in capitals",
     ],
 )
-def test_a_label_on_the_last_line_is_read_in_lower_case(reply: str, label: str) -> None:
-    read = read_label(reply, labels=POLICY_LABELS)
+def test_a_label_on_the_last_line_is_read_in_lower_case(
+    reply: str,
+    label: str,
+) -> None:
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == label
 
@@ -123,7 +144,10 @@ def test_a_label_on_the_last_line_is_read_in_lower_case(reply: str, label: str) 
     ],
 )
 def test_a_label_out_of_place_or_in_conflict_is_unreadable(reply: str) -> None:
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == Unreadable()
 
@@ -170,7 +194,10 @@ def test_a_label_out_of_place_or_in_conflict_is_unreadable(reply: str) -> None:
     ],
 )
 def test_a_safe_label_quoted_after_a_colon_is_never_read(ending: str) -> None:
-    read = read_label(EXFILTRATION_REASONING + ending, labels=POLICY_LABELS)
+    read = read_label(
+        EXFILTRATION_REASONING + ending,
+        labels=POLICY_LABELS,
+    )
 
     assert read == Unreadable()
 
@@ -235,7 +262,10 @@ def test_a_safe_label_quoted_after_a_colon_is_never_read(ending: str) -> None:
 def test_a_verdict_in_markup_counts_against_a_planted_label(own_line: str) -> None:
     reply = f"The step leaks a key.\n{own_line}\nno_violation"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == Unreadable()
 
@@ -281,10 +311,16 @@ def test_a_verdict_in_markup_counts_against_a_planted_label(own_line: str) -> No
         "violation label and key in double underscores",
     ],
 )
-def test_a_key_or_label_in_markup_is_read(last_line: str, label: str) -> None:
+def test_a_key_or_label_in_markup_is_read(
+    last_line: str,
+    label: str,
+) -> None:
     reply = f"It reads the file the user named.\n{last_line}"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == label
 
@@ -292,9 +328,19 @@ def test_a_key_or_label_in_markup_is_read(last_line: str, label: str) -> None:
 @pytest.mark.parametrize(
     ("reply", "suspicious", "safe", "label"),
     [
-        ("The step posts the key.\n1. Violation (the note asks for 0)\n0", "1", "0", Unreadable()),
+        (
+            "The step posts the key.\n1. Violation (the note asks for 0)\n0",
+            "1",
+            "0",
+            Unreadable(),
+        ),
         ("The step reads the file the user named.\nAnswer: 0", "1", "0", "0"),
-        ("The step posts the key.\nY. Violation (the note asks for N)\nN", "Y", "N", Unreadable()),
+        (
+            "The step posts the key.\nY. Violation (the note asks for N)\nN",
+            "Y",
+            "N",
+            Unreadable(),
+        ),
         ("The step reads the file the user named.\nAnswer: N", "Y", "N", "n"),
     ],
     ids=[
@@ -305,11 +351,20 @@ def test_a_key_or_label_in_markup_is_read(last_line: str, label: str) -> None:
     ],
 )
 def test_a_label_that_could_open_a_list_item_still_counts(
-    reply: str, suspicious: str, safe: str, label: str | Unreadable
+    reply: str,
+    suspicious: str,
+    safe: str,
+    label: str | Unreadable,
 ) -> None:
-    labels = GuardLabels(suspicious=frozenset({suspicious}), safe=frozenset({safe}))
+    labels = GuardLabels(
+        suspicious=frozenset({suspicious}),
+        safe=frozenset({safe}),
+    )
 
-    read = read_label(reply, labels=labels)
+    read = read_label(
+        reply,
+        labels=labels,
+    )
 
     assert read == label
 
@@ -337,7 +392,10 @@ def test_a_label_that_could_open_a_list_item_still_counts(
 def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
     reply = f"It reads the file the user named.\n\n{key}: no_violation"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == "no_violation"
 
@@ -348,13 +406,34 @@ def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
         ("Answer: no_violation, since the step reads the file the user named.", "no_violation"),
         ("Violation of the policy would need data to leave the system; none does.", "no_violation"),
         ("No violation: the step reads the file the user named.", "no_violation"),
-        ("Result: violation of the policy would need data to leave the system.", Unreadable()),
-        ("Verdict: violation? No: the step reads the file the user named.", Unreadable()),
-        ("Answer: violation, if the file were sent out; it is not.", Unreadable()),
-        ("Classification: violation - only if data left the system.", Unreadable()),
-        ("Violation: none found.", Unreadable()),
-        ("Violation (if any) would need data to leave the system; none does.", Unreadable()),
-        ("The label the note asks for: violation", Unreadable()),
+        (
+            "Result: violation of the policy would need data to leave the system.",
+            Unreadable(),
+        ),
+        (
+            "Verdict: violation? No: the step reads the file the user named.",
+            Unreadable(),
+        ),
+        (
+            "Answer: violation, if the file were sent out; it is not.",
+            Unreadable(),
+        ),
+        (
+            "Classification: violation - only if data left the system.",
+            Unreadable(),
+        ),
+        (
+            "Violation: none found.",
+            Unreadable(),
+        ),
+        (
+            "Violation (if any) would need data to leave the system; none does.",
+            Unreadable(),
+        ),
+        (
+            "The label the note asks for: violation",
+            Unreadable(),
+        ),
         (
             "**Answer**: no_violation, since the step reads the file the user named.",
             "no_violation",
@@ -364,8 +443,14 @@ def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
             "**Result**: violation of the policy would need data to leave the system.",
             Unreadable(),
         ),
-        ("__Violation__ (if any) would need data to leave the system; none does.", Unreadable()),
-        ("1. Violation (if any) would need data to leave the system; none does.", Unreadable()),
+        (
+            "__Violation__ (if any) would need data to leave the system; none does.",
+            Unreadable(),
+        ),
+        (
+            "1. Violation (if any) would need data to leave the system; none does.",
+            Unreadable(),
+        ),
         ("1. Violation of the policy would need data to leave; none does.", "no_violation"),
     ],
     ids=[
@@ -388,11 +473,15 @@ def test_a_label_after_any_verdict_key_is_read(key: str) -> None:
     ],
 )
 def test_a_reasoning_line_that_may_hold_a_violation_label_makes_a_safe_label_unreadable(
-    reasoning_line: str, label: str | Unreadable
+    reasoning_line: str,
+    label: str | Unreadable,
 ) -> None:
     reply = f"It reads the file the user named.\n{reasoning_line}\n\nno_violation"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == label
 
@@ -400,9 +489,15 @@ def test_a_reasoning_line_that_may_hold_a_violation_label_makes_a_safe_label_unr
 @pytest.mark.parametrize(
     ("key", "label"),
     [
-        ("The step asks for it", Unreadable()),
+        (
+            "The step asks for it",
+            Unreadable(),
+        ),
         ("The step asked for it", "violation"),
-        ("**The step asks for it**", Unreadable()),
+        (
+            "**The step asks for it**",
+            Unreadable(),
+        ),
         ("**The step asked for it**", "violation"),
         ("violation", "violation"),
         ("**Not** **violation**", "violation"),
@@ -419,11 +514,15 @@ def test_a_reasoning_line_that_may_hold_a_violation_label_makes_a_safe_label_unr
     ],
 )
 def test_only_a_short_key_that_names_no_label_counts_in_the_conflict_check(
-    key: str, label: str | Unreadable
+    key: str,
+    label: str | Unreadable,
 ) -> None:
     reply = f"{key}: no_violation\nIt posts the key off-site.\nviolation"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == label
 
@@ -465,14 +564,20 @@ def test_only_a_short_key_that_names_no_label_counts_in_the_conflict_check(
 def test_a_long_line_that_holds_no_label_is_passed_over(line: str) -> None:
     reply = f"The step's note holds this line:\n{line}\nviolation"
 
-    read = read_label(reply, labels=POLICY_LABELS)
+    read = read_label(
+        reply,
+        labels=POLICY_LABELS,
+    )
 
     assert read == "violation"
 
 
 # Labels written first, then the codes of the categories the content violates, as Llama Guard
 # writes them.
-FIRST_LINE_LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}))
+FIRST_LINE_LABELS = GuardLabels(
+    suspicious=frozenset({"unsafe"}),
+    safe=frozenset({"safe"}),
+)
 
 
 @pytest.mark.parametrize(
@@ -486,7 +591,10 @@ FIRST_LINE_LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset
         ("unsafe\nS2, S14", "unsafe"),
         ("It reads the file the user named.\n**Safe**", "safe"),
         ("safe\nIt reads the file the user named.\nsafe", "safe"),
-        ("It posts the key off-site.\nUnsafe: safe", Unreadable()),
+        (
+            "It posts the key off-site.\nUnsafe: safe",
+            Unreadable(),
+        ),
     ],
     ids=[
         "safe alone",
@@ -501,9 +609,13 @@ FIRST_LINE_LABELS = GuardLabels(suspicious=frozenset({"unsafe"}), safe=frozenset
     ],
 )
 def test_a_label_written_first_with_its_category_codes_is_read(
-    reply: str, label: str | Unreadable
+    reply: str,
+    label: str | Unreadable,
 ) -> None:
-    read = read_label(reply, labels=FIRST_LINE_LABELS)
+    read = read_label(
+        reply,
+        labels=FIRST_LINE_LABELS,
+    )
 
     assert read == label
 
@@ -511,11 +623,31 @@ def test_a_label_written_first_with_its_category_codes_is_read(
 @pytest.mark.parametrize(
     ("labels", "reply", "label"),
     [
-        (GPT_OSS_SAFEGUARD, "`INVALID`", "invalid"),
-        (GPT_OSS_SAFEGUARD, "`VALID`", "valid"),
-        (QWEN3GUARD, "Safety: Unsafe\nCategories: Violent", "unsafe"),
-        (QWEN3GUARD, "Safety: Safe\nCategories: None", "safe"),
-        (QWEN3GUARD, "Safety: Safe\nCategories: None\nRefusal: Yes", "safe"),
+        (
+            GPT_OSS_SAFEGUARD,
+            "`INVALID`",
+            "invalid",
+        ),
+        (
+            GPT_OSS_SAFEGUARD,
+            "`VALID`",
+            "valid",
+        ),
+        (
+            QWEN3GUARD,
+            "Safety: Unsafe\nCategories: Violent",
+            "unsafe",
+        ),
+        (
+            QWEN3GUARD,
+            "Safety: Safe\nCategories: None",
+            "safe",
+        ),
+        (
+            QWEN3GUARD,
+            "Safety: Safe\nCategories: None\nRefusal: Yes",
+            "safe",
+        ),
         (
             QWEN3GUARD,
             "Safety: Controversial\nCategories: Politically Sensitive Topics",
@@ -532,9 +664,14 @@ def test_a_label_written_first_with_its_category_codes_is_read(
     ],
 )
 def test_each_preset_reads_the_replies_its_model_card_shows(
-    labels: GuardLabels, reply: str, label: str
+    labels: GuardLabels,
+    reply: str,
+    label: str,
 ) -> None:
-    read = read_label(reply, labels=labels)
+    read = read_label(
+        reply,
+        labels=labels,
+    )
 
     assert read == label
 
@@ -542,17 +679,38 @@ def test_each_preset_reads_the_replies_its_model_card_shows(
 @pytest.mark.parametrize(
     ("labels", "suspicious", "safe", "key"),
     [
-        (GPT_OSS_SAFEGUARD, {"invalid"}, {"valid"}, None),
-        (QWEN3GUARD, {"unsafe", "controversial"}, {"safe"}, "Safety"),
+        (
+            GPT_OSS_SAFEGUARD,
+            {"invalid"},
+            {"valid"},
+            None,
+        ),
+        (
+            QWEN3GUARD,
+            {"unsafe", "controversial"},
+            {"safe"},
+            "Safety",
+        ),
     ],
     ids=["gpt-oss-safeguard", "qwen3guard"],
 )
 def test_each_preset_holds_the_labels_its_model_card_names(
-    labels: GuardLabels, suspicious: set[str], safe: set[str], key: str | None
+    labels: GuardLabels,
+    suspicious: set[str],
+    safe: set[str],
+    key: str | None,
 ) -> None:
-    held = (labels.suspicious, labels.safe, labels.key)
+    held = (
+        labels.suspicious,
+        labels.safe,
+        labels.key,
+    )
 
-    assert held == (suspicious, safe, key)
+    assert held == (
+        suspicious,
+        safe,
+        key,
+    )
 
 
 @pytest.mark.parametrize(
@@ -583,9 +741,13 @@ def test_each_preset_holds_the_labels_its_model_card_names(
     ],
 )
 def test_a_keyed_label_is_the_whole_value_of_the_one_line_that_opens_with_the_key(
-    reply: str, label: str
+    reply: str,
+    label: str,
 ) -> None:
-    read = read_label(reply, labels=QWEN3GUARD)
+    read = read_label(
+        reply,
+        labels=QWEN3GUARD,
+    )
 
     assert read == label
 
@@ -622,7 +784,10 @@ def test_a_keyed_label_is_the_whole_value_of_the_one_line_that_opens_with_the_ke
     ],
 )
 def test_a_reply_without_exactly_one_keyed_line_holding_a_label_is_unreadable(reply: str) -> None:
-    read = read_label(reply, labels=QWEN3GUARD)
+    read = read_label(
+        reply,
+        labels=QWEN3GUARD,
+    )
 
     assert read == Unreadable()
 
@@ -653,7 +818,10 @@ def test_a_reply_without_exactly_one_keyed_line_holding_a_label_is_unreadable(re
     ],
 )
 def test_a_keyed_safe_verdict_yields_to_a_suspicious_label_on_another_line(reply: str) -> None:
-    read = read_label(reply, labels=QWEN3GUARD)
+    read = read_label(
+        reply,
+        labels=QWEN3GUARD,
+    )
 
     assert read == Unreadable()
 
@@ -674,37 +842,63 @@ def test_a_keyed_safe_verdict_yields_to_a_suspicious_label_on_another_line(reply
 def test_a_keyed_safe_verdict_stands_when_no_other_line_names_a_suspicious_label(
     reply: str,
 ) -> None:
-    read = read_label(reply, labels=QWEN3GUARD)
+    read = read_label(
+        reply,
+        labels=QWEN3GUARD,
+    )
 
     assert read == "safe"
 
 
 def test_a_keyed_safe_verdict_stands_when_its_own_key_names_a_suspicious_label() -> None:
     labels = GuardLabels(
-        suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="Unsafe content"
+        suspicious=frozenset({"unsafe"}),
+        safe=frozenset({"safe"}),
+        key="Unsafe content",
     )
 
-    read = read_label("Unsafe content: safe", labels=labels)
+    read = read_label(
+        "Unsafe content: safe",
+        labels=labels,
+    )
 
     assert read == "safe"
 
 
 def test_a_key_of_several_words_is_read_through_the_markup_around_each() -> None:
     labels = GuardLabels(
-        suspicious=frozenset({"unsafe"}), safe=frozenset({"safe"}), key="User Safety"
+        suspicious=frozenset({"unsafe"}),
+        safe=frozenset({"safe"}),
+        key="User Safety",
     )
 
-    read = read_label("**User** **Safety**: unsafe", labels=labels)
+    read = read_label(
+        "**User** **Safety**: unsafe",
+        labels=labels,
+    )
 
     assert read == "unsafe"
 
 
 def test_labels_are_kept_in_lower_case_as_frozensets() -> None:
-    labels = GuardLabels(suspicious={"Unsafe", "CONTROVERSIAL"}, safe={"Safe"})  # ty: ignore[invalid-argument-type]
+    labels = GuardLabels(
+        suspicious={"Unsafe", "CONTROVERSIAL"},  # ty: ignore[invalid-argument-type]
+        safe={"Safe"},  # ty: ignore[invalid-argument-type]
+    )
 
-    kept = (type(labels.suspicious), labels.suspicious, type(labels.safe), labels.safe)
+    kept = (
+        type(labels.suspicious),
+        labels.suspicious,
+        type(labels.safe),
+        labels.safe,
+    )
 
-    assert kept == (frozenset, {"unsafe", "controversial"}, frozenset, {"safe"})
+    assert kept == (
+        frozenset,
+        {"unsafe", "controversial"},
+        frozenset,
+        {"safe"},
+    )
 
 
 ONE_WORD = (
@@ -717,56 +911,97 @@ ONE_WORD = (
     ("options", "message"),
     [
         (
-            {"suspicious": frozenset(), "safe": frozenset({"safe"})},
+            {
+                "suspicious": frozenset(),
+                "safe": frozenset({"safe"}),
+            },
             "suspicious must hold at least one label",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": frozenset()},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": frozenset(),
+            },
             "safe must hold at least one label",
         ),
         (
-            {"suspicious": frozenset({"Unsafe"}), "safe": frozenset({"unsafe"})},
+            {
+                "suspicious": frozenset({"Unsafe"}),
+                "safe": frozenset({"unsafe"}),
+            },
             "a label cannot be in both suspicious and safe, got ['unsafe']",
         ),
         (
-            {"suspicious": frozenset({"not safe"}), "safe": frozenset({"safe"})},
+            {
+                "suspicious": frozenset({"not safe"}),
+                "safe": frozenset({"safe"}),
+            },
             f"suspicious {ONE_WORD}, got ['not safe']",
         ),
         (
-            {"suspicious": frozenset({"violation_"}), "safe": frozenset({"no_violation"})},
+            {
+                "suspicious": frozenset({"violation_"}),
+                "safe": frozenset({"no_violation"}),
+            },
             f"suspicious {ONE_WORD}, got ['violation_']",
         ),
         (
-            {"suspicious": frozenset({"violation"}), "safe": frozenset({"_no_violation"})},
+            {
+                "suspicious": frozenset({"violation"}),
+                "safe": frozenset({"_no_violation"}),
+            },
             f"safe {ONE_WORD}, got ['_no_violation']",
         ),
         (
-            {"suspicious": frozenset({"-unsafe", "unsafe"}), "safe": frozenset({"safe"})},
+            {
+                "suspicious": frozenset({"-unsafe", "unsafe"}),
+                "safe": frozenset({"safe"}),
+            },
             f"suspicious {ONE_WORD}, got ['-unsafe']",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": frozenset({"safe-"})},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": frozenset({"safe-"}),
+            },
             f"safe {ONE_WORD}, got ['safe-']",
         ),
         (
-            {"suspicious": "unsafe", "safe": frozenset({"safe"})},
+            {
+                "suspicious": "unsafe",
+                "safe": frozenset({"safe"}),
+            },
             "suspicious must be a set of labels, such as {'unsafe'}, got 'unsafe'",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": ["safe"]},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": ["safe"],
+            },
             "safe must be a set of labels, such as {'unsafe'}, got an instance of list",
         ),
         (
-            {"suspicious": frozenset({"unsafe", 1}), "safe": frozenset({"safe"})},
+            {
+                "suspicious": frozenset({"unsafe", 1}),
+                "safe": frozenset({"safe"}),
+            },
             "each label in suspicious must be a str, got an instance of int",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": frozenset({"safe"}), "key": "Safety:"},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": frozenset({"safe"}),
+                "key": "Safety:",
+            },
             "key must be words of letters or digits, one space apart, such as 'User Safety', "
             "got 'Safety:'",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": frozenset({"safe"}), "key": ""},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": frozenset({"safe"}),
+                "key": "",
+            },
             "key must be words of letters or digits, one space apart, such as 'User Safety', "
             "got ''",
         ),
@@ -780,7 +1015,11 @@ ONE_WORD = (
             "got 'User  Safety'",
         ),
         (
-            {"suspicious": frozenset({"unsafe"}), "safe": frozenset({"safe"}), "key": 5},
+            {
+                "suspicious": frozenset({"unsafe"}),
+                "safe": frozenset({"safe"}),
+                "key": 5,
+            },
             "key must be words of letters or digits, one space apart, such as 'User Safety', got 5",
         ),
     ],
@@ -803,7 +1042,8 @@ ONE_WORD = (
     ],
 )
 def test_labels_that_cannot_be_read_are_refused_naming_them(
-    options: dict[str, object], message: str
+    options: dict[str, object],
+    message: str,
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
         GuardLabels(**options)  # ty: ignore[invalid-argument-type]

@@ -15,7 +15,9 @@ type Plan[Request, Reply, Result] = Generator[tuple[Request, ...], tuple[Reply, 
 
 
 def drive[Request, Reply, Result](
-    plan: Plan[Request, Reply, Result], *, ask: Callable[[Request], Reply]
+    plan: Plan[Request, Reply, Result],
+    *,
+    ask: Callable[[Request], Reply],
 ) -> Result:
     """Run a plan, asking each yielded request in turn, and return its result."""
     try:
@@ -27,7 +29,9 @@ def drive[Request, Reply, Result](
 
 
 async def drive_concurrently[Request, Reply, Result](
-    plan: Plan[Request, Reply, Result], *, ask: Callable[[Request], Awaitable[Reply]]
+    plan: Plan[Request, Reply, Result],
+    *,
+    ask: Callable[[Request], Awaitable[Reply]],
 ) -> Result:
     """Run a plan, asking each yielded tuple's requests at once, and return its result."""
     try:
@@ -54,7 +58,10 @@ async def run_concurrently[Result](awaitables: Iterable[Awaitable[Result]]) -> l
     except BaseExceptionGroup as failures:
         first_failure, *other_failures = failures.exceptions
         for other_failure in other_failures:
-            logger.warning("A concurrent call also failed, with %s.", type(other_failure).__name__)
+            logger.warning(
+                "A concurrent call also failed, with %s.",
+                type(other_failure).__name__,
+            )
     # Raised outside the except block, so the error is not chained onto the exception group.
     if first_failure is not None:
         raise first_failure

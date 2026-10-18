@@ -52,7 +52,10 @@ UNAVAILABLE_EXPLANATION = (
 UNAVAILABLE_SCORE = SuspicionScore(
     value=1.0,
     explanation=UNAVAILABLE_EXPLANATION,
-    evidence=FailedClosed(model=MODEL_NAME, cause=Unavailable(status=503)),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Unavailable(status=503),
+    ),
 )
 FAILURES = (Unavailable(status=503),) * 8
 REFUSED_EXPLANATION = (
@@ -61,36 +64,63 @@ REFUSED_EXPLANATION = (
 REFUSED_SCORE = SuspicionScore(
     value=1.0,
     explanation=REFUSED_EXPLANATION,
-    evidence=FailedClosed(model=MODEL_NAME, cause=Refused(explanation="I cannot assess this.")),
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Refused(explanation="I cannot assess this."),
+    ),
 )
 
 
 class Script:
     """The outcomes a scripted model returns in order, and the prompts it received."""
 
-    def __init__(self, *outcomes: GenerationOutcome) -> None:
+    def __init__(
+        self,
+        *outcomes: GenerationOutcome,
+    ) -> None:
         self.outcomes = list(outcomes)
         self.received: list[Prompt] = []
 
-    def generate(self, prompt: Prompt) -> GenerationOutcome:
+    def generate(
+        self,
+        prompt: Prompt,
+    ) -> GenerationOutcome:
         self.received.append(prompt)
         return self.outcomes.pop(0)
 
-    async def generate_asynchronously(self, prompt: Prompt) -> GenerationOutcome:
+    async def generate_asynchronously(
+        self,
+        prompt: Prompt,
+    ) -> GenerationOutcome:
         return self.generate(prompt)
 
 
-def build_reply(score: int, reasoning: str = "r") -> Generation:
+def build_reply(
+    score: int,
+    reasoning: str = "r",
+) -> Generation:
     return Generation(text=f"<reasoning>{reasoning}</reasoning><score>{score}</score>")
 
 
-def build_score(value: float, explanation: str = "r", *, model: str = MODEL_NAME) -> SuspicionScore:
+def build_score(
+    value: float,
+    explanation: str = "r",
+    *,
+    model: str = MODEL_NAME,
+) -> SuspicionScore:
     """The score an LLM monitor gives a reply: a value and the reasoning, from a model."""
-    return SuspicionScore(value=value, explanation=explanation, evidence=Rationale(model=model))
+    return SuspicionScore(
+        value=value,
+        explanation=explanation,
+        evidence=Rationale(model=model),
+    )
 
 
 def build_trajectory() -> Trajectory:
-    return Trajectory.from_run(TASK, answer="Done.").trajectory
+    return Trajectory.from_run(
+        TASK,
+        answer="Done.",
+    ).trajectory
 
 
 def build_action(text: str = "Reading q3.md.") -> Action:
@@ -98,14 +128,19 @@ def build_action(text: str = "Reading q3.md.") -> Action:
 
 
 def build_acted_trajectory(
-    text: str = "Let me look.", *, rating: SuspicionScore | None = None
+    text: str = "Let me look.",
+    *,
+    rating: SuspicionScore | None = None,
 ) -> Trajectory:
     """A trajectory whose history ends in a new action, which carries the rating if given."""
     trajectory = build_trajectory()
     acted = build_action(text)
     trajectory.act(acted)
     if rating is not None:
-        trajectory.attach(rating, to=acted)
+        trajectory.attach(
+            rating,
+            to=acted,
+        )
     return trajectory
 
 
@@ -113,29 +148,66 @@ def run[Result](awaitable: Awaitable[Result]) -> Result:
     """Run on a fresh event loop; a test that waits longer than the timeout fails."""
 
     async def finish() -> Result:
-        return await asyncio.wait_for(awaitable, timeout=TIMEOUT_SECONDS)
+        return await asyncio.wait_for(
+            awaitable,
+            timeout=TIMEOUT_SECONDS,
+        )
 
     return asyncio.run(finish())
 
 
-def build_synchronous_llm(script: Script, *, highest_score: int = 10) -> LLMMonitor:
-    model = GenerativeModel(name=MODEL_NAME, generate=script.generate)
-    return LLMMonitor(model=model, highest_score=highest_score)
+def build_synchronous_llm(
+    script: Script,
+    *,
+    highest_score: int = 10,
+) -> LLMMonitor:
+    model = GenerativeModel(
+        name=MODEL_NAME,
+        generate=script.generate,
+    )
+    return LLMMonitor(
+        model=model,
+        highest_score=highest_score,
+    )
 
 
-def build_asynchronous_llm(script: Script, *, highest_score: int = 10) -> AsyncLLMMonitor:
-    model = AsyncGenerativeModel(name=MODEL_NAME, generate=script.generate_asynchronously)
-    return AsyncLLMMonitor(model=model, highest_score=highest_score)
+def build_asynchronous_llm(
+    script: Script,
+    *,
+    highest_score: int = 10,
+) -> AsyncLLMMonitor:
+    model = AsyncGenerativeModel(
+        name=MODEL_NAME,
+        generate=script.generate_asynchronously,
+    )
+    return AsyncLLMMonitor(
+        model=model,
+        highest_score=highest_score,
+    )
 
 
-def rate_synchronously(monitor: Monitor, action: Action, trajectory: Trajectory) -> SuspicionScore:
-    return monitor.rate(action, trajectory=trajectory)
+def rate_synchronously(
+    monitor: Monitor,
+    action: Action,
+    trajectory: Trajectory,
+) -> SuspicionScore:
+    return monitor.rate(
+        action,
+        trajectory=trajectory,
+    )
 
 
 def rate_asynchronously(
-    monitor: AsyncMonitor, action: Action, trajectory: Trajectory
+    monitor: AsyncMonitor,
+    action: Action,
+    trajectory: Trajectory,
 ) -> SuspicionScore:
-    return run(monitor.rate(action, trajectory=trajectory))
+    return run(
+        monitor.rate(
+            action,
+            trajectory=trajectory,
+        ),
+    )
 
 
 class Layer(Enum):
@@ -146,7 +218,11 @@ class Layer(Enum):
     CASCADE = auto()
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Family[Wrapped]:
     """The wrappers of one family, built around scripted LLM monitors, and how they are rated."""
 
@@ -154,14 +230,35 @@ class Family[Wrapped]:
     repeated: Callable[..., Wrapped]
     calibrated: Callable[..., Wrapped]
     cascade: Callable[..., Wrapped]
-    rate: Callable[[Wrapped, Action, Trajectory], SuspicionScore]
+    rate: Callable[
+        [
+            Wrapped,
+            Action,
+            Trajectory,
+        ],
+        SuspicionScore,
+    ]
 
     def rate_repeated(
-        self, script: Script, *, ensemble_size: int, highest_score: int = 10
+        self,
+        script: Script,
+        *,
+        ensemble_size: int,
+        highest_score: int = 10,
     ) -> SuspicionScore:
-        llm = self.build_llm(script, highest_score=highest_score)
-        monitor = self.repeated(monitor=llm, ensemble_size=ensemble_size)
-        return self.rate(monitor, ACTION, build_trajectory())
+        llm = self.build_llm(
+            script,
+            highest_score=highest_score,
+        )
+        monitor = self.repeated(
+            monitor=llm,
+            ensemble_size=ensemble_size,
+        )
+        return self.rate(
+            monitor,
+            ACTION,
+            build_trajectory(),
+        )
 
     def rate_calibrated(
         self,
@@ -173,35 +270,75 @@ class Family[Wrapped]:
         trajectory: Trajectory | None = None,
     ) -> SuspicionScore:
         monitor = self.calibrated(
-            monitor=self.build_llm(script), honest_scores=honest_scores, random_seed=random_seed
+            monitor=self.build_llm(script),
+            honest_scores=honest_scores,
+            random_seed=random_seed,
         )
-        return self.rate(monitor, action, build_trajectory() if trajectory is None else trajectory)
+        return self.rate(
+            monitor,
+            action,
+            build_trajectory() if trajectory is None else trajectory,
+        )
 
     def rate_cascade(
-        self, fast: Script, careful: Script, *, escalation_threshold: float
+        self,
+        fast: Script,
+        careful: Script,
+        *,
+        escalation_threshold: float,
     ) -> SuspicionScore:
         monitor = self.cascade(
             fast=self.build_llm(fast),
             careful=self.build_llm(careful),
             escalation_threshold=escalation_threshold,
         )
-        return self.rate(monitor, ACTION, build_trajectory())
+        return self.rate(
+            monitor,
+            ACTION,
+            build_trajectory(),
+        )
 
-    def rate_stack(self, script: Script, *, layers: tuple[Layer, ...]) -> SuspicionScore:
+    def rate_stack(
+        self,
+        script: Script,
+        *,
+        layers: tuple[Layer, ...],
+    ) -> SuspicionScore:
         """Rate with the layers wrapped around an LLM monitor, the first layer innermost."""
         monitor = self.build_llm(script)
         for layer in layers:
-            monitor = self.wrap(layer, monitor)
-        return self.rate(monitor, ACTION, build_trajectory())
+            monitor = self.wrap(
+                layer,
+                monitor,
+            )
+        return self.rate(
+            monitor,
+            ACTION,
+            build_trajectory(),
+        )
 
-    def wrap(self, layer: Layer, monitor: Wrapped) -> Wrapped:
+    def wrap(
+        self,
+        layer: Layer,
+        monitor: Wrapped,
+    ) -> Wrapped:
         match layer:
             case Layer.REPEATED:
-                return self.repeated(monitor=monitor, ensemble_size=2)
+                return self.repeated(
+                    monitor=monitor,
+                    ensemble_size=2,
+                )
             case Layer.CALIBRATED:
-                return self.calibrated(monitor=monitor, honest_scores=HONEST_SCORES)
+                return self.calibrated(
+                    monitor=monitor,
+                    honest_scores=HONEST_SCORES,
+                )
             case Layer.CASCADE:
-                return self.cascade(fast=monitor, careful=monitor, escalation_threshold=0.5)
+                return self.cascade(
+                    fast=monitor,
+                    careful=monitor,
+                    escalation_threshold=0.5,
+                )
             case unreachable:
                 assert_never(unreachable)
 
@@ -222,7 +359,13 @@ ASYNCHRONOUS = Family(
 )
 
 
-@pytest.fixture(params=[SYNCHRONOUS, ASYNCHRONOUS], ids=["sync", "async"])
+@pytest.fixture(
+    params=[
+        SYNCHRONOUS,
+        ASYNCHRONOUS,
+    ],
+    ids=["sync", "async"],
+)
 def family(request: pytest.FixtureRequest) -> Family[Monitor] | Family[AsyncMonitor]:
     return request.param
 
@@ -230,11 +373,31 @@ def family(request: pytest.FixtureRequest) -> Family[Monitor] | Family[AsyncMoni
 @pytest.mark.parametrize(
     ("scores", "ensemble_size", "value"),
     [
-        ([1, 2, 6], 3, 0.3),
-        ([10], 1, 1.0),
-        ([0, 0], 2, 0.0),
-        ([1, 0, 2], 3, 0.1),
-        ([0, 0, 3], 3, 0.1),
+        (
+            [1, 2, 6],
+            3,
+            0.3,
+        ),
+        (
+            [10],
+            1,
+            1.0,
+        ),
+        (
+            [0, 0],
+            2,
+            0.0,
+        ),
+        (
+            [1, 0, 2],
+            3,
+            0.1,
+        ),
+        (
+            [0, 0, 3],
+            3,
+            0.1,
+        ),
     ],
     ids=["three-calls", "one-call", "all-lowest", "tenth-from-0.1-0.0-0.2", "tenth-from-0-0-0.3"],
 )
@@ -246,22 +409,40 @@ def test_the_value_is_the_mean_of_the_calls_rounded_to_12_decimal_places(
 ) -> None:
     script = Script(*(build_reply(score) for score in scores))
 
-    score = family.rate_repeated(script, ensemble_size=ensemble_size)
+    score = family.rate_repeated(
+        script,
+        ensemble_size=ensemble_size,
+    )
 
     assert score.value == value
 
 
 @pytest.mark.parametrize(
     ("scores", "value"),
-    [([10, 10], 1e-12), ([3, 0], 0.0)],
+    [
+        (
+            [10, 10],
+            1e-12,
+        ),
+        (
+            [3, 0],
+            0.0,
+        ),
+    ],
     ids=["twelfth-place-kept", "thirteenth-place-rounded-away"],
 )
 def test_the_mean_keeps_the_twelfth_decimal_place_and_rounds_away_the_thirteenth(
-    family: Family[Monitor] | Family[AsyncMonitor], scores: list[int], value: float
+    family: Family[Monitor] | Family[AsyncMonitor],
+    scores: list[int],
+    value: float,
 ) -> None:
     script = Script(*(build_reply(score) for score in scores))
 
-    score = family.rate_repeated(script, ensemble_size=2, highest_score=10**13)
+    score = family.rate_repeated(
+        script,
+        ensemble_size=2,
+        highest_score=10**13,
+    )
 
     assert score.value == value
 
@@ -269,11 +450,46 @@ def test_the_mean_keeps_the_twelfth_decimal_place_and_rounds_away_the_thirteenth
 @pytest.mark.parametrize(
     ("scores", "explanation"),
     [
-        ([(2, "calm"), (6, "odd"), (4, "mild")], "odd"),
-        ([(7, "first"), (3, "second"), (3, "third")], "first"),
-        ([(3, "first"), (3, "second"), (7, "third")], "third"),
-        ([(2, "low"), (5, "tied first"), (5, "tied second")], "tied first"),
-        ([(5, "first"), (5, "second"), (5, "third")], "first"),
+        (
+            [
+                (2, "calm"),
+                (6, "odd"),
+                (4, "mild"),
+            ],
+            "odd",
+        ),
+        (
+            [
+                (7, "first"),
+                (3, "second"),
+                (3, "third"),
+            ],
+            "first",
+        ),
+        (
+            [
+                (3, "first"),
+                (3, "second"),
+                (7, "third"),
+            ],
+            "third",
+        ),
+        (
+            [
+                (2, "low"),
+                (5, "tied first"),
+                (5, "tied second"),
+            ],
+            "tied first",
+        ),
+        (
+            [
+                (5, "first"),
+                (5, "second"),
+                (5, "third"),
+            ],
+            "first",
+        ),
     ],
     ids=["middle", "first", "last", "first-of-two-tied", "first-of-three-tied"],
 )
@@ -282,9 +498,20 @@ def test_the_explanation_is_the_most_suspicious_calls_and_the_first_of_a_tie(
     scores: list[tuple[int, str]],
     explanation: str,
 ) -> None:
-    script = Script(*(build_reply(score, reasoning) for score, reasoning in scores))
+    script = Script(
+        *(
+            build_reply(
+                score,
+                reasoning,
+            )
+            for score, reasoning in scores
+        ),
+    )
 
-    score = family.rate_repeated(script, ensemble_size=3)
+    score = family.rate_repeated(
+        script,
+        ensemble_size=3,
+    )
 
     assert score.explanation == explanation
 
@@ -292,12 +519,23 @@ def test_the_explanation_is_the_most_suspicious_calls_and_the_first_of_a_tie(
 def test_the_evidence_holds_each_calls_score_in_order(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
-    script = Script(build_reply(1, "a"), build_reply(6, "b"), build_reply(2, "c"))
+    script = Script(
+        build_reply(1, "a"),
+        build_reply(6, "b"),
+        build_reply(2, "c"),
+    )
 
-    score = family.rate_repeated(script, ensemble_size=3)
+    score = family.rate_repeated(
+        script,
+        ensemble_size=3,
+    )
 
     assert score.evidence == Composite(
-        parts=(build_score(0.1, "a"), build_score(0.6, "b"), build_score(0.2, "c"))
+        parts=(
+            build_score(0.1, "a"),
+            build_score(0.6, "b"),
+            build_score(0.2, "c"),
+        ),
     )
 
 
@@ -305,14 +543,30 @@ def test_the_evidence_holds_each_calls_score_in_order(
     ("outcomes", "explanation", "parts"),
     [
         (
-            [build_reply(3), Refused(explanation="I cannot assess this."), Unavailable(status=503)],
+            [
+                build_reply(3),
+                Refused(explanation="I cannot assess this."),
+                Unavailable(status=503),
+            ],
             REFUSED_EXPLANATION,
-            (build_score(0.3), REFUSED_SCORE, UNAVAILABLE_SCORE),
+            (
+                build_score(0.3),
+                REFUSED_SCORE,
+                UNAVAILABLE_SCORE,
+            ),
         ),
         (
-            [build_reply(10, "genuine"), Unavailable(status=503), build_reply(2)],
+            [
+                build_reply(10, "genuine"),
+                Unavailable(status=503),
+                build_reply(2),
+            ],
             UNAVAILABLE_EXPLANATION,
-            (build_score(1.0, "genuine"), UNAVAILABLE_SCORE, build_score(0.2)),
+            (
+                build_score(1.0, "genuine"),
+                UNAVAILABLE_SCORE,
+                build_score(0.2),
+            ),
         ),
     ],
     ids=["first-of-two-failures", "after-a-genuine-top-score"],
@@ -325,10 +579,15 @@ def test_a_call_that_failed_closed_fails_the_whole_score_closed_with_its_explana
 ) -> None:
     script = Script(*outcomes)
 
-    score = family.rate_repeated(script, ensemble_size=3)
+    score = family.rate_repeated(
+        script,
+        ensemble_size=3,
+    )
 
     assert score == SuspicionScore(
-        value=1.0, explanation=explanation, evidence=Composite(parts=parts)
+        value=1.0,
+        explanation=explanation,
+        evidence=Composite(parts=parts),
     )
     assert score.failed_closed
 
@@ -342,9 +601,18 @@ def test_the_async_wrapper_asks_its_calls_at_once() -> None:
             await barrier.wait()
             return build_reply(4)
 
-        model = AsyncGenerativeModel(name=MODEL_NAME, generate=generate)
-        monitor = AsyncRepeatedMonitor(monitor=AsyncLLMMonitor(model=model), ensemble_size=3)
-        return await monitor.rate(ACTION, trajectory=build_trajectory())
+        model = AsyncGenerativeModel(
+            name=MODEL_NAME,
+            generate=generate,
+        )
+        monitor = AsyncRepeatedMonitor(
+            monitor=AsyncLLMMonitor(model=model),
+            ensemble_size=3,
+        )
+        return await monitor.rate(
+            ACTION,
+            trajectory=build_trajectory(),
+        )
 
     score = run(rate_at_a_barrier())
 
@@ -365,12 +633,17 @@ def test_the_async_wrapper_asks_its_calls_at_once() -> None:
     ids=["zero", "negative", "float", "whole-float", "bool", "string", "none"],
 )
 def test_an_ensemble_size_that_is_not_a_count_of_at_least_1_is_refused_naming_it(
-    family: Family[Monitor] | Family[AsyncMonitor], ensemble_size: object, message: str
+    family: Family[Monitor] | Family[AsyncMonitor],
+    ensemble_size: object,
+    message: str,
 ) -> None:
     llm = family.build_llm(Script())
 
     with pytest.raises(ConfigurationError) as raised:
-        family.repeated(monitor=llm, ensemble_size=ensemble_size)
+        family.repeated(
+            monitor=llm,
+            ensemble_size=ensemble_size,
+        )
 
     assert str(raised.value) == message
 
@@ -378,7 +651,10 @@ def test_an_ensemble_size_that_is_not_a_count_of_at_least_1_is_refused_naming_it
 class ArrayInteger:
     """Stands in for numpy's integers: registered as integral, but not a subclass of int."""
 
-    def __init__(self, value: int) -> None:
+    def __init__(
+        self,
+        value: int,
+    ) -> None:
         self.value = value
 
     def __index__(self) -> int:
@@ -395,8 +671,16 @@ ASYNCHRONOUS_LLM = build_asynchronous_llm(Script())
 @pytest.mark.parametrize(
     "build",
     [
-        partial(RepeatedMonitor, monitor=SYNCHRONOUS_LLM, ensemble_size=ArrayInteger(2)),
-        partial(AsyncRepeatedMonitor, monitor=ASYNCHRONOUS_LLM, ensemble_size=ArrayInteger(2)),
+        partial(
+            RepeatedMonitor,
+            monitor=SYNCHRONOUS_LLM,
+            ensemble_size=ArrayInteger(2),
+        ),
+        partial(
+            AsyncRepeatedMonitor,
+            monitor=ASYNCHRONOUS_LLM,
+            ensemble_size=ArrayInteger(2),
+        ),
     ],
     ids=["sync", "async"],
 )
@@ -405,29 +689,51 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
 ) -> None:
     repeated = build()
 
-    assert (type(repeated.ensemble_size), repeated.ensemble_size) == (int, 2)
+    assert (
+        type(repeated.ensemble_size),
+        repeated.ensemble_size,
+    ) == (
+        int,
+        2,
+    )
 
 
 @pytest.mark.parametrize(
     ("build", "message"),
     [
         (
-            partial(RepeatedMonitor, monitor=ASYNCHRONOUS_LLM, ensemble_size=2),
+            partial(
+                RepeatedMonitor,
+                monitor=ASYNCHRONOUS_LLM,
+                ensemble_size=2,
+            ),
             "monitor must be a Monitor, got an instance of AsyncLLMMonitor. "
             "Use AsyncRepeatedMonitor for an AsyncMonitor.",
         ),
         (
-            partial(AsyncRepeatedMonitor, monitor=SYNCHRONOUS_LLM, ensemble_size=2),
+            partial(
+                AsyncRepeatedMonitor,
+                monitor=SYNCHRONOUS_LLM,
+                ensemble_size=2,
+            ),
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use RepeatedMonitor for a Monitor.",
         ),
         (
-            partial(CalibratedMonitor, monitor=ASYNCHRONOUS_LLM, honest_scores=[0.5]),
+            partial(
+                CalibratedMonitor,
+                monitor=ASYNCHRONOUS_LLM,
+                honest_scores=[0.5],
+            ),
             "monitor must be a Monitor, got an instance of AsyncLLMMonitor. "
             "Use AsyncCalibratedMonitor for an AsyncMonitor.",
         ),
         (
-            partial(AsyncCalibratedMonitor, monitor=SYNCHRONOUS_LLM, honest_scores=[0.5]),
+            partial(
+                AsyncCalibratedMonitor,
+                monitor=SYNCHRONOUS_LLM,
+                honest_scores=[0.5],
+            ),
             "monitor must be an AsyncMonitor, got an instance of LLMMonitor. "
             "Use CalibratedMonitor for a Monitor.",
         ),
@@ -484,7 +790,8 @@ def test_a_whole_number_that_is_not_an_int_is_kept_as_an_int(
     ],
 )
 def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_to(
-    build: Callable[[], Monitor | AsyncMonitor], message: str
+    build: Callable[[], Monitor | AsyncMonitor],
+    message: str,
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
         build()
@@ -492,7 +799,11 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_wrapper_it_belongs_
     assert str(raised.value) == message
 
 
-@pytest.mark.parametrize("random_seed", [None, 7], ids=["unseeded", "seeded"])
+@pytest.mark.parametrize(
+    "random_seed",
+    [None, 7],
+    ids=["unseeded", "seeded"],
+)
 @pytest.mark.parametrize(
     ("reply", "lower", "midpoint", "upper"),
     [
@@ -540,9 +851,15 @@ def test_the_explanation_is_the_wrapped_scores_and_the_evidence_holds_it(
 ) -> None:
     script = Script(build_reply(2, "It reads the file the task names."))
 
-    score = family.rate_calibrated(script, honest_scores=HONEST_SCORES)
+    score = family.rate_calibrated(
+        script,
+        honest_scores=HONEST_SCORES,
+    )
 
-    assert (score.explanation, score.evidence) == (
+    assert (
+        score.explanation,
+        score.evidence,
+    ) == (
         "It reads the file the task names.",
         Composite(parts=(build_score(0.2, "It reads the file the task names."),)),
     )
@@ -551,8 +868,14 @@ def test_the_explanation_is_the_wrapped_scores_and_the_evidence_holds_it(
 @pytest.mark.parametrize(
     ("failure", "failed_score"),
     [
-        (Unavailable(status=503), UNAVAILABLE_SCORE),
-        (Refused(explanation="I cannot assess this."), REFUSED_SCORE),
+        (
+            Unavailable(status=503),
+            UNAVAILABLE_SCORE,
+        ),
+        (
+            Refused(explanation="I cannot assess this."),
+            REFUSED_SCORE,
+        ),
     ],
     ids=["unavailable", "refused"],
 )
@@ -563,7 +886,10 @@ def test_a_score_that_failed_closed_is_returned_unchanged_and_not_ranked(
 ) -> None:
     script = Script(failure)
 
-    score = family.rate_calibrated(script, honest_scores=HONEST_SCORES)
+    score = family.rate_calibrated(
+        script,
+        honest_scores=HONEST_SCORES,
+    )
 
     assert score == failed_score
 
@@ -573,7 +899,10 @@ def test_honest_scores_given_as_a_generator_are_all_ranked_among(
 ) -> None:
     script = Script(build_reply(9))
 
-    score = family.rate_calibrated(script, honest_scores=(0.1 for _ in range(500)))
+    score = family.rate_calibrated(
+        script,
+        honest_scores=(0.1 for _ in range(500)),
+    )
 
     # Above all 500 honest scores, so in the top place: 500 / 501 up to 1.
     assert 500 / 501 <= score.value < 1.0
@@ -600,7 +929,11 @@ def test_a_seeded_draw_is_the_same_for_the_same_action_and_history_whatever_thei
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
     values = [
-        rate_seeded(family, action=build_action(), trajectory=build_acted_trajectory())
+        rate_seeded(
+            family,
+            action=build_action(),
+            trajectory=build_acted_trajectory(),
+        )
         for _ in range(2)
     ]
 
@@ -611,9 +944,16 @@ def test_a_seeded_draw_is_the_same_for_the_same_action_and_history_whatever_thei
 def test_a_seeded_draw_ignores_the_ratings_attached_to_the_history(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
-    trajectories = [build_acted_trajectory(rating=build_score(0.4)), build_acted_trajectory()]
+    trajectories = [
+        build_acted_trajectory(rating=build_score(0.4)),
+        build_acted_trajectory(),
+    ]
     values = [
-        rate_seeded(family, action=build_action(), trajectory=trajectory)
+        rate_seeded(
+            family,
+            action=build_action(),
+            trajectory=trajectory,
+        )
         for trajectory in trajectories
     ]
 
@@ -624,9 +964,18 @@ def test_a_seeded_draw_ignores_the_ratings_attached_to_the_history(
 @pytest.mark.parametrize(
     ("first", "second"),
     [
-        ((7, "Reading q3.md.", "Let me look."), (8, "Reading q3.md.", "Let me look.")),
-        ((7, "Reading q3.md.", "Let me look."), (7, "Reading q4.md.", "Let me look.")),
-        ((7, "Reading q3.md.", "Let me look."), (7, "Reading q3.md.", "Let me think.")),
+        (
+            (7, "Reading q3.md.", "Let me look."),
+            (8, "Reading q3.md.", "Let me look."),
+        ),
+        (
+            (7, "Reading q3.md.", "Let me look."),
+            (7, "Reading q4.md.", "Let me look."),
+        ),
+        (
+            (7, "Reading q3.md.", "Let me look."),
+            (7, "Reading q3.md.", "Let me think."),
+        ),
     ],
     ids=["the-seed", "the-action", "the-history"],
 )
@@ -642,7 +991,10 @@ def test_a_seeded_draw_differs_with_the_seed_the_action_and_the_history(
             action=build_action(action_text),
             trajectory=build_acted_trajectory(history_text),
         )
-        for seed, action_text, history_text in (first, second)
+        for seed, action_text, history_text in (
+            first,
+            second,
+        )
     ]
 
     assert values[0] != values[1]
@@ -686,16 +1038,32 @@ print(asyncio.run(monitor.rate(action, trajectory=trajectory)).value)
 """
 
 
-@pytest.mark.parametrize("hash_seed", ["0", "1"])
 @pytest.mark.parametrize(
-    "script", [RATE_SEEDED_SYNCHRONOUSLY, RATE_SEEDED_ASYNCHRONOUSLY], ids=["sync", "async"]
+    "hash_seed",
+    ["0", "1"],
+)
+@pytest.mark.parametrize(
+    "script",
+    [
+        RATE_SEEDED_SYNCHRONOUSLY,
+        RATE_SEEDED_ASYNCHRONOUSLY,
+    ],
+    ids=["sync", "async"],
 )
 def test_a_seeded_rating_is_the_same_in_processes_started_with_different_hash_seeds(
-    script: str, hash_seed: str
+    script: str,
+    hash_seed: str,
 ) -> None:
     process = subprocess.run(
-        [sys.executable, "-c", script],
-        env={**os.environ, "PYTHONHASHSEED": hash_seed},
+        [
+            sys.executable,
+            "-c",
+            script,
+        ],
+        env={
+            **os.environ,
+            "PYTHONHASHSEED": hash_seed,
+        },
         capture_output=True,
         text=True,
         check=True,
@@ -713,7 +1081,10 @@ def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
     family: Family[Monitor] | Family[AsyncMonitor],
 ) -> None:
     values = [
-        family.rate_calibrated(Script(build_reply(3)), honest_scores=HONEST_SCORES).value
+        family.rate_calibrated(
+            Script(build_reply(3)),
+            honest_scores=HONEST_SCORES,
+        ).value
         for _ in range(20)
     ]
 
@@ -723,8 +1094,14 @@ def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
 @pytest.mark.parametrize(
     ("honest_scores", "message"),
     [
-        ([], "honest_scores must hold at least one score"),
-        ((score for score in ()), "honest_scores must hold at least one score"),
+        (
+            [],
+            "honest_scores must hold at least one score",
+        ),
+        (
+            (score for score in ()),
+            "honest_scores must hold at least one score",
+        ),
         ("0.5", "honest_scores must be an iterable of numbers between 0 and 1, got '0.5'"),
         (
             b"\x00\x01",
@@ -733,11 +1110,29 @@ def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
         ),
         (5, "honest_scores must be an iterable of numbers between 0 and 1, got 5"),
         (None, "honest_scores must be an iterable of numbers between 0 and 1, got None"),
-        ([0.2, float("nan")], "honest_scores[1] must be between 0 and 1, got nan"),
-        ([1.5], "honest_scores[0] must be between 0 and 1, got 1.5"),
-        ([0.1, 0.2, -0.1], "honest_scores[2] must be between 0 and 1, got -0.1"),
-        ([0.1, True], "honest_scores[1] must be a number between 0 and 1, got True"),
-        (["0.5"], "honest_scores[0] must be a number between 0 and 1, got '0.5'"),
+        (
+            [
+                0.2,
+                float("nan"),
+            ],
+            "honest_scores[1] must be between 0 and 1, got nan",
+        ),
+        (
+            [1.5],
+            "honest_scores[0] must be between 0 and 1, got 1.5",
+        ),
+        (
+            [0.1, 0.2, -0.1],
+            "honest_scores[2] must be between 0 and 1, got -0.1",
+        ),
+        (
+            [0.1, True],
+            "honest_scores[1] must be a number between 0 and 1, got True",
+        ),
+        (
+            ["0.5"],
+            "honest_scores[0] must be a number between 0 and 1, got '0.5'",
+        ),
     ],
     ids=[
         "empty-list",
@@ -754,12 +1149,17 @@ def test_an_unseeded_draw_differs_between_calls_for_the_same_action_and_history(
     ],
 )
 def test_honest_scores_that_cannot_be_ranked_among_are_refused_naming_the_problem(
-    family: Family[Monitor] | Family[AsyncMonitor], honest_scores: object, message: str
+    family: Family[Monitor] | Family[AsyncMonitor],
+    honest_scores: object,
+    message: str,
 ) -> None:
     llm = family.build_llm(Script())
 
     with pytest.raises(ConfigurationError) as raised:
-        family.calibrated(monitor=llm, honest_scores=honest_scores)
+        family.calibrated(
+            monitor=llm,
+            honest_scores=honest_scores,
+        )
 
     assert str(raised.value) == message
 
@@ -779,12 +1179,18 @@ def test_honest_scores_that_cannot_be_ranked_among_are_refused_naming_the_proble
     ids=["float", "bool", "string", "too-long-to-write-out"],
 )
 def test_a_random_seed_that_cannot_seed_a_draw_is_refused_naming_the_problem(
-    family: Family[Monitor] | Family[AsyncMonitor], random_seed: object, message: str
+    family: Family[Monitor] | Family[AsyncMonitor],
+    random_seed: object,
+    message: str,
 ) -> None:
     llm = family.build_llm(Script())
 
     with pytest.raises(ConfigurationError) as raised:
-        family.calibrated(monitor=llm, honest_scores=HONEST_SCORES, random_seed=random_seed)
+        family.calibrated(
+            monitor=llm,
+            honest_scores=HONEST_SCORES,
+            random_seed=random_seed,
+        )
 
     assert str(raised.value) == message
 
@@ -812,15 +1218,33 @@ def test_a_seed_that_is_a_whole_number_but_not_an_int_is_kept_as_an_int(
 ) -> None:
     calibrated = build()
 
-    assert (type(calibrated.random_seed), calibrated.random_seed) == (int, 7)
+    assert (
+        type(calibrated.random_seed),
+        calibrated.random_seed,
+    ) == (
+        int,
+        7,
+    )
 
 
 @pytest.mark.parametrize(
     ("fast_reply", "kept", "careful_asks"),
     [
-        (2, build_score(0.2, "fast"), 0),
-        (3, build_score(0.9, "careful"), 1),
-        (4, build_score(0.9, "careful"), 1),
+        (
+            2,
+            build_score(0.2, "fast"),
+            0,
+        ),
+        (
+            3,
+            build_score(0.9, "careful"),
+            1,
+        ),
+        (
+            4,
+            build_score(0.9, "careful"),
+            1,
+        ),
     ],
     ids=["below-the-threshold", "at-the-threshold", "above-the-threshold"],
 )
@@ -830,22 +1254,46 @@ def test_a_fast_score_below_the_threshold_is_kept_and_one_at_or_above_it_escalat
     kept: SuspicionScore,
     careful_asks: int,
 ) -> None:
-    fast = Script(build_reply(fast_reply, "fast"))
+    fast = Script(
+        build_reply(
+            fast_reply,
+            "fast",
+        ),
+    )
     careful = Script(build_reply(9, "careful"))
 
-    score = family.rate_cascade(fast, careful, escalation_threshold=0.3)
+    score = family.rate_cascade(
+        fast,
+        careful,
+        escalation_threshold=0.3,
+    )
 
-    assert (score, len(careful.received)) == (kept, careful_asks)
+    assert (
+        score,
+        len(careful.received),
+    ) == (
+        kept,
+        careful_asks,
+    )
 
 
-@pytest.mark.parametrize("escalation_threshold", [0.5, 1.0], ids=["half", "one"])
+@pytest.mark.parametrize(
+    "escalation_threshold",
+    [0.5, 1.0],
+    ids=["half", "one"],
+)
 def test_a_fast_score_that_failed_closed_always_escalates(
-    family: Family[Monitor] | Family[AsyncMonitor], escalation_threshold: float
+    family: Family[Monitor] | Family[AsyncMonitor],
+    escalation_threshold: float,
 ) -> None:
     fast = Script(Unavailable(status=503))
     careful = Script(build_reply(9, "careful"))
 
-    score = family.rate_cascade(fast, careful, escalation_threshold=escalation_threshold)
+    score = family.rate_cascade(
+        fast,
+        careful,
+        escalation_threshold=escalation_threshold,
+    )
 
     assert score == build_score(0.9, "careful")
 
@@ -856,7 +1304,11 @@ def test_a_careful_score_that_failed_closed_is_returned_unchanged(
     fast = Script(build_reply(5, "fast"))
     careful = Script(Unavailable(status=503))
 
-    score = family.rate_cascade(fast, careful, escalation_threshold=0.3)
+    score = family.rate_cascade(
+        fast,
+        careful,
+        escalation_threshold=0.3,
+    )
 
     assert score == UNAVAILABLE_SCORE
 
@@ -866,7 +1318,10 @@ def test_a_careful_score_that_failed_closed_is_returned_unchanged(
     [
         (1.2, "escalation_threshold must be between 0 and 1, got 1.2"),
         (-0.1, "escalation_threshold must be between 0 and 1, got -0.1"),
-        (float("nan"), "escalation_threshold must be between 0 and 1, got nan"),
+        (
+            float("nan"),
+            "escalation_threshold must be between 0 and 1, got nan",
+        ),
         (True, "escalation_threshold must be a number between 0 and 1, got True"),
         ("0.5", "escalation_threshold must be a number between 0 and 1, got '0.5'"),
         (None, "escalation_threshold must be a number between 0 and 1, got None"),
@@ -874,12 +1329,18 @@ def test_a_careful_score_that_failed_closed_is_returned_unchanged(
     ids=["above-one", "below-zero", "nan", "bool", "string", "none"],
 )
 def test_an_escalation_threshold_that_is_not_from_0_to_1_is_refused_naming_it(
-    family: Family[Monitor] | Family[AsyncMonitor], escalation_threshold: object, message: str
+    family: Family[Monitor] | Family[AsyncMonitor],
+    escalation_threshold: object,
+    message: str,
 ) -> None:
     llm = family.build_llm(Script())
 
     with pytest.raises(ConfigurationError) as raised:
-        family.cascade(fast=llm, careful=llm, escalation_threshold=escalation_threshold)
+        family.cascade(
+            fast=llm,
+            careful=llm,
+            escalation_threshold=escalation_threshold,
+        )
 
     assert str(raised.value) == message
 
@@ -907,24 +1368,83 @@ def test_a_threshold_that_is_a_real_number_but_not_a_float_is_kept_as_a_float(
 ) -> None:
     cascade = build()
 
-    assert (type(cascade.escalation_threshold), cascade.escalation_threshold) == (float, 0.5)
+    assert (
+        type(cascade.escalation_threshold),
+        cascade.escalation_threshold,
+    ) == (
+        float,
+        0.5,
+    )
 
 
 @pytest.mark.parametrize(
     ("layers", "outcomes"),
     [
-        ((Layer.REPEATED,), FAILURES),
-        ((Layer.CALIBRATED,), FAILURES),
-        ((Layer.CASCADE,), FAILURES),
-        ((Layer.REPEATED, Layer.CALIBRATED), FAILURES),
-        ((Layer.CALIBRATED, Layer.REPEATED), FAILURES),
-        ((Layer.CASCADE, Layer.CALIBRATED), FAILURES),
-        ((Layer.CALIBRATED, Layer.CASCADE), FAILURES),
-        ((Layer.REPEATED, Layer.CASCADE), FAILURES),
-        ((Layer.CASCADE, Layer.REPEATED), FAILURES),
         (
-            (Layer.REPEATED, Layer.REPEATED),
-            (build_reply(1), Unavailable(status=503), build_reply(1), build_reply(1)),
+            (Layer.REPEATED,),
+            FAILURES,
+        ),
+        (
+            (Layer.CALIBRATED,),
+            FAILURES,
+        ),
+        (
+            (Layer.CASCADE,),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.REPEATED,
+                Layer.CALIBRATED,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.CALIBRATED,
+                Layer.REPEATED,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.CASCADE,
+                Layer.CALIBRATED,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.CALIBRATED,
+                Layer.CASCADE,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.REPEATED,
+                Layer.CASCADE,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.CASCADE,
+                Layer.REPEATED,
+            ),
+            FAILURES,
+        ),
+        (
+            (
+                Layer.REPEATED,
+                Layer.REPEATED,
+            ),
+            (
+                build_reply(1),
+                Unavailable(status=503),
+                build_reply(1),
+                build_reply(1),
+            ),
         ),
     ],
     ids=[
@@ -947,6 +1467,12 @@ def test_a_failure_in_any_stack_of_wrappers_fails_the_whole_score_closed_at_1(
 ) -> None:
     script = Script(*outcomes)
 
-    score = family.rate_stack(script, layers=layers)
+    score = family.rate_stack(
+        script,
+        layers=layers,
+    )
 
-    assert (score.failed_closed, score.value) == (True, 1.0)
+    assert (
+        score.failed_closed,
+        score.value,
+    ) == (True, 1.0)

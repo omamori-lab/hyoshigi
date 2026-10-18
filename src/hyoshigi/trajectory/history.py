@@ -14,7 +14,11 @@ def _create_action_id() -> str:
     return uuid4().hex
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class ToolCall:
     """A tool the agent asks to run, with its arguments as the JSON text the model emitted."""
 
@@ -23,7 +27,11 @@ class ToolCall:
     arguments: str
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Action:
     """What the agent emits in one step: its thought, what it says and the tools it calls.
 
@@ -78,7 +86,11 @@ class Action:
         return open_responses.read_response(output)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Observation:
     """Content that reaches the agent, with who wrote it and where it came from."""
 
@@ -87,13 +99,20 @@ class Observation:
     source: str | None = None
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class ToolObservation(Observation):
     """A tool's result, answering one of the agent's tool calls."""
 
     call_id: str
     is_error: bool = False
-    author: Author = field(default=Author.TOOL, init=False)
+    author: Author = field(
+        default=Author.TOOL,
+        init=False,
+    )
 
 
 # OpenHands calls actions and observations events (Wang et al., "OpenHands", ICLR 2025,

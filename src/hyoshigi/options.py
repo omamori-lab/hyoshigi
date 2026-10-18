@@ -20,13 +20,19 @@ def describe_option_value(value: object) -> str:
     an integer of more than 4,300 digits, so a number it cannot write, such as 10**5000 or
     a Fraction built on one, is named by its type and said to be too long.
     """
-    if value is None or isinstance(value, str | numbers.Number):
+    if value is None or isinstance(
+        value,
+        str | numbers.Number,
+    ):
         try:
             return repr(value)
         except ValueError:
             kind = (
                 "an integer"
-                if isinstance(value, numbers.Integral)
+                if isinstance(
+                    value,
+                    numbers.Integral,
+                )
                 else f"a {name_type(type(value))}"
             )
             return f"{kind} too long to write out"
@@ -39,7 +45,10 @@ def describe_type(value: object) -> str:
     """
     if value is None:
         return "None"
-    if isinstance(value, type):
+    if isinstance(
+        value,
+        type,
+    ):
         return f"the class {name_type(value)}; pass an instance"
     return f"an instance of {name_type(type(value))}"
 
@@ -57,10 +66,20 @@ def is_whole_number(value: object) -> TypeGuard[numbers.Integral]:
     numpy's integers count, since they are counted with through __index__. A bool does not,
     although Python counts it as an int, and nor does a float such as 2.0.
     """
-    return isinstance(value, numbers.Integral) and not isinstance(value, bool)
+    return isinstance(
+        value,
+        numbers.Integral,
+    ) and not isinstance(
+        value,
+        bool,
+    )
 
 
-def read_integer(value: object, *, name: str) -> int:
+def read_integer(
+    value: object,
+    *,
+    name: str,
+) -> int:
     """Return an integer option as an int.
 
     Any whole number counts, negative ones and numpy's integers included; a bool, a float
@@ -75,12 +94,17 @@ def read_integer(value: object, *, name: str) -> int:
     except ValueError:
         # Python refuses to write an integer of more than 4,300 digits, by default.
         raise ConfigurationError(
-            f"{name} must be an integer Python can write out, got {describe_option_value(integer)}"
+            f"{name} must be an integer Python can write out, got {describe_option_value(integer)}",
         ) from None
     return integer
 
 
-def read_count(value: object, *, name: str, minimum: int) -> int:
+def read_count(
+    value: object,
+    *,
+    name: str,
+    minimum: int,
+) -> int:
     """Return a count option as an int: a whole number from minimum to sys.maxsize.
 
     A count is a size or a number of repeats, and Python cannot index past sys.maxsize.
@@ -89,21 +113,25 @@ def read_count(value: object, *, name: str, minimum: int) -> int:
     if not is_whole_number(value):
         raise ConfigurationError(
             f"{name} must be a whole number of at least {minimum}, "
-            f"got {describe_option_value(value)}"
+            f"got {describe_option_value(value)}",
         )
     count = operator.index(value)
     if count < minimum:
         raise ConfigurationError(
-            f"{name} must be at least {minimum}, got {describe_option_value(count)}"
+            f"{name} must be at least {minimum}, got {describe_option_value(count)}",
         )
     if count > sys.maxsize:
         raise ConfigurationError(
-            f"{name} must be at most {sys.maxsize}, got {describe_option_value(count)}"
+            f"{name} must be at most {sys.maxsize}, got {describe_option_value(count)}",
         )
     return count
 
 
-def read_threshold(value: object, *, name: str) -> float:
+def read_threshold(
+    value: object,
+    *,
+    name: str,
+) -> float:
     """Return a threshold as a float from 0 to 1; anything else raises ConfigurationError.
 
     Any real number counts, a Fraction or numpy's floats included, and so does a Decimal. A
@@ -112,9 +140,15 @@ def read_threshold(value: object, *, name: str) -> float:
     just outside [0, 1] that a float would round into it is refused, as is NaN. -0.0 is
     read as 0.0.
     """
-    if isinstance(value, bool) or not isinstance(value, numbers.Real | Decimal):
+    if isinstance(
+        value,
+        bool,
+    ) or not isinstance(
+        value,
+        numbers.Real | Decimal,
+    ):
         raise ConfigurationError(
-            f"{name} must be a number between 0 and 1, got {describe_option_value(value)}"
+            f"{name} must be a number between 0 and 1, got {describe_option_value(value)}",
         )
     try:
         is_in_range = not value < 0 and value <= 1
@@ -123,19 +157,28 @@ def read_threshold(value: object, *, name: str) -> float:
         is_in_range = False
     if not is_in_range:
         raise ConfigurationError(
-            f"{name} must be between 0 and 1, got {describe_option_value(value)}"
+            f"{name} must be between 0 and 1, got {describe_option_value(value)}",
         )
     # Adding 0.0 turns -0.0 into 0.0.
     return float(value) + 0.0
 
 
-def check_instance(value: object, *, expected: type, name: str, hint: str = "") -> None:
+def check_instance(
+    value: object,
+    *,
+    expected: type,
+    name: str,
+    hint: str = "",
+) -> None:
     """Raise ConfigurationError unless the value is an instance of the expected class.
 
     The message names the class and the value's type, never its content, then the hint, a
     sentence that can name the likely mix-up, such as a sync model given to an async monitor.
     """
-    if isinstance(value, expected):
+    if isinstance(
+        value,
+        expected,
+    ):
         return
     article = "an" if expected.__name__[0] in "AEIOU" else "a"
     message = f"{name} must be {article} {expected.__name__}, got {describe_type(value)}"

@@ -35,7 +35,12 @@ MAX_TOKENS = 1024
 # The media the API reads: https://platform.claude.com/docs/en/build-with-claude/vision,
 # "Supported formats"; pdf-support; and citations, "Plain text documents" (same path).
 PERCEIVES = MediaTypes(
-    "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf", "text/plain"
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "text/plain",
 )
 SYSTEM = "Today's date is 2024-06-01."
 
@@ -48,7 +53,13 @@ REFERENCE_RESPONSE: dict[str, JSON] = {
     "container": {
         "id": "container_011CpZohnwH4vuy7gazohgSP",
         "expires_at": "2019-12-27T18:11:19.117Z",
-        "skills": [{"skill_id": "pdf", "type": "anthropic", "version": "latest"}],
+        "skills": [
+            {
+                "skill_id": "pdf",
+                "type": "anthropic",
+                "version": "latest",
+            },
+        ],
     },
     "content": [
         {
@@ -61,13 +72,18 @@ REFERENCE_RESPONSE: dict[str, JSON] = {
                     "file_id": "file_011CNha8iCJcU1wXNR6q4V8w",
                     "start_char_index": 0,
                     "type": "char_location",
-                }
+                },
             ],
             "text": "Hi! My name is Claude.",
             "type": "text",
-        }
+        },
     ],
-    "diagnostics": {"cache_miss_reason": {"cache_missed_input_tokens": 0, "type": "model_changed"}},
+    "diagnostics": {
+        "cache_miss_reason": {
+            "cache_missed_input_tokens": 0,
+            "type": "model_changed",
+        },
+    },
     "model": "claude-opus-5-5",
     "role": "assistant",
     "stop_details": {
@@ -80,14 +96,20 @@ REFERENCE_RESPONSE: dict[str, JSON] = {
     "stop_sequence": None,
     "type": "message",
     "usage": {
-        "cache_creation": {"ephemeral_1h_input_tokens": 0, "ephemeral_5m_input_tokens": 0},
+        "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0,
+        },
         "cache_creation_input_tokens": 2051,
         "cache_read_input_tokens": 2051,
         "inference_geo": "global",
         "input_tokens": 2095,
         "output_tokens": 503,
         "output_tokens_details": {"thinking_tokens": 0},
-        "server_tool_use": {"web_fetch_requests": 2, "web_search_requests": 0},
+        "server_tool_use": {
+            "web_fetch_requests": 2,
+            "web_search_requests": 0,
+        },
         "service_tier": "standard",
         "speed": "standard",
     },
@@ -101,11 +123,19 @@ STOP_REASONS_RESPONSE: dict[str, JSON] = {
     "id": "msg_01234",
     "type": "message",
     "role": "assistant",
-    "content": [{"type": "text", "text": "Here's the answer to your question..."}],
+    "content": [
+        {
+            "type": "text",
+            "text": "Here's the answer to your question...",
+        },
+    ],
     "stop_reason": "end_turn",
     "stop_sequence": None,
     "stop_details": None,
-    "usage": {"input_tokens": 100, "output_tokens": 50},
+    "usage": {
+        "input_tokens": 100,
+        "output_tokens": 50,
+    },
 }
 ANSWER = "Here's the answer to your question..."
 
@@ -134,20 +164,32 @@ THINKING_CONTENT: JSON = [
         "simpler one and use its result to constrain the second...",
         "signature": "WaUjzkypQ2mUEVM36O2Txu....",
     },
-    {"type": "text", "text": "Based on my analysis..."},
+    {
+        "type": "text",
+        "text": "Based on my analysis...",
+    },
 ]
 
 # https://platform.claude.com/docs/en/build-with-claude/thinking, "Redacted thinking blocks",
 # before the text block above.
 REDACTED_THINKING_CONTENT: JSON = [
-    {"type": "redacted_thinking", "data": "..."},
-    {"type": "text", "text": "Based on my analysis..."},
+    {
+        "type": "redacted_thinking",
+        "data": "...",
+    },
+    {
+        "type": "text",
+        "text": "Based on my analysis...",
+    },
 ]
 
 # https://platform.claude.com/docs/en/build-with-claude/citations, "Response structure": one
 # sentence split across text blocks, some with citations.
 CITED_CONTENT: JSON = [
-    {"type": "text", "text": "According to the document, "},
+    {
+        "type": "text",
+        "text": "According to the document, ",
+    },
     {
         "type": "text",
         "text": "the grass is green",
@@ -159,10 +201,13 @@ CITED_CONTENT: JSON = [
                 "document_title": "Example Document",
                 "start_char_index": 0,
                 "end_char_index": 20,
-            }
+            },
         ],
     },
-    {"type": "text", "text": " and "},
+    {
+        "type": "text",
+        "text": " and ",
+    },
     {
         "type": "text",
         "text": "the sky is blue",
@@ -174,10 +219,13 @@ CITED_CONTENT: JSON = [
                 "document_title": "Example Document",
                 "start_char_index": 20,
                 "end_char_index": 36,
-            }
+            },
         ],
     },
-    {"type": "text", "text": ". Information from page 5 states that "},
+    {
+        "type": "text",
+        "text": ". Information from page 5 states that ",
+    },
     {
         "type": "text",
         "text": "water is essential",
@@ -189,10 +237,13 @@ CITED_CONTENT: JSON = [
                 "document_title": "PDF Document",
                 "start_page_number": 5,
                 "end_page_number": 6,
-            }
+            },
         ],
     },
-    {"type": "text", "text": ". The custom document mentions "},
+    {
+        "type": "text",
+        "text": ". The custom document mentions ",
+    },
     {
         "type": "text",
         "text": "important findings",
@@ -204,7 +255,7 @@ CITED_CONTENT: JSON = [
                 "document_title": "Custom Content Document",
                 "start_block_index": 0,
                 "end_block_index": 1,
-            }
+            },
         ],
     },
 ]
@@ -216,9 +267,18 @@ CITED_TEXT = (
 
 # A block type the API adds after this adapter: only text blocks are the reply's text.
 FUTURE_CONTENT: JSON = [
-    {"type": "text", "text": "first "},
-    {"type": "a_block_added_later", "text": "unseen "},
-    {"type": "text", "text": "last"},
+    {
+        "type": "text",
+        "text": "first ",
+    },
+    {
+        "type": "a_block_added_later",
+        "text": "unseen ",
+    },
+    {
+        "type": "text",
+        "text": "last",
+    },
 ]
 
 # https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback, "What a refusal
@@ -235,7 +295,10 @@ REFUSAL_RESPONSE: dict[str, JSON] = {
         "category": "cyber",
         "explanation": "This request was declined because it could enable cyber harm.",
     },
-    "usage": {"input_tokens": 412, "output_tokens": 0},
+    "usage": {
+        "input_tokens": 412,
+        "output_tokens": 0,
+    },
 }
 REFUSAL_EXPLANATION = "This request was declined because it could enable cyber harm."
 
@@ -253,7 +316,10 @@ NOT_FOUND_ERROR: JSON = {
 NOT_FOUND_MESSAGE = "The requested resource could not be found."
 OVERLOADED_ERROR: JSON = {
     "type": "error",
-    "error": {"type": "overloaded_error", "message": "Overloaded"},
+    "error": {
+        "type": "overloaded_error",
+        "message": "Overloaded",
+    },
 }
 
 # https://platform.claude.com/docs/en/build-with-claude/vision, "Base64-encoded image" and
@@ -272,56 +338,92 @@ FOOBAR_BASE64 = "Zm9vYmFy"
 # https://platform.claude.com/docs/en/build-with-claude/citations, "Plain text documents".
 GRASS_AND_SKY = b"The grass is green. The sky is blue."
 
-HELLO = Prompt(system=SYSTEM, content=(TextPart(text="Hello, world"),))
+HELLO = Prompt(
+    system=SYSTEM,
+    content=(TextPart(text="Hello, world"),),
+)
 
 
 class Wire:
     """The Messages API's end of the connection: replays one response, records each request."""
 
-    def __init__(self, body: JSON, *, status: int = 200) -> None:
+    def __init__(
+        self,
+        body: JSON,
+        *,
+        status: int = 200,
+    ) -> None:
         self.body = body
         self.status = status
         self.requests: list[JSON] = []
 
-    def respond(self, request: httpx2.Request) -> httpx2.Response:
+    def respond(
+        self,
+        request: httpx2.Request,
+    ) -> httpx2.Response:
         self.requests.append(json.loads(request.content))
-        return httpx2.Response(self.status, json=self.body)
+        return httpx2.Response(
+            self.status,
+            json=self.body,
+        )
 
 
 def fail_to_connect(request: httpx2.Request) -> httpx2.Response:
-    raise httpx2.ConnectError("connection refused", request=request)
+    raise httpx2.ConnectError(
+        "connection refused",
+        request=request,
+    )
 
 
 def time_out(request: httpx2.Request) -> httpx2.Response:
-    raise httpx2.ReadTimeout("timed out", request=request)
+    raise httpx2.ReadTimeout(
+        "timed out",
+        request=request,
+    )
 
 
 # What a proxy in front of the API can answer with status 200: an HTML page, or a JSON reply
 # cut off.
 def send_html(request: httpx2.Request) -> httpx2.Response:
     return httpx2.Response(
-        200, text="<html>Bad gateway</html>", headers={"content-type": "text/html"}
+        200,
+        text="<html>Bad gateway</html>",
+        headers={"content-type": "text/html"},
     )
 
 
 def send_cut_off_json(request: httpx2.Request) -> httpx2.Response:
     return httpx2.Response(
-        200, text='{"id": "msg_01234", "ty', headers={"content-type": "application/json"}
+        200,
+        text='{"id": "msg_01234", "ty',
+        headers={"content-type": "application/json"},
     )
 
 
 def send_invalid_utf8(request: httpx2.Request) -> httpx2.Response:
     return httpx2.Response(
-        200, content=b'{"id": "\xff"}', headers={"content-type": "application/json"}
+        200,
+        content=b'{"id": "\xff"}',
+        headers={"content-type": "application/json"},
     )
 
 
 def send_corrupt_gzip(request: httpx2.Request) -> httpx2.Response:
-    headers = {"content-type": "application/json", "content-encoding": "gzip"}
-    return httpx2.Response(200, content=b"not gzip", headers=headers)
+    headers = {
+        "content-type": "application/json",
+        "content-encoding": "gzip",
+    }
+    return httpx2.Response(
+        200,
+        content=b"not gzip",
+        headers=headers,
+    )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class Driver:
     """A model built by one of the two families, driven to a result either way."""
 
@@ -359,9 +461,17 @@ def build_sync_driver(
         http_client=DefaultHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = GenerativeModel.from_anthropic(
-        client, model=model, perceives=perceives, max_tokens=max_tokens, thinking=thinking
+        client,
+        model=model,
+        perceives=perceives,
+        max_tokens=max_tokens,
+        thinking=thinking,
     )
-    return Driver(name=built.name, perceives=built.perceives, generate=built.generate)
+    return Driver(
+        name=built.name,
+        perceives=built.perceives,
+        generate=built.generate,
+    )
 
 
 def build_async_driver(
@@ -380,20 +490,34 @@ def build_async_driver(
         http_client=DefaultAsyncHttpxClient(transport=httpx2.MockTransport(respond)),
     )
     built = AsyncGenerativeModel.from_anthropic(
-        client, model=model, perceives=perceives, max_tokens=max_tokens, thinking=thinking
+        client,
+        model=model,
+        perceives=perceives,
+        max_tokens=max_tokens,
+        thinking=thinking,
     )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         return asyncio.run(await_outcome(built.generate(prompt)))
 
-    return Driver(name=built.name, perceives=built.perceives, generate=generate)
+    return Driver(
+        name=built.name,
+        perceives=built.perceives,
+        generate=generate,
+    )
 
 
 async def await_outcome(outcome: Awaitable[GenerationOutcome]) -> GenerationOutcome:
     return await outcome
 
 
-@pytest.fixture(params=[build_sync_driver, build_async_driver], ids=["sync", "async"])
+@pytest.fixture(
+    params=[
+        build_sync_driver,
+        build_async_driver,
+    ],
+    ids=["sync", "async"],
+)
 def build_driver(request: pytest.FixtureRequest) -> BuildDriver:
     return request.param
 
@@ -403,7 +527,12 @@ def build_request(content: list[JSON]) -> dict[str, JSON]:
         "max_tokens": MAX_TOKENS,
         "model": MODEL_ID,
         "system": SYSTEM,
-        "messages": [{"role": "user", "content": content}],
+        "messages": [
+            {
+                "role": "user",
+                "content": content,
+            },
+        ],
     }
 
 
@@ -422,34 +551,83 @@ def test_the_model_perceives_the_media_it_was_given(build_driver: BuildDriver) -
 @pytest.mark.parametrize(
     ("patterns", "named"),
     [
-        (("image/*",), "image/*"),
-        (("image/svg+xml",), "image/svg+xml"),
-        (("application/zip",), "application/zip"),
-        (("video/mp4", "image/png", "audio/wav"), "audio/wav"),
+        (
+            ("image/*",),
+            "image/*",
+        ),
+        (
+            ("image/svg+xml",),
+            "image/svg+xml",
+        ),
+        (
+            ("application/zip",),
+            "application/zip",
+        ),
+        (
+            ("video/mp4", "image/png", "audio/wav"),
+            "audio/wav",
+        ),
     ],
     ids=["image-range", "image-type-outside-the-four", "zip", "the-first-of-those-it-cannot-carry"],
 )
 def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when_built(
-    build_driver: BuildDriver, patterns: tuple[str, ...], named: str
+    build_driver: BuildDriver,
+    patterns: tuple[str, ...],
+    named: str,
 ) -> None:
-    with pytest.raises(ConfigurationError, match=re.escape(named)):
-        build_driver(Wire(REFERENCE_RESPONSE).respond, perceives=MediaTypes(*patterns))
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(named),
+    ):
+        build_driver(
+            Wire(REFERENCE_RESPONSE).respond,
+            perceives=MediaTypes(*patterns),
+        )
 
 
 @pytest.mark.parametrize(
     ("model", "max_tokens", "argument"),
-    [("", MAX_TOKENS, "model"), (MODEL_ID, 0, "max_tokens"), (MODEL_ID, -1, "max_tokens")],
+    [
+        (
+            "",
+            MAX_TOKENS,
+            "model",
+        ),
+        (
+            MODEL_ID,
+            0,
+            "max_tokens",
+        ),
+        (
+            MODEL_ID,
+            -1,
+            "max_tokens",
+        ),
+    ],
     ids=["no-model-id", "no-token", "negative"],
 )
 def test_a_model_without_a_model_id_or_a_token_to_write_raises_naming_the_argument_when_built(
-    build_driver: BuildDriver, model: str, max_tokens: int, argument: str
+    build_driver: BuildDriver,
+    model: str,
+    max_tokens: int,
+    argument: str,
 ) -> None:
-    with pytest.raises(ConfigurationError, match=argument):
-        build_driver(Wire(REFERENCE_RESPONSE).respond, model=model, max_tokens=max_tokens)
+    with pytest.raises(
+        ConfigurationError,
+        match=argument,
+    ):
+        build_driver(
+            Wire(REFERENCE_RESPONSE).respond,
+            model=model,
+            max_tokens=max_tokens,
+        )
 
 
 def test_a_model_may_write_a_single_token(build_driver: BuildDriver) -> None:
-    built = build_driver(Wire(REFERENCE_RESPONSE).respond, max_tokens=1)
+    built = build_driver(
+        Wire(REFERENCE_RESPONSE).respond,
+        max_tokens=1,
+    )
 
     assert built.name == "anthropic:claude-opus-5-5"
 
@@ -462,13 +640,21 @@ def test_a_max_tokens_the_sdk_will_not_send_without_streaming_raises_before_any_
     build_driver: BuildDriver,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
-    model = build_driver(wire.respond, max_tokens=64_000)
+    model = build_driver(
+        wire.respond,
+        max_tokens=64_000,
+    )
 
     with pytest.raises(ConfigurationError) as raised:
         model.generate(HELLO)
 
     error = raised.value
-    assert (str(error), error.__cause__, error.__context__, wire.requests) == (
+    assert (
+        str(error),
+        error.__cause__,
+        error.__context__,
+        wire.requests,
+    ) == (
         "the Anthropic SDK refused the request's arguments before sending them",
         None,
         None,
@@ -484,7 +670,16 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
 
     model.generate(HELLO)
 
-    assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
+    assert wire.requests == [
+        build_request(
+            [
+                {
+                    "type": "text",
+                    "text": "Hello, world",
+                },
+            ],
+        ),
+    ]
 
 
 # https://platform.claude.com/docs/en/build-with-claude/thinking: the request of the first
@@ -494,22 +689,46 @@ def test_a_prompt_is_sent_as_the_system_prompt_and_one_user_message(
     ("thinking", "sent"),
     [
         (
-            {"type": "adaptive", "display": "summarized"},
-            {"type": "adaptive", "display": "summarized"},
+            {
+                "type": "adaptive",
+                "display": "summarized",
+            },
+            {
+                "type": "adaptive",
+                "display": "summarized",
+            },
         ),
-        ({"type": "disabled"}, {"type": "disabled"}),
+        (
+            {"type": "disabled"},
+            {"type": "disabled"},
+        ),
     ],
     ids=["adaptive-summarized", "disabled"],
 )
 def test_the_thinking_configuration_is_sent_when_given(
-    build_driver: BuildDriver, thinking: ThinkingConfigParam, sent: JSON
+    build_driver: BuildDriver,
+    thinking: ThinkingConfigParam,
+    sent: JSON,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
-    model = build_driver(wire.respond, thinking=thinking)
+    model = build_driver(
+        wire.respond,
+        thinking=thinking,
+    )
 
     model.generate(HELLO)
 
-    expected = {**build_request([{"type": "text", "text": "Hello, world"}]), "thinking": sent}
+    expected = {
+        **build_request(
+            [
+                {
+                    "type": "text",
+                    "text": "Hello, world",
+                },
+            ],
+        ),
+        "thinking": sent,
+    }
     assert wire.requests == [expected]
 
 
@@ -518,36 +737,86 @@ def test_the_thinking_configuration_is_sent_when_given(
     [
         (
             (
-                MediaPart(media_type="image/jpeg", data=JPEG_BYTES),
+                MediaPart(
+                    media_type="image/jpeg",
+                    data=JPEG_BYTES,
+                ),
                 TextPart(text="Describe this image."),
             ),
             [
                 {
                     "type": "image",
-                    "source": {"type": "base64", "media_type": "image/jpeg", "data": JPEG_BASE64},
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": JPEG_BASE64,
+                    },
                 },
-                {"type": "text", "text": "Describe this image."},
+                {
+                    "type": "text",
+                    "text": "Describe this image.",
+                },
             ],
         ),
         (
-            (MediaPart(media_type="IMAGE/JPEG", data=JPEG_BYTES),),
+            (
+                MediaPart(
+                    media_type="IMAGE/JPEG",
+                    data=JPEG_BYTES,
+                ),
+            ),
             [
                 {
                     "type": "image",
-                    "source": {"type": "base64", "media_type": "image/jpeg", "data": JPEG_BASE64},
-                }
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": JPEG_BASE64,
+                    },
+                },
             ],
         ),
         (
-            (MediaPart(media_type="image/jpeg", url=VISION_URL),),
-            [{"type": "image", "source": {"type": "url", "url": VISION_URL}}],
+            (
+                MediaPart(
+                    media_type="image/jpeg",
+                    url=VISION_URL,
+                ),
+            ),
+            [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": VISION_URL,
+                    },
+                },
+            ],
         ),
         (
-            (MediaPart(media_type="image/*", url=VISION_URL),),
-            [{"type": "image", "source": {"type": "url", "url": VISION_URL}}],
+            (
+                MediaPart(
+                    media_type="image/*",
+                    url=VISION_URL,
+                ),
+            ),
+            [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": VISION_URL,
+                    },
+                },
+            ],
         ),
         (
-            (MediaPart(media_type="application/pdf", data=FOOBAR),),
+            (
+                MediaPart(
+                    media_type="application/pdf",
+                    data=FOOBAR,
+                ),
+            ),
             [
                 {
                     "type": "document",
@@ -556,19 +825,50 @@ def test_the_thinking_configuration_is_sent_when_given(
                         "media_type": "application/pdf",
                         "data": FOOBAR_BASE64,
                     },
-                }
+                },
             ],
         ),
         (
-            (MediaPart(media_type="application/pdf", url=MODEL_CARD),),
-            [{"type": "document", "source": {"type": "url", "url": MODEL_CARD}}],
+            (
+                MediaPart(
+                    media_type="application/pdf",
+                    url=MODEL_CARD,
+                ),
+            ),
+            [
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": MODEL_CARD,
+                    },
+                },
+            ],
         ),
         (
-            (MediaPart(media_type="APPLICATION/PDF", url=MODEL_CARD),),
-            [{"type": "document", "source": {"type": "url", "url": MODEL_CARD}}],
+            (
+                MediaPart(
+                    media_type="APPLICATION/PDF",
+                    url=MODEL_CARD,
+                ),
+            ),
+            [
+                {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": MODEL_CARD,
+                    },
+                },
+            ],
         ),
         (
-            (MediaPart(media_type="text/plain", data=GRASS_AND_SKY),),
+            (
+                MediaPart(
+                    media_type="text/plain",
+                    data=GRASS_AND_SKY,
+                ),
+            ),
             [
                 {
                     "type": "document",
@@ -577,7 +877,7 @@ def test_the_thinking_configuration_is_sent_when_given(
                         "media_type": "text/plain",
                         "data": "The grass is green. The sky is blue.",
                     },
-                }
+                },
             ],
         ),
     ],
@@ -593,117 +893,259 @@ def test_the_thinking_configuration_is_sent_when_given(
     ],
 )
 def test_media_is_sent_in_the_content_block_the_api_documents_for_it(
-    build_driver: BuildDriver, parts: tuple[MediaPart | TextPart, ...], content: list[JSON]
+    build_driver: BuildDriver,
+    parts: tuple[MediaPart | TextPart, ...],
+    content: list[JSON],
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
-    model.generate(Prompt(system=SYSTEM, content=parts))
+    model.generate(
+        Prompt(
+            system=SYSTEM,
+            content=parts,
+        ),
+    )
 
     assert wire.requests == [build_request(content)]
 
 
 # https://platform.claude.com/docs/en/build-with-claude/vision, "Supported formats": JPEG, PNG,
 # GIF and WebP.
-@pytest.mark.parametrize("media_type", ["image/jpeg", "image/png", "image/gif", "image/webp"])
+@pytest.mark.parametrize(
+    "media_type",
+    ["image/jpeg", "image/png", "image/gif", "image/webp"],
+)
 def test_each_image_type_the_api_supports_is_sent_as_base64_with_its_type(
-    build_driver: BuildDriver, media_type: str
-) -> None:
-    wire = Wire(REFERENCE_RESPONSE)
-    model = build_driver(wire.respond)
-
-    model.generate(Prompt(system=SYSTEM, content=(MediaPart(media_type=media_type, data=FOOBAR),)))
-
-    source: JSON = {"type": "base64", "media_type": media_type, "data": FOOBAR_BASE64}
-    assert wire.requests == [build_request([{"type": "image", "source": source}])]
-
-
-@pytest.mark.parametrize("media_type", ["image/jpeg", "image/png", "image/gif", "image/webp"])
-def test_each_image_type_the_api_supports_is_sent_by_url(
-    build_driver: BuildDriver, media_type: str
+    build_driver: BuildDriver,
+    media_type: str,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
     model.generate(
-        Prompt(system=SYSTEM, content=(MediaPart(media_type=media_type, url=VISION_URL),))
+        Prompt(
+            system=SYSTEM,
+            content=(
+                MediaPart(
+                    media_type=media_type,
+                    data=FOOBAR,
+                ),
+            ),
+        ),
     )
 
-    source: JSON = {"type": "url", "url": VISION_URL}
-    assert wire.requests == [build_request([{"type": "image", "source": source}])]
+    source: JSON = {
+        "type": "base64",
+        "media_type": media_type,
+        "data": FOOBAR_BASE64,
+    }
+    assert wire.requests == [
+        build_request(
+            [
+                {
+                    "type": "image",
+                    "source": source,
+                },
+            ],
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "media_type",
+    ["image/jpeg", "image/png", "image/gif", "image/webp"],
+)
+def test_each_image_type_the_api_supports_is_sent_by_url(
+    build_driver: BuildDriver,
+    media_type: str,
+) -> None:
+    wire = Wire(REFERENCE_RESPONSE)
+    model = build_driver(wire.respond)
+
+    model.generate(
+        Prompt(
+            system=SYSTEM,
+            content=(
+                MediaPart(
+                    media_type=media_type,
+                    url=VISION_URL,
+                ),
+            ),
+        ),
+    )
+
+    source: JSON = {
+        "type": "url",
+        "url": VISION_URL,
+    }
+    assert wire.requests == [
+        build_request(
+            [
+                {
+                    "type": "image",
+                    "source": source,
+                },
+            ],
+        ),
+    ]
 
 
 # https://platform.claude.com/docs/en/api/messages, TextBlockParam: text has minLength 1.
 # Observed live on 2026-10-18 (claude-haiku-5-5): a user message whose only block is whitespace
 # is answered with 400 invalid_request_error, "messages: text content blocks must contain
 # non-whitespace text"; beside other text, such a block is accepted.
-@pytest.mark.parametrize("blank", ["", " \n\t"], ids=["empty", "whitespace"])
-def test_blank_text_is_not_sent(build_driver: BuildDriver, blank: str) -> None:
+@pytest.mark.parametrize(
+    "blank",
+    ["", " \n\t"],
+    ids=["empty", "whitespace"],
+)
+def test_blank_text_is_not_sent(
+    build_driver: BuildDriver,
+    blank: str,
+) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
-    content = (TextPart(text=blank), TextPart(text="Hello, world"), TextPart(text=blank))
+    content = (
+        TextPart(text=blank),
+        TextPart(text="Hello, world"),
+        TextPart(text=blank),
+    )
 
-    model.generate(Prompt(system=SYSTEM, content=content))
+    model.generate(
+        Prompt(
+            system=SYSTEM,
+            content=content,
+        ),
+    )
 
-    assert wire.requests == [build_request([{"type": "text", "text": "Hello, world"}])]
+    assert wire.requests == [
+        build_request(
+            [
+                {
+                    "type": "text",
+                    "text": "Hello, world",
+                },
+            ],
+        ),
+    ]
 
 
 @pytest.mark.parametrize(
     "content",
-    [(TextPart(text=""),), (TextPart(text=" \n\t"),), ()],
+    [
+        (TextPart(text=""),),
+        (TextPart(text=" \n\t"),),
+        (),
+    ],
     ids=["empty-text", "whitespace-text", "no-content"],
 )
 def test_a_prompt_without_content_to_send_is_unavailable_before_any_request(
-    build_driver: BuildDriver, content: tuple[TextPart, ...]
+    build_driver: BuildDriver,
+    content: tuple[TextPart, ...],
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
-    outcome = model.generate(Prompt(system=SYSTEM, content=content))
+    outcome = model.generate(
+        Prompt(
+            system=SYSTEM,
+            content=content,
+        ),
+    )
 
-    assert (outcome, wire.requests) == (Unavailable(status=None), [])
+    assert (
+        outcome,
+        wire.requests,
+    ) == (
+        Unavailable(status=None),
+        [],
+    )
 
 
 # json.loads gives a lone surrogate for "\ud800" in a tool's output.
 @pytest.mark.parametrize(
     "prompt",
     [
-        Prompt(system=SYSTEM, content=(TextPart(text="a\ud800b"),)),
-        Prompt(system="a\ud800b", content=(TextPart(text="Hello, world"),)),
+        Prompt(
+            system=SYSTEM,
+            content=(TextPart(text="a\ud800b"),),
+        ),
+        Prompt(
+            system="a\ud800b",
+            content=(TextPart(text="Hello, world"),),
+        ),
     ],
     ids=["text", "system"],
 )
 def test_text_that_cannot_be_encoded_is_unavailable_before_any_request(
-    build_driver: BuildDriver, prompt: Prompt
+    build_driver: BuildDriver,
+    prompt: Prompt,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
     outcome = model.generate(prompt)
 
-    assert (outcome, wire.requests) == (Unavailable(status=None), [])
+    assert (
+        outcome,
+        wire.requests,
+    ) == (
+        Unavailable(status=None),
+        [],
+    )
 
 
 @pytest.mark.parametrize(
     "part",
     [
-        MediaPart(media_type="audio/wav", data=FOOBAR),
-        MediaPart(media_type="video/mp4", url="https://example.com/clip.mp4"),
-        MediaPart(media_type="video/*", url="https://example.com/clip"),
-        MediaPart(media_type="image/svg+xml", data=FOOBAR),
-        MediaPart(media_type="image/svg+xml", url="https://example.com/figure.svg"),
-        MediaPart(media_type="application/zip", data=FOOBAR),
+        MediaPart(
+            media_type="audio/wav",
+            data=FOOBAR,
+        ),
+        MediaPart(
+            media_type="video/mp4",
+            url="https://example.com/clip.mp4",
+        ),
+        MediaPart(
+            media_type="video/*",
+            url="https://example.com/clip",
+        ),
+        MediaPart(
+            media_type="image/svg+xml",
+            data=FOOBAR,
+        ),
+        MediaPart(
+            media_type="image/svg+xml",
+            url="https://example.com/figure.svg",
+        ),
+        MediaPart(
+            media_type="application/zip",
+            data=FOOBAR,
+        ),
     ],
     ids=["audio", "video-url", "video-range", "svg-bytes", "svg-url", "zip"],
 )
 def test_a_media_type_the_api_cannot_carry_raises_naming_the_type_before_any_request(
-    build_driver: BuildDriver, part: MediaPart
+    build_driver: BuildDriver,
+    part: MediaPart,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
-    with pytest.raises(ConfigurationError, match=re.escape(part.media_type)):
-        model.generate(Prompt(system=SYSTEM, content=(TextPart(text="Rate this."), part)))
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape(part.media_type),
+    ):
+        model.generate(
+            Prompt(
+                system=SYSTEM,
+                content=(
+                    TextPart(text="Rate this."),
+                    part,
+                ),
+            ),
+        )
 
     assert wire.requests == []
 
@@ -713,37 +1155,79 @@ def test_a_media_type_the_api_cannot_carry_raises_after_media_it_cannot_take_in_
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
-    notes = MediaPart(media_type="text/plain", url="https://example.com/notes.txt")
-    prompt = Prompt(system=SYSTEM, content=(notes, MediaPart(media_type="audio/wav", data=FOOBAR)))
+    notes = MediaPart(
+        media_type="text/plain",
+        url="https://example.com/notes.txt",
+    )
+    prompt = Prompt(
+        system=SYSTEM,
+        content=(
+            notes,
+            MediaPart(
+                media_type="audio/wav",
+                data=FOOBAR,
+            ),
+        ),
+    )
 
-    with pytest.raises(ConfigurationError, match=re.escape("audio/wav")):
+    with pytest.raises(
+        ConfigurationError,
+        match=re.escape("audio/wav"),
+    ):
         model.generate(prompt)
 
 
 @pytest.mark.parametrize(
     "part",
     [
-        MediaPart(media_type="text/plain", url="https://example.com/notes.txt"),
-        MediaPart(media_type="image/*", data=FOOBAR),
-        MediaPart(media_type="text/plain", data=b"\xff\xfe"),
+        MediaPart(
+            media_type="text/plain",
+            url="https://example.com/notes.txt",
+        ),
+        MediaPart(
+            media_type="image/*",
+            data=FOOBAR,
+        ),
+        MediaPart(
+            media_type="text/plain",
+            data=b"\xff\xfe",
+        ),
     ],
     ids=["plain-text-url", "image-range-bytes", "plain-text-not-utf-8"],
 )
 def test_media_in_a_form_the_api_cannot_take_is_unavailable_before_any_request(
-    build_driver: BuildDriver, part: MediaPart
+    build_driver: BuildDriver,
+    part: MediaPart,
 ) -> None:
     wire = Wire(REFERENCE_RESPONSE)
     model = build_driver(wire.respond)
 
-    outcome = model.generate(Prompt(system=SYSTEM, content=(TextPart(text="Rate this."), part)))
+    outcome = model.generate(
+        Prompt(
+            system=SYSTEM,
+            content=(
+                TextPart(text="Rate this."),
+                part,
+            ),
+        ),
+    )
 
-    assert (outcome, wire.requests) == (Unavailable(status=None), [])
+    assert (
+        outcome,
+        wire.requests,
+    ) == (
+        Unavailable(status=None),
+        [],
+    )
 
 
 @pytest.mark.parametrize(
     ("body", "text"),
     [
-        (REFERENCE_RESPONSE, "Hi! My name is Claude."),
+        (
+            REFERENCE_RESPONSE,
+            "Hi! My name is Claude.",
+        ),
         (
             {
                 **STOP_REASONS_RESPONSE,
@@ -756,7 +1240,9 @@ def test_media_in_a_form_the_api_cannot_take_is_unavailable_before_any_request(
     ids=["end-turn-despite-a-refusal-in-stop-details", "stop-sequence"],
 )
 def test_a_reply_that_stopped_on_its_own_is_a_generation_of_its_text(
-    build_driver: BuildDriver, body: JSON, text: str
+    build_driver: BuildDriver,
+    body: JSON,
+    text: str,
 ) -> None:
     model = build_driver(Wire(body).respond)
 
@@ -768,7 +1254,14 @@ def test_a_reply_that_stopped_on_its_own_is_a_generation_of_its_text(
 def test_the_text_blocks_of_a_reply_are_joined_without_a_separator(
     build_driver: BuildDriver,
 ) -> None:
-    model = build_driver(Wire({**STOP_REASONS_RESPONSE, "content": CITED_CONTENT}).respond)
+    model = build_driver(
+        Wire(
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": CITED_CONTENT,
+            },
+        ).respond,
+    )
 
     outcome = model.generate(HELLO)
 
@@ -778,16 +1271,34 @@ def test_the_text_blocks_of_a_reply_are_joined_without_a_separator(
 @pytest.mark.parametrize(
     ("content", "text"),
     [
-        (THINKING_CONTENT, "Based on my analysis..."),
-        (REDACTED_THINKING_CONTENT, "Based on my analysis..."),
-        (FUTURE_CONTENT, "first last"),
+        (
+            THINKING_CONTENT,
+            "Based on my analysis...",
+        ),
+        (
+            REDACTED_THINKING_CONTENT,
+            "Based on my analysis...",
+        ),
+        (
+            FUTURE_CONTENT,
+            "first last",
+        ),
     ],
     ids=["thinking", "redacted-thinking", "block-type-added-later"],
 )
 def test_blocks_that_are_not_text_are_not_part_of_the_reply(
-    build_driver: BuildDriver, content: JSON, text: str
+    build_driver: BuildDriver,
+    content: JSON,
+    text: str,
 ) -> None:
-    model = build_driver(Wire({**STOP_REASONS_RESPONSE, "content": content}).respond)
+    model = build_driver(
+        Wire(
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": content,
+            },
+        ).respond,
+    )
 
     outcome = model.generate(HELLO)
 
@@ -797,16 +1308,32 @@ def test_blocks_that_are_not_text_are_not_part_of_the_reply(
 @pytest.mark.parametrize(
     "body",
     [
-        {**STOP_REASONS_RESPONSE, "stop_reason": "max_tokens"},
-        {**STOP_REASONS_RESPONSE, "stop_reason": "pause_turn"},
-        {**STOP_REASONS_RESPONSE, "stop_reason": "model_context_window_exceeded"},
-        {**STOP_REASONS_RESPONSE, "stop_reason": "a_stop_reason_added_later"},
-        {**STOP_REASONS_RESPONSE, "stop_reason": None},
+        {
+            **STOP_REASONS_RESPONSE,
+            "stop_reason": "max_tokens",
+        },
+        {
+            **STOP_REASONS_RESPONSE,
+            "stop_reason": "pause_turn",
+        },
+        {
+            **STOP_REASONS_RESPONSE,
+            "stop_reason": "model_context_window_exceeded",
+        },
+        {
+            **STOP_REASONS_RESPONSE,
+            "stop_reason": "a_stop_reason_added_later",
+        },
+        {
+            **STOP_REASONS_RESPONSE,
+            "stop_reason": None,
+        },
     ],
     ids=["max-tokens", "pause-turn", "context-window", "added-later", "none"],
 )
 def test_a_reply_that_stopped_for_another_reason_is_truncated_with_its_text_so_far(
-    build_driver: BuildDriver, body: JSON
+    build_driver: BuildDriver,
+    body: JSON,
 ) -> None:
     model = build_driver(Wire(body).respond)
 
@@ -818,7 +1345,11 @@ def test_a_reply_that_stopped_for_another_reason_is_truncated_with_its_text_so_f
 def test_a_reply_that_stopped_to_use_a_tool_is_truncated_with_the_text_before_the_call(
     build_driver: BuildDriver,
 ) -> None:
-    body = {**STOP_REASONS_RESPONSE, "content": TOOL_USE_CONTENT, "stop_reason": "tool_use"}
+    body = {
+        **STOP_REASONS_RESPONSE,
+        "content": TOOL_USE_CONTENT,
+        "stop_reason": "tool_use",
+    }
     model = build_driver(Wire(body).respond)
 
     outcome = model.generate(HELLO)
@@ -839,13 +1370,24 @@ def test_a_refusal_is_refused_with_the_explanation_the_api_gives(build_driver: B
 # stop_details is null for every stop reason other than refusal.
 @pytest.mark.parametrize(
     "stop_details",
-    [{"type": "refusal", "category": None, "explanation": None}, None],
+    [
+        {
+            "type": "refusal",
+            "category": None,
+            "explanation": None,
+        },
+        None,
+    ],
     ids=["no-explanation", "no-details"],
 )
 def test_a_refusal_without_an_explanation_is_refused_without_one(
-    build_driver: BuildDriver, stop_details: JSON
+    build_driver: BuildDriver,
+    stop_details: JSON,
 ) -> None:
-    body = {**REFUSAL_RESPONSE, "stop_details": stop_details}
+    body = {
+        **REFUSAL_RESPONSE,
+        "stop_details": stop_details,
+    }
     model = build_driver(Wire(body).respond)
 
     outcome = model.generate(HELLO)
@@ -857,37 +1399,102 @@ def test_a_refusal_without_an_explanation_is_refused_without_one(
     "body",
     [
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": "Here is a string"}, id="content-is-a-string"
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": "Here is a string",
+            },
+            id="content-is-a-string",
         ),
-        pytest.param({"id": "msg_01234", "type": "message", "role": "assistant"}, id="no-content"),
-        pytest.param("a string", id="not-a-message"),
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": [{"type": "text"}]}, id="text-block-without-text"
+            {
+                "id": "msg_01234",
+                "type": "message",
+                "role": "assistant",
+            },
+            id="no-content",
         ),
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": [{"type": "text", "text": 123}]},
+            "a string",
+            id="not-a-message",
+        ),
+        pytest.param(
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": [{"type": "text"}],
+            },
+            id="text-block-without-text",
+        ),
+        pytest.param(
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": 123,
+                    },
+                ],
+            },
             id="text-is-not-a-string",
         ),
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": ["not a block"]},
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": ["not a block"],
+            },
             id="element-is-not-a-block",
         ),
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": [{"text": "missing type"}]},
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": [{"text": "missing type"}],
+            },
             id="block-without-type",
         ),
         pytest.param(
-            {**STOP_REASONS_RESPONSE, "content": [{"type": 123, "text": "bad type"}]},
+            {
+                **STOP_REASONS_RESPONSE,
+                "content": [
+                    {
+                        "type": 123,
+                        "text": "bad type",
+                    },
+                ],
+            },
             id="block-type-is-not-a-string",
         ),
-        pytest.param({"stop_reason": "end_turn", "content": []}, id="no-type-or-role"),
-        pytest.param({**STOP_REASONS_RESPONSE, "type": "error"}, id="type-is-not-message"),
-        pytest.param({**STOP_REASONS_RESPONSE, "role": "user"}, id="role-is-not-assistant"),
-        pytest.param({**REFUSAL_RESPONSE, "type": "error"}, id="refusal-is-not-a-message"),
+        pytest.param(
+            {
+                "stop_reason": "end_turn",
+                "content": [],
+            },
+            id="no-type-or-role",
+        ),
+        pytest.param(
+            {
+                **STOP_REASONS_RESPONSE,
+                "type": "error",
+            },
+            id="type-is-not-message",
+        ),
+        pytest.param(
+            {
+                **STOP_REASONS_RESPONSE,
+                "role": "user",
+            },
+            id="role-is-not-assistant",
+        ),
+        pytest.param(
+            {
+                **REFUSAL_RESPONSE,
+                "type": "error",
+            },
+            id="refusal-is-not-a-message",
+        ),
     ],
 )
 def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
-    build_driver: BuildDriver, body: JSON
+    build_driver: BuildDriver,
+    body: JSON,
 ) -> None:
     model = build_driver(Wire(body).respond)
 
@@ -899,7 +1506,10 @@ def test_a_reply_that_is_not_a_message_is_unavailable_without_a_status(
 def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
     build_driver: BuildDriver,
 ) -> None:
-    model = build_driver(Wire({"type": "message"}).respond, strict=True)
+    model = build_driver(
+        Wire({"type": "message"}).respond,
+        strict=True,
+    )
 
     outcome = model.generate(HELLO)
 
@@ -926,29 +1536,58 @@ def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
     ],
 )
 def test_a_status_that_is_not_a_configuration_error_is_unavailable_with_its_status(
-    build_driver: BuildDriver, status: int
+    build_driver: BuildDriver,
+    status: int,
 ) -> None:
-    wire = Wire(OVERLOADED_ERROR, status=status)
+    wire = Wire(
+        OVERLOADED_ERROR,
+        status=status,
+    )
     model = build_driver(wire.respond)
 
     outcome = model.generate(HELLO)
 
-    assert (outcome, len(wire.requests)) == (Unavailable(status=status), 1)
+    assert (
+        outcome,
+        len(wire.requests),
+    ) == (
+        Unavailable(status=status),
+        1,
+    )
 
 
 @pytest.mark.parametrize(
     "respond",
     [
-        pytest.param(fail_to_connect, id="connection"),
-        pytest.param(time_out, id="timeout"),
-        pytest.param(send_html, id="html"),
-        pytest.param(send_cut_off_json, id="cut-off-json"),
-        pytest.param(send_invalid_utf8, id="invalid-utf-8"),
-        pytest.param(send_corrupt_gzip, id="corrupt-gzip"),
+        pytest.param(
+            fail_to_connect,
+            id="connection",
+        ),
+        pytest.param(
+            time_out,
+            id="timeout",
+        ),
+        pytest.param(
+            send_html,
+            id="html",
+        ),
+        pytest.param(
+            send_cut_off_json,
+            id="cut-off-json",
+        ),
+        pytest.param(
+            send_invalid_utf8,
+            id="invalid-utf-8",
+        ),
+        pytest.param(
+            send_corrupt_gzip,
+            id="corrupt-gzip",
+        ),
     ],
 )
 def test_a_connection_that_failed_or_a_reply_that_is_not_json_is_unavailable_without_a_status(
-    build_driver: BuildDriver, respond: Respond
+    build_driver: BuildDriver,
+    respond: Respond,
 ) -> None:
     model = build_driver(respond)
 
@@ -957,26 +1596,47 @@ def test_a_connection_that_failed_or_a_reply_that_is_not_json_is_unavailable_wit
     assert outcome == Unavailable(status=None)
 
 
-@pytest.mark.parametrize("status", [400, 401, 402, 403, 404])
+@pytest.mark.parametrize(
+    "status",
+    [400, 401, 402, 403, 404],
+)
 def test_any_other_error_status_raises_naming_the_status(
-    build_driver: BuildDriver, status: int
+    build_driver: BuildDriver,
+    status: int,
 ) -> None:
-    model = build_driver(Wire(NOT_FOUND_ERROR, status=status).respond)
+    model = build_driver(
+        Wire(
+            NOT_FOUND_ERROR,
+            status=status,
+        ).respond,
+    )
 
-    with pytest.raises(ConfigurationError, match=str(status)):
+    with pytest.raises(
+        ConfigurationError,
+        match=str(status),
+    ):
         model.generate(HELLO)
 
 
 def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     build_driver: BuildDriver,
 ) -> None:
-    model = build_driver(Wire(NOT_FOUND_ERROR, status=404).respond)
+    model = build_driver(
+        Wire(
+            NOT_FOUND_ERROR,
+            status=404,
+        ).respond,
+    )
 
     with pytest.raises(ConfigurationError) as raised:
         model.generate(HELLO)
 
     error = raised.value
-    assert (NOT_FOUND_MESSAGE in str(error), error.__cause__, error.__context__) == (
+    assert (
+        NOT_FOUND_MESSAGE in str(error),
+        error.__cause__,
+        error.__context__,
+    ) == (
         False,
         None,
         None,

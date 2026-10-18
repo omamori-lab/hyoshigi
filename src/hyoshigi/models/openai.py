@@ -15,7 +15,7 @@ try:
     from openai.types.shared_params import Reasoning
 except ModuleNotFoundError as error:
     raise ModuleNotFoundError(
-        "OpenAI models need the extra: pip install 'hyoshigi[openai]'"
+        "OpenAI models need the extra: pip install 'hyoshigi[openai]'",
     ) from error
 
 from hyoshigi.errors import ConfigurationError
@@ -50,7 +50,10 @@ DECISION_IMAGES = MediaTypes("image/png", "image/jpeg", "image/webp", "image/gif
 
 # What a call to the client raises when it gets no usable reply: the SDK's own errors, and the
 # error of encoding a prompt text that has no UTF-8 form, such as a lone surrogate.
-_FAILURES = (APIError, UnicodeError)
+_FAILURES = (
+    APIError,
+    UnicodeError,
+)
 # Statuses that are no answer rather than a mistake: request timeout, conflict, payload too
 # large and too many requests.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
@@ -74,7 +77,7 @@ _UNUSABLE_INPUT_CODES = frozenset(
         "unsupported_image_media_type",
         "empty_image_file",
         "failed_to_download_image",
-    }
+    },
 )
 
 
@@ -90,7 +93,11 @@ class RequestArguments(TypedDict):
 
 
 def build_arguments(
-    prompt: Prompt, *, model: str, max_output_tokens: int | None, reasoning_effort: ReasoningEffort
+    prompt: Prompt,
+    *,
+    model: str,
+    max_output_tokens: int | None,
+    reasoning_effort: ReasoningEffort,
 ) -> RequestArguments | None:
     """The prompt as one user message under the instructions, with nothing stored; None if a
     part is in a form the API cannot take. The reasoning effort is sent only when given.
@@ -100,11 +107,19 @@ def build_arguments(
         return None
     # The SDK's part types name every optional key, which no type outside the SDK can, so the
     # type checker cannot see that the shared parts are of them.
-    parts = cast(ResponseInputMessageContentListParam, content)
+    parts = cast(
+        ResponseInputMessageContentListParam,
+        content,
+    )
     return {
         "model": model,
         "instructions": prompt.system,
-        "input": [{"role": "user", "content": parts}],
+        "input": [
+            {
+                "role": "user",
+                "content": parts,
+            },
+        ],
         "max_output_tokens": omit if max_output_tokens is None else max_output_tokens,
         "reasoning": omit if reasoning_effort is None else {"effort": reasoning_effort},
         "store": False,
@@ -130,15 +145,25 @@ def build_decision_part(part: PromptPart) -> DecisionInputPartUnionParam | None:
     """
     match part:
         case TextPart(text=text):
-            return {"type": "input_text", "text": text}
+            return {
+                "type": "input_text",
+                "text": text,
+            }
         case MediaPart(media_type=media_type) if (
             DECISION_IMAGES.covers(media_type) or media_type.lower() == "image/*"
         ):
             image_url = responses.locate(part)
-            return None if image_url is None else {"type": "input_image", "image_url": image_url}
+            return (
+                None
+                if image_url is None
+                else {
+                    "type": "input_image",
+                    "image_url": image_url,
+                }
+            )
         case MediaPart(media_type=media_type):
             raise ConfigurationError(
-                f"OpenAI's Decisions API reads png, jpeg, webp and gif images, not {media_type}"
+                f"OpenAI's Decisions API reads png, jpeg, webp and gif images, not {media_type}",
             )
         case _:
             assert_never(part)
@@ -152,11 +177,27 @@ def build_decision_input(state: tuple[PromptPart, ...]) -> DecisionInput | None:
     without a separator. Every part is built before the result is decided, so media the API
     can never read raises whatever parts come before it.
     """
-    texts = [part.text for part in state if isinstance(part, TextPart)]
+    texts = [
+        part.text
+        for part in state
+        if isinstance(
+            part,
+            TextPart,
+        )
+    ]
     if len(texts) == len(state):
         return "".join(texts)
     parts = collect([build_decision_part(part) for part in state])
-    return None if parts is None else [{"role": "user", "content": parts}]
+    return (
+        None
+        if parts is None
+        else [
+            {
+                "role": "user",
+                "content": parts,
+            },
+        ]
+    )
 
 
 def read_decision(reply: JSON) -> DecisionOutcome:
@@ -167,7 +208,14 @@ def read_decision(reply: JSON) -> DecisionOutcome:
     including an answer of another type, is unavailable.
     """
     match reply:
-        case {"answers": [{"type": "predicate", "probability": int() | float() as probability}]}:
+        case {
+            "answers": [
+                {
+                    "type": "predicate",
+                    "probability": int() | float() as probability,
+                },
+            ],
+        }:
             try:
                 return Decision(probability=probability)
             except ConfigurationError:
@@ -192,7 +240,10 @@ def read_failure(error: Failure) -> Refused | Unavailable:
     match error:
         case APIStatusError(code=str(code)) if responses.names_refusal(code):
             return Refused()
-        case APIStatusError(status_code=status, code=code) if (
+        case APIStatusError(
+            status_code=status,
+            code=code,
+        ) if (
             400 <= status < 500
             and status not in _UNAVAILABLE_STATUSES
             and code not in _UNUSABLE_INPUT_CODES
@@ -218,7 +269,10 @@ def build_model(
     perceives names media the API cannot carry.
     """
     check_name(model)
-    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=responses.CARRIED_MEDIA,
+    )
 
     def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(
@@ -237,7 +291,11 @@ def build_model(
             return responses.read_reply(load_body(reply.http_response.content))
         return read_failure(error)
 
-    return GenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
+    return GenerativeModel(
+        name=f"openai:{model}",
+        generate=generate,
+        perceives=perceives,
+    )
 
 
 def build_async_model(
@@ -255,7 +313,10 @@ def build_async_model(
     perceives names media the API cannot carry.
     """
     check_name(model)
-    check_perceives(perceives, carries=responses.CARRIED_MEDIA)
+    check_perceives(
+        perceives,
+        carries=responses.CARRIED_MEDIA,
+    )
 
     async def generate(prompt: Prompt) -> GenerationOutcome:
         arguments = build_arguments(
@@ -274,10 +335,19 @@ def build_async_model(
             return responses.read_reply(load_body(reply.http_response.content))
         return read_failure(error)
 
-    return AsyncGenerativeModel(name=f"openai:{model}", generate=generate, perceives=perceives)
+    return AsyncGenerativeModel(
+        name=f"openai:{model}",
+        generate=generate,
+        perceives=perceives,
+    )
 
 
-def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -> DecisionModel:
+def build_decision_model(
+    client: OpenAI,
+    *,
+    model: str,
+    perceives: MediaTypes,
+) -> DecisionModel:
     """A decision model on the Decisions API, through the caller's client.
 
     The question is one predicate question, whose instructions are the statement; the
@@ -285,7 +355,10 @@ def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -
     ConfigurationError if the model id is empty or perceives names media the API cannot read.
     """
     check_name(model)
-    check_perceives(perceives, carries=DECISION_IMAGES)
+    check_perceives(
+        perceives,
+        carries=DECISION_IMAGES,
+    )
 
     def decide(question: Question) -> DecisionOutcome:
         state = build_decision_input(question.state)
@@ -295,7 +368,12 @@ def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -
             reply = client.decisions.with_raw_response.create(
                 model=model,
                 input=state,
-                questions=[{"type": "predicate", "instructions": question.statement}],
+                questions=[
+                    {
+                        "type": "predicate",
+                        "instructions": question.statement,
+                    },
+                ],
             )
         except _FAILURES as caught:
             error = caught
@@ -303,11 +381,18 @@ def build_decision_model(client: OpenAI, *, model: str, perceives: MediaTypes) -
             return read_decision(load_body(reply.http_response.content))
         return read_failure(error)
 
-    return DecisionModel(name=f"openai:{model}", decide=decide, perceives=perceives)
+    return DecisionModel(
+        name=f"openai:{model}",
+        decide=decide,
+        perceives=perceives,
+    )
 
 
 def build_async_decision_model(
-    client: AsyncOpenAI, *, model: str, perceives: MediaTypes
+    client: AsyncOpenAI,
+    *,
+    model: str,
+    perceives: MediaTypes,
 ) -> AsyncDecisionModel:
     """A decision model on the Decisions API, through the caller's async client.
 
@@ -316,7 +401,10 @@ def build_async_decision_model(
     ConfigurationError if the model id is empty or perceives names media the API cannot read.
     """
     check_name(model)
-    check_perceives(perceives, carries=DECISION_IMAGES)
+    check_perceives(
+        perceives,
+        carries=DECISION_IMAGES,
+    )
 
     async def decide(question: Question) -> DecisionOutcome:
         state = build_decision_input(question.state)
@@ -326,7 +414,12 @@ def build_async_decision_model(
             reply = await client.decisions.with_raw_response.create(
                 model=model,
                 input=state,
-                questions=[{"type": "predicate", "instructions": question.statement}],
+                questions=[
+                    {
+                        "type": "predicate",
+                        "instructions": question.statement,
+                    },
+                ],
             )
         except _FAILURES as caught:
             error = caught
@@ -334,4 +427,8 @@ def build_async_decision_model(
             return read_decision(load_body(reply.http_response.content))
         return read_failure(error)
 
-    return AsyncDecisionModel(name=f"openai:{model}", decide=decide, perceives=perceives)
+    return AsyncDecisionModel(
+        name=f"openai:{model}",
+        decide=decide,
+        perceives=perceives,
+    )

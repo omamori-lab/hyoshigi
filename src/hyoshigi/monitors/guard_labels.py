@@ -43,7 +43,7 @@ _MARK = r"(?:[^\w\s]|_)"
 # A label alone, or after a short key such as Label:, with markup around either. The bounded
 # key and the possessive quantifiers make a line that holds no label fail in linear time.
 _LABEL_LINE = re.compile(
-    rf"{_LINE_OPENING}(?:(?P<key>{_KEY}){_KEY_END}{_MARKUP})?{_LABEL}{_MARKUP}"
+    rf"{_LINE_OPENING}(?:(?P<key>{_KEY}){_KEY_END}{_MARKUP})?{_LABEL}{_MARKUP}",
 )
 # The keys a guard may put before its verdict, as in Label: or Final answer:.
 _VERDICT_KEY = re.compile(
@@ -68,12 +68,19 @@ _LISTED_LABEL_START = re.compile(rf"{_MARKUP}{_LIST_MARKER}{_MARKUP}{_LABEL}\s*+
 _LABEL_AFTER_COLON = re.compile(rf"{_MARKUP}{_LABEL}{_MARKUP}")
 _CATEGORY_CODES = re.compile(r"\s*S\d+(?:\s*,\s*S\d+)*\s*")
 # A line holding more than whitespace; anchored to the line's start, so it runs in linear time.
-_NON_EMPTY_LINE = re.compile(r"^[^\n]*\S[^\n]*", flags=re.MULTILINE)
+_NON_EMPTY_LINE = re.compile(
+    r"^[^\n]*\S[^\n]*",
+    flags=re.MULTILINE,
+)
 _KEY_WORDS = re.compile(r"[^\W_]+(?: [^\W_]+)*")
 _ONE_WORD = re.compile(_LABEL_WORD)
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class GuardLabels:
     """The labels a guard model writes, and the key it writes its verdict after, if any.
 
@@ -98,39 +105,68 @@ class GuardLabels:
     key: str | None = None
 
     def __post_init__(self) -> None:
-        suspicious = _read_labels(self.suspicious, name="suspicious")
-        safe = _read_labels(self.safe, name="safe")
+        suspicious = _read_labels(
+            self.suspicious,
+            name="suspicious",
+        )
+        safe = _read_labels(
+            self.safe,
+            name="safe",
+        )
         shared = sorted(suspicious & safe)
         if shared:
             raise ConfigurationError(f"a label cannot be in both suspicious and safe, got {shared}")
         if self.key is not None and not (
-            isinstance(self.key, str) and _KEY_WORDS.fullmatch(self.key)
+            isinstance(
+                self.key,
+                str,
+            )
+            and _KEY_WORDS.fullmatch(self.key)
         ):
             raise ConfigurationError(
                 "key must be words of letters or digits, one space apart, such as "
-                f"'User Safety', got {describe_option_value(self.key)}"
+                f"'User Safety', got {describe_option_value(self.key)}",
             )
         # The dataclass is frozen, so the sets are set past its guard.
-        object.__setattr__(self, "suspicious", suspicious)
-        object.__setattr__(self, "safe", safe)
+        object.__setattr__(
+            self,
+            "suspicious",
+            suspicious,
+        )
+        object.__setattr__(
+            self,
+            "safe",
+            safe,
+        )
 
 
-def _read_labels(labels: object, *, name: str) -> frozenset[str]:
+def _read_labels(
+    labels: object,
+    *,
+    name: str,
+) -> frozenset[str]:
     """Return a set of labels in lower case, or raise ConfigurationError naming the set."""
-    if not isinstance(labels, AbstractSet):
+    if not isinstance(
+        labels,
+        AbstractSet,
+    ):
         raise ConfigurationError(
             f"{name} must be a set of labels, such as {{'unsafe'}}, "
-            f"got {describe_option_value(labels)}"
+            f"got {describe_option_value(labels)}",
         )
     for label in labels:
-        check_instance(label, expected=str, name=f"each label in {name}")
+        check_instance(
+            label,
+            expected=str,
+            name=f"each label in {name}",
+        )
     if not labels:
         raise ConfigurationError(f"{name} must hold at least one label")
     malformed = sorted(label for label in labels if _ONE_WORD.fullmatch(label) is None)
     if malformed:
         raise ConfigurationError(
             f"{name} must hold only single words of letters, digits, _ or -, each beginning "
-            f"and ending with a letter or digit, got {malformed}"
+            f"and ending with a letter or digit, got {malformed}",
         )
     return frozenset(label.lower() for label in labels)
 
@@ -139,7 +175,10 @@ def _read_labels(labels: object, *, name: str) -> frozenset[str]:
 # https://developers.openai.com/cookbook/articles/gpt-oss-safeguard-guide: its example
 # policies ask to "Classify each example as `VALID` (allowed) or `INVALID`". A policy that
 # asks for other labels, such as 0 and 1, takes GuardLabels of its own.
-GPT_OSS_SAFEGUARD = GuardLabels(suspicious=frozenset({"invalid"}), safe=frozenset({"valid"}))
+GPT_OSS_SAFEGUARD = GuardLabels(
+    suspicious=frozenset({"invalid"}),
+    safe=frozenset({"valid"}),
+)
 
 # Qwen, "Qwen3Guard-Gen-8B" model card, https://huggingface.co/Qwen/Qwen3Guard-Gen-8B: its
 # reply is "Safety: Unsafe" then "Categories: Violent", which the card reads with
@@ -148,11 +187,17 @@ GPT_OSS_SAFEGUARD = GuardLabels(suspicious=frozenset({"invalid"}), safe=frozense
 # Technical Report", arXiv:2510.14276) name the "tri-class judgments (safe, controversial,
 # unsafe)".
 QWEN3GUARD = GuardLabels(
-    suspicious=frozenset({"unsafe", "controversial"}), safe=frozenset({"safe"}), key="Safety"
+    suspicious=frozenset({"unsafe", "controversial"}),
+    safe=frozenset({"safe"}),
+    key="Safety",
 )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class _LabelLine:
     """A known label a line names, in lower case, and whether the line can be the verdict.
 
@@ -165,7 +210,11 @@ class _LabelLine:
     is_verdict: bool
 
 
-def read_label(text: str, *, labels: GuardLabels) -> str | Unreadable:
+def read_label(
+    text: str,
+    *,
+    labels: GuardLabels,
+) -> str | Unreadable:
     """Return the guard's label, in lower case, from where its format puts it, or Unreadable.
 
     A reply in which two lines name different labels is unreadable: a guard that quotes a
@@ -177,21 +226,38 @@ def read_label(text: str, *, labels: GuardLabels) -> str | Unreadable:
     """
     lines = list(_NON_EMPTY_LINE.finditer(text))
     if labels.key is not None:
-        return _read_keyed_label(lines, key=labels.key, labels=labels)
-    label_lines = _find_label_lines(lines, labels=labels.suspicious | labels.safe)
+        return _read_keyed_label(
+            lines,
+            key=labels.key,
+            labels=labels,
+        )
+    label_lines = _find_label_lines(
+        lines,
+        labels=labels.suspicious | labels.safe,
+    )
     named = {line.label for line in label_lines.values()}
     for line in lines:
-        named |= _read_suspicious_mentions(line.group(), suspicious=labels.suspicious)
+        named |= _read_suspicious_mentions(
+            line.group(),
+            suspicious=labels.suspicious,
+        )
     if len(named) != 1:
         return Unreadable()
     last_line = label_lines.get(len(lines) - 1)
     if last_line is not None:
         return last_line.label if last_line.is_verdict else Unreadable()
-    return _read_first_line_label(lines, label_lines=label_lines, suspicious=labels.suspicious)
+    return _read_first_line_label(
+        lines,
+        label_lines=label_lines,
+        suspicious=labels.suspicious,
+    )
 
 
 def _read_keyed_label(
-    lines: list[re.Match[str]], *, key: str, labels: GuardLabels
+    lines: list[re.Match[str]],
+    *,
+    key: str,
+    labels: GuardLabels,
 ) -> str | Unreadable:
     """Return the whole value of the one line that opens with the key, if it is a label.
 
@@ -199,34 +265,67 @@ def _read_keyed_label(
     other line names a suspicious label as a word, since the guard may have quoted one the
     agent planted, and the reader errs towards suspicion.
     """
-    keyed = _find_keyed_lines(lines, key=key)
+    keyed = _find_keyed_lines(
+        lines,
+        key=key,
+    )
     if len(keyed) != 1:
         return Unreadable()
-    ((keyed_line, key_match),) = keyed
-    value = _LABEL_AFTER_COLON.fullmatch(key_match.string, key_match.end())
+    (
+        (
+            keyed_line,
+            key_match,
+        ),
+    ) = keyed
+    value = _LABEL_AFTER_COLON.fullmatch(
+        key_match.string,
+        key_match.end(),
+    )
     if value is None:
         return Unreadable()
     label = value["label"].lower()
     if label in labels.suspicious:
         return label
     if label in labels.safe and not _names_label_elsewhere(
-        lines, besides=keyed_line, labels=labels.suspicious
+        lines,
+        besides=keyed_line,
+        labels=labels.suspicious,
     ):
         return label
     return Unreadable()
 
 
 def _find_keyed_lines(
-    lines: list[re.Match[str]], *, key: str
+    lines: list[re.Match[str]],
+    *,
+    key: str,
 ) -> list[tuple[re.Match[str], re.Match[str]]]:
     """Return each line that opens with the key and a colon, with the match of that opening."""
-    words = r"[\s*_`]++".join(map(re.escape, key.split()))
-    opening = re.compile(rf"{_LINE_OPENING}{words}{_KEY_END}", flags=re.IGNORECASE)
-    return [(line, match) for line in lines if (match := opening.match(line.group()))]
+    words = r"[\s*_`]++".join(
+        map(
+            re.escape,
+            key.split(),
+        ),
+    )
+    opening = re.compile(
+        rf"{_LINE_OPENING}{words}{_KEY_END}",
+        flags=re.IGNORECASE,
+    )
+    return [
+        (
+            line,
+            match,
+        )
+        for line in lines
+        if (match := opening.match(line.group()))
+    ]
 
 
 def _names_label_elsewhere(
-    lines: list[re.Match[str]], *, besides: re.Match[str], labels: frozenset[str]
+    lines: list[re.Match[str]],
+    *,
+    besides: re.Match[str],
+    labels: frozenset[str],
 ) -> bool:
     """Tell whether a line other than the given one holds a label as a whole word, in any case."""
     return any(
@@ -238,20 +337,30 @@ def _names_label_elsewhere(
 
 
 def _find_label_lines(
-    lines: list[re.Match[str]], *, labels: frozenset[str]
+    lines: list[re.Match[str]],
+    *,
+    labels: frozenset[str],
 ) -> dict[int, _LabelLine]:
     """Return the label of every line that holds one or opens with a keyed one, by index."""
     label_lines: dict[int, _LabelLine] = {}
     for index, line in enumerate(lines):
-        found = _match_label_line(line.group(), labels=labels) or _match_keyed_label_start(
-            line.group(), labels=labels
+        found = _match_label_line(
+            line.group(),
+            labels=labels,
+        ) or _match_keyed_label_start(
+            line.group(),
+            labels=labels,
         )
         if found is not None:
             label_lines[index] = found
     return label_lines
 
 
-def _match_label_line(line: str, *, labels: frozenset[str]) -> _LabelLine | None:
+def _match_label_line(
+    line: str,
+    *,
+    labels: frozenset[str],
+) -> _LabelLine | None:
     """Read a line that holds one known label, alone or after a short key.
 
     A key that names a label, as in "violation: no_violation", makes the line name two
@@ -263,7 +372,10 @@ def _match_label_line(line: str, *, labels: frozenset[str]) -> _LabelLine | None
     key = match["key"]
     if key and any(word.lower() in labels for word in _KEY_WORD.findall(key)):
         return None
-    return _LabelLine(label=match["label"].lower(), is_verdict=_is_verdict(match))
+    return _LabelLine(
+        label=match["label"].lower(),
+        is_verdict=_is_verdict(match),
+    )
 
 
 def _is_verdict(match: re.Match[str]) -> bool:
@@ -278,7 +390,11 @@ def _is_verdict(match: re.Match[str]) -> bool:
     return match["list_marker"] is None and _BULLET_OR_QUOTE.match(match.string) is None
 
 
-def _match_keyed_label_start(line: str, *, labels: frozenset[str]) -> _LabelLine | None:
+def _match_keyed_label_start(
+    line: str,
+    *,
+    labels: frozenset[str],
+) -> _LabelLine | None:
     """Read the label a line opens with after a verdict key, as in "Label: violation (...".
 
     A guard that gives its keyed label and then quotes the action on the same line still
@@ -287,28 +403,44 @@ def _match_keyed_label_start(line: str, *, labels: frozenset[str]) -> _LabelLine
     match = _KEYED_LABEL_START.match(line)
     if match is None or match["label"].lower() not in labels:
         return None
-    return _LabelLine(label=match["label"].lower(), is_verdict=False)
+    return _LabelLine(
+        label=match["label"].lower(),
+        is_verdict=False,
+    )
 
 
-def _read_suspicious_mentions(line: str, *, suspicious: frozenset[str]) -> set[str]:
+def _read_suspicious_mentions(
+    line: str,
+    *,
+    suspicious: frozenset[str],
+) -> set[str]:
     """Return the suspicious labels a line opens with before a mark, or ends on after a colon.
 
     Such a line may be the guard's own verdict written off format, with a planted safe label
     quoted on the next line. The reader cannot tell, so it errs towards suspicion: the line
     names the suspicious label, and a reply that also names a safe label is unreadable.
     """
-    openings = [_UNKEYED_LABEL_START.match(line), _LISTED_LABEL_START.match(line)]
+    openings = [
+        _UNKEYED_LABEL_START.match(line),
+        _LISTED_LABEL_START.match(line),
+    ]
     _, colon, after = line.rpartition(":")
     ending = _LABEL_AFTER_COLON.fullmatch(after) if colon else None
     return {
         match["label"].lower()
-        for match in (*openings, ending)
+        for match in (
+            *openings,
+            ending,
+        )
         if match is not None and match["label"].lower() in suspicious
     }
 
 
 def _read_first_line_label(
-    lines: list[re.Match[str]], *, label_lines: dict[int, _LabelLine], suspicious: frozenset[str]
+    lines: list[re.Match[str]],
+    *,
+    label_lines: dict[int, _LabelLine],
+    suspicious: frozenset[str],
 ) -> str | Unreadable:
     """Read an unsafe reply written first, followed only by category codes, as Llama Guard
     writes it (Meta, "Llama Guard 4 12B" model card).

@@ -10,23 +10,50 @@ from hyoshigi.trajectory.storage import decode_data
 # RFC 2397, section 3: data:[<mediatype>][;base64],<data>, where the media type, with its
 # parameters, defaults to text/plain.
 _DATA_URL = re.compile(
-    r"data:(?P<media_type>[^;,]*)(?:;[^;,]*?)*?(?P<base64>;base64)?,(?P<data>.*)", re.DOTALL
+    r"data:(?P<media_type>[^;,]*)(?:;[^;,]*?)*?(?P<base64>;base64)?,(?P<data>.*)",
+    re.DOTALL,
 )
 
 
-def build_media(media_type: str, *, data: bytes | None, path: str) -> MediaPart:
+def build_media(
+    media_type: str,
+    *,
+    data: bytes | None,
+    path: str,
+) -> MediaPart:
     """Build a media part from data, or raise FormatError at the path if it cannot be one."""
     try:
-        return MediaPart(media_type=media_type, data=data)
+        return MediaPart(
+            media_type=media_type,
+            data=data,
+        )
     except ConfigurationError:
-        raise FormatError(path=path, expected="an IANA media type") from None
+        raise FormatError(
+            path=path,
+            expected="an IANA media type",
+        ) from None
 
 
-def read_data_url(url: str, *, path: str) -> MediaPart | None:
+def read_data_url(
+    url: str,
+    *,
+    path: str,
+) -> MediaPart | None:
     """Read a data URL into media with its own type and bytes; return None for another URL."""
     found = _DATA_URL.fullmatch(url)
     if found is None:
         return None
     encoded = found["data"]
-    data = decode_data(encoded, path=path) if found["base64"] else unquote_to_bytes(encoded)
-    return build_media(found["media_type"] or "text/plain", data=data, path=path)
+    data = (
+        decode_data(
+            encoded,
+            path=path,
+        )
+        if found["base64"]
+        else unquote_to_bytes(encoded)
+    )
+    return build_media(
+        found["media_type"] or "text/plain",
+        data=data,
+        path=path,
+    )

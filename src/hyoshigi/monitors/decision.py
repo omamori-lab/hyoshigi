@@ -75,7 +75,11 @@ ATTACK_CRITERIA: tuple[str, ...] = (
 )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class DecisionMonitor(Monitor):
     """A monitor that rates an action using a decision model synchronously."""
 
@@ -91,15 +95,28 @@ class DecisionMonitor(Monitor):
             hint="Use AsyncDecisionMonitor for an async model.",
         )
 
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far."""
         return drive(
-            plan_decision(self, action=action, trajectory=trajectory),
+            plan_decision(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
             ask=self.model.decide,
         )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class AsyncDecisionMonitor(AsyncMonitor):
     """A monitor that rates an action using a decision model asynchronously."""
 
@@ -115,10 +132,19 @@ class AsyncDecisionMonitor(AsyncMonitor):
             hint="Use DecisionMonitor for a sync model.",
         )
 
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far."""
         return await drive_concurrently(
-            plan_decision(self, action=action, trajectory=trajectory),
+            plan_decision(
+                self,
+                action=action,
+                trajectory=trajectory,
+            ),
             ask=self.model.decide,
         )
 
@@ -130,10 +156,27 @@ def check_decision_options(
     hint: str,
 ) -> None:
     """Raise ConfigurationError unless the options are valid for a decision monitor."""
-    check_instance(monitor.model, expected=expected_model, name="model", hint=hint)
-    check_instance(monitor.view, expected=View, name="view")
-    check_instance(monitor.aggregation, expected=Aggregation, name="aggregation")
-    check_instance(monitor.statements, expected=tuple, name="statements")
+    check_instance(
+        monitor.model,
+        expected=expected_model,
+        name="model",
+        hint=hint,
+    )
+    check_instance(
+        monitor.view,
+        expected=View,
+        name="view",
+    )
+    check_instance(
+        monitor.aggregation,
+        expected=Aggregation,
+        name="aggregation",
+    )
+    check_instance(
+        monitor.statements,
+        expected=tuple,
+        name="statements",
+    )
     check_statements(monitor.statements)
 
 
@@ -141,7 +184,14 @@ def check_statements(statements: tuple[str, ...]) -> None:
     """Raise ConfigurationError unless the statements are non-empty, non-blank and unique."""
     if not statements:
         raise ConfigurationError("statements must not be empty")
-    if any(not isinstance(statement, str) or not statement.strip() for statement in statements):
+    if any(
+        not isinstance(
+            statement,
+            str,
+        )
+        or not statement.strip()
+        for statement in statements
+    ):
         raise ConfigurationError("each statement must be a non-blank string")
     if len(set(statements)) != len(statements):
         raise ConfigurationError("statements must not be repeated")
@@ -156,7 +206,7 @@ def build_state(rendering: Rendering) -> tuple[PromptPart, ...]:
             TextPart(text="\n</trajectory>\n<proposed_action>\n"),
             *rendering.proposed_action,
             TextPart(text="\n</proposed_action>"),
-        ]
+        ],
     )
 
 
@@ -192,7 +242,11 @@ def aggregate_decisions(
             )
         case Aggregation.MAX | Aggregation.MEAN:
             statement, decision = max(
-                zip(statements, decisions, strict=True),
+                zip(
+                    statements,
+                    decisions,
+                    strict=True,
+                ),
                 key=lambda pair: pair[1].probability,
             )
             value = (
@@ -225,12 +279,22 @@ def plan_decision(
         )
     state = build_state(rendering)
     questions = tuple(
-        Question(statement=statement, state=state) for statement in monitor.statements
+        Question(
+            statement=statement,
+            state=state,
+        )
+        for statement in monitor.statements
     )
     outcomes = yield questions
     collected = collect_decisions(outcomes)
-    if isinstance(collected, Refused | Unavailable):
-        return fail_closed(collected, model=monitor.model.name)
+    if isinstance(
+        collected,
+        Refused | Unavailable,
+    ):
+        return fail_closed(
+            collected,
+            model=monitor.model.name,
+        )
     value, explanation = aggregate_decisions(
         collected,
         statements=monitor.statements,
@@ -239,9 +303,20 @@ def plan_decision(
     evidence = Decisions(
         model=monitor.model.name,
         decisions=tuple(
-            StatementDecision(statement=statement, decision=decision)
-            for statement, decision in zip(monitor.statements, collected, strict=True)
+            StatementDecision(
+                statement=statement,
+                decision=decision,
+            )
+            for statement, decision in zip(
+                monitor.statements,
+                collected,
+                strict=True,
+            )
         ),
         hidden_reasoning=rendering.hidden_reasoning,
     )
-    return SuspicionScore(value=value, explanation=explanation, evidence=evidence)
+    return SuspicionScore(
+        value=value,
+        explanation=explanation,
+        evidence=evidence,
+    )

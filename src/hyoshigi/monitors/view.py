@@ -29,7 +29,11 @@ class Channel(Flag):
     DEFAULT = TASK | TOOL_CALLS | SUBAGENT_REPORTS
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class View:
     """Which entries of a trajectory a monitor reads.
 
@@ -45,22 +49,48 @@ class View:
     delegation_tools: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
-        check_instance(self.channels, expected=Channel, name="channels")
+        check_instance(
+            self.channels,
+            expected=Channel,
+            name="channels",
+        )
         # The dataclass is frozen, so the checked values are set past its guard.
         if self.most_recent is not None:
-            count = read_count(self.most_recent, name="most_recent", minimum=1)
-            object.__setattr__(self, "most_recent", count)
-        object.__setattr__(self, "delegation_tools", _read_delegation_tools(self.delegation_tools))
+            count = read_count(
+                self.most_recent,
+                name="most_recent",
+                minimum=1,
+            )
+            object.__setattr__(
+                self,
+                "most_recent",
+                count,
+            )
+        object.__setattr__(
+            self,
+            "delegation_tools",
+            _read_delegation_tools(self.delegation_tools),
+        )
 
 
 def _read_delegation_tools(tools: object) -> frozenset[str]:
     """Read the tool names once, each checked as a string by its position."""
-    if isinstance(tools, str | bytes) or not isinstance(tools, Iterable):
+    if isinstance(
+        tools,
+        str | bytes,
+    ) or not isinstance(
+        tools,
+        Iterable,
+    ):
         raise ConfigurationError(
             "delegation_tools must be an iterable of tool names other than a string, "
-            f"got {describe_option_value(tools)}"
+            f"got {describe_option_value(tools)}",
         )
     names = tuple(tools)
     for position, name in enumerate(names):
-        check_instance(name, expected=str, name=f"delegation_tools[{position}]")
+        check_instance(
+            name,
+            expected=str,
+            name=f"delegation_tools[{position}]",
+        )
     return frozenset(names)

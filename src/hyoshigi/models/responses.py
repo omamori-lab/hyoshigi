@@ -57,7 +57,11 @@ type InputPart = InputText | InputImage | InputFile
 type Piece = TextPart | Refused | OpaquePart
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Message:
     """An assistant's message in a reply: its parts as text, refusals and parts of other
     types, and whether it is whole, completed with no part of another type.
@@ -80,7 +84,10 @@ def build_part(part: PromptPart) -> InputPart | None:
     """A text part as input text, a media part as an image or a file."""
     match part:
         case TextPart(text=text):
-            return {"type": "input_text", "text": text}
+            return {
+                "type": "input_text",
+                "text": text,
+            }
         case MediaPart():
             return build_media(part)
         case _:
@@ -98,9 +105,16 @@ def build_media(part: MediaPart) -> InputImage | InputFile | None:
         case "image" | "application" | "text", None:
             return None
         case "image", str(image_url):
-            return {"type": "input_image", "image_url": image_url, "detail": "auto"}
+            return {
+                "type": "input_image",
+                "image_url": image_url,
+                "detail": "auto",
+            }
         case "application" | "text", str(file_url) if part.url is not None:
-            return {"type": "input_file", "file_url": file_url}
+            return {
+                "type": "input_file",
+                "file_url": file_url,
+            }
         case "application" | "text", str(file_data):
             extension = _EXTENSIONS.guess_extension(part.media_type) or ""
             return {
@@ -139,7 +153,10 @@ def read_reply(body: JSON) -> GenerationOutcome:
     match body:
         case {"status": "completed"}:
             return read_completed(messages)
-        case {"status": "incomplete", "incomplete_details": {"reason": "content_filter"}}:
+        case {
+            "status": "incomplete",
+            "incomplete_details": {"reason": "content_filter"},
+        }:
             return Refused()
         case {"status": "failed"}:
             return Refused() if is_blocked(body) else Unavailable()
@@ -153,7 +170,13 @@ def read_completed(messages: list[Message]) -> GenerationOutcome:
     else the text.
     """
     refusals = [
-        piece for message in messages for piece in message.pieces if isinstance(piece, Refused)
+        piece
+        for message in messages
+        for piece in message.pieces
+        if isinstance(
+            piece,
+            Refused,
+        )
     ]
     if refusals:
         return refusals[0]
@@ -170,7 +193,10 @@ def join_text(messages: list[Message]) -> str:
         piece.text
         for message in messages
         for piece in message.pieces
-        if isinstance(piece, TextPart)
+        if isinstance(
+            piece,
+            TextPart,
+        )
     )
 
 
@@ -197,7 +223,18 @@ def read_output(body: JSON) -> list[Message] | None:
             read = collect([read_item(item) for item in items])
         case _:
             return None
-    return None if read is None else [item for item in read if isinstance(item, Message)]
+    return (
+        None
+        if read is None
+        else [
+            item
+            for item in read
+            if isinstance(
+                item,
+                Message,
+            )
+        ]
+    )
 
 
 def read_item(item: JSON) -> Message | OpaquePart | None:
@@ -205,21 +242,41 @@ def read_item(item: JSON) -> Message | OpaquePart | None:
     it has no type, or is a message that is not the assistant's or holds no list of parts.
     """
     match item:
-        case {"type": "message", "role": "assistant", "content": list(content)}:
-            return read_message(content, completed=item.get("status") == "completed")
+        case {
+            "type": "message",
+            "role": "assistant",
+            "content": list(content),
+        }:
+            return read_message(
+                content,
+                completed=item.get("status") == "completed",
+            )
         case {"type": str(kind)} if kind != "message":
             return OpaquePart(kind=kind)
         case _:
             return None
 
 
-def read_message(content: list[JSON], *, completed: bool) -> Message | None:
+def read_message(
+    content: list[JSON],
+    *,
+    completed: bool,
+) -> Message | None:
     """An assistant's message from its parts; None if a part is not what the format documents."""
     pieces = collect([read_part(part) for part in content])
     if pieces is None:
         return None
-    unread = any(isinstance(piece, OpaquePart) for piece in pieces)
-    return Message(pieces=pieces, whole=completed and not unread)
+    unread = any(
+        isinstance(
+            piece,
+            OpaquePart,
+        )
+        for piece in pieces
+    )
+    return Message(
+        pieces=pieces,
+        whole=completed and not unread,
+    )
 
 
 def read_part(part: JSON) -> Piece | None:
@@ -227,9 +284,15 @@ def read_part(part: JSON) -> Piece | None:
     it has no type, or is output text or a refusal without its text.
     """
     match part:
-        case {"type": "output_text", "text": str(text)}:
+        case {
+            "type": "output_text",
+            "text": str(text),
+        }:
             return TextPart(text=text)
-        case {"type": "refusal", "refusal": str(refusal)}:
+        case {
+            "type": "refusal",
+            "refusal": str(refusal),
+        }:
             return Refused(explanation=refusal)
         case {"type": str(kind)} if kind not in ("output_text", "refusal"):
             return OpaquePart(kind=kind)

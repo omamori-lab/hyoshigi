@@ -14,7 +14,12 @@ class Monitor(ABC):
     """
 
     @abstractmethod
-    def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far.
 
         The action is not yet in the trajectory. A rating that fails returns a score that
@@ -29,7 +34,12 @@ class AsyncMonitor(ABC):
     """
 
     @abstractmethod
-    async def rate(self, action: Action, *, trajectory: Trajectory) -> SuspicionScore:
+    async def rate(
+        self,
+        action: Action,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
         """Rate an action the agent proposes against the trajectory so far.
 
         The action is not yet in the trajectory. A rating that fails returns a score that
