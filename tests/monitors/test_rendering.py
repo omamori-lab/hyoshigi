@@ -231,6 +231,42 @@ def test_a_part_renders_by_its_kind_and_what_the_model_perceives(
     assert rendered == expected
 
 
+@pytest.mark.parametrize(
+    ("observation", "expected"),
+    [
+        (
+            ToolObservation(call_id="c1", parts=(PNG,)),
+            (
+                TextPart(text='<tool_result call_id="c1"><media type="image/png">'),
+                PNG,
+                TextPart(text="</media></tool_result>"),
+            ),
+        ),
+        (
+            Observation(author=Author.SCAFFOLD, source="read_file", parts=(PNG,)),
+            (
+                TextPart(
+                    text='<context_note author="scaffold" source="read_file">'
+                    '<media type="image/png">'
+                ),
+                PNG,
+                TextPart(text="</media></context_note>"),
+            ),
+        ),
+    ],
+    ids=["tool-result", "context-note"],
+)
+def test_media_in_any_observation_reaches_a_model_that_perceives_it(
+    observation: Observation, expected: tuple[PromptPart, ...]
+) -> None:
+    trajectory = Trajectory()
+    trajectory.observe(observation)
+
+    rendered = render_history(trajectory, view=View(channels=EVERY_CHANNEL), perceives=IMAGES)
+
+    assert rendered == expected
+
+
 def test_an_opaque_part_in_a_thought_renders_as_hidden_reasoning() -> None:
     trajectory = Trajectory()
     trajectory.act(Action(thought=(OpaquePart(kind="reasoning.encrypted"),)))
