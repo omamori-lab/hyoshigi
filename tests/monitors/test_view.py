@@ -1,7 +1,7 @@
 """The view: its channels, how many recent entries a monitor reads, and its delegation tools."""
 
 import numbers
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 
 import pytest
 
@@ -100,18 +100,23 @@ def test_a_view_whose_delegation_tools_hold_a_non_string_raises_naming_its_posit
     assert str(raised.value) == "delegation_tools[1] must be a str, got 5"
 
 
+# Each case builds its iterable anew, since a generator is spent once it has been read.
 @pytest.mark.parametrize(
-    "tools",
+    "make_tools",
     [
-        frozenset({"task"}),
-        ["task"],
-        ("task",),
-        {"task"},
-        yield_tool_names(),
+        lambda: frozenset({"task"}),
+        lambda: ["task"],
+        lambda: ("task",),
+        lambda: {"task"},
+        yield_tool_names,
     ],
     ids=["frozenset", "list", "tuple", "set", "generator"],
 )
-def test_a_views_delegation_tools_are_kept_as_a_frozenset(tools: object) -> None:
+def test_a_views_delegation_tools_are_kept_as_a_frozenset(
+    make_tools: Callable[[], Iterable[str]],
+) -> None:
+    tools = make_tools()
+
     view = View(delegation_tools=tools)  # ty: ignore[invalid-argument-type]
 
     assert (view.delegation_tools, type(view.delegation_tools)) == (
