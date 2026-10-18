@@ -207,6 +207,7 @@ def _render_history(
                     event,
                     delegations=delegations,
                     perceives=perceives,
+                    channels=view.channels,
                 )
             case unreachable:
                 assert_never(unreachable)
@@ -247,8 +248,13 @@ def _render_observation(
     *,
     delegations: set[str],
     perceives: MediaTypes,
+    channels: Channel,
 ) -> _Entry:
-    """Render an observation by who wrote it; only the user or the delegator sets the task."""
+    """Render an observation by who wrote it; only the user or the delegator sets the task.
+
+    Without context notes, an unknown author's observation is <opaque/> with the tool calls:
+    it may be a tool the agent's provider ran, and the monitor sees that it is there.
+    """
     match observation:
         case ToolObservation():
             return _render_tool_observation(
@@ -262,6 +268,11 @@ def _render_observation(
                 channel=Channel.TASK,
                 tag=author.value,
                 perceives=perceives,
+            )
+        case Observation(author=Author.UNKNOWN) if Channel.CONTEXT not in channels:
+            return _Entry(
+                channel=Channel.TOOL_CALLS,
+                content=_Content(parts=(TextPart(text="<opaque/>"),)),
             )
         case _:
             return _render_entry(
