@@ -85,11 +85,14 @@ class Decisions:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Composite:
-    """The scores a monitor combined into its own: at least one."""
+    """The scores a monitor combined into its own: a tuple of at least one."""
 
     parts: tuple[SuspicionScore, ...]
 
     def __post_init__(self) -> None:
+        check_instance(self.parts, expected=tuple, name="parts")
+        for position, part in enumerate(self.parts):
+            check_instance(part, expected=SuspicionScore, name=f"parts[{position}]")
         if not self.parts:
             raise ConfigurationError("a composite holds at least one score")
 

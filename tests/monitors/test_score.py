@@ -203,7 +203,6 @@ def test_evidence_that_must_hold_something_raises_when_empty(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("parts", "message"),
     [
