@@ -26,7 +26,6 @@ def yield_tool_names() -> Iterator[str]:
     yield "task"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("most_recent", "message"),
     [
@@ -53,14 +52,12 @@ def test_a_view_of_one_recent_entry_keeps_its_count() -> None:
     assert view.most_recent == 1
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_view_keeps_the_count_of_recent_entries_as_an_int() -> None:
     view = View(most_recent=ArrayInteger(3))  # ty: ignore[invalid-argument-type]
 
     assert (view.most_recent, type(view.most_recent)) == (3, int)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("channels", "message"),
     [
@@ -80,7 +77,6 @@ def test_a_view_whose_channels_are_not_a_channel_raises_when_built(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("tools", "described"),
     [("Task", "'Task'"), (b"Task", "an instance of bytes"), (123, "123"), (None, "None")],
@@ -97,7 +93,6 @@ def test_a_view_whose_delegation_tools_are_not_an_iterable_of_names_raises_when_
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_view_whose_delegation_tools_hold_a_non_string_raises_naming_its_position() -> None:
     with pytest.raises(ConfigurationError) as raised:
         View(delegation_tools=("task", 5))  # ty: ignore[invalid-argument-type]
@@ -109,10 +104,10 @@ def test_a_view_whose_delegation_tools_hold_a_non_string_raises_naming_its_posit
     "tools",
     [
         frozenset({"task"}),
-        pytest.param(["task"], marks=pytest.mark.xfail(strict=True)),
-        pytest.param(("task",), marks=pytest.mark.xfail(strict=True)),
-        pytest.param({"task"}, marks=pytest.mark.xfail(strict=True)),
-        pytest.param(yield_tool_names(), marks=pytest.mark.xfail(strict=True)),
+        ["task"],
+        ("task",),
+        {"task"},
+        yield_tool_names(),
     ],
     ids=["frozenset", "list", "tuple", "set", "generator"],
 )
