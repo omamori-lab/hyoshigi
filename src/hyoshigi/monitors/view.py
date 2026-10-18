@@ -16,7 +16,9 @@ class Channel(Flag):
     Anthropic, 2026). Thoughts are one flag away: reading them catches more misbehaviour
     (Baker et al., "Monitoring Reasoning Models for Misbehavior", arXiv:2503.11926) but
     can also mislead a monitor (Arnav et al., "CoT Red-Handed", arXiv:2505.23575). A tool
-    error travels with the tool calls, so a view that shows a call shows that it failed.
+    error travels with the tool calls, so a view that shows a call shows that it failed. A
+    view without context notes shows an unknown author's observation with the tool calls as
+    <opaque/>.
     """
 
     TASK = auto()
