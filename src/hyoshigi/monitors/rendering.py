@@ -230,7 +230,10 @@ def _render_part(part: Part, *, channel: Channel, perceives: MediaTypes) -> _Con
 
 
 def _render_media(part: MediaPart, *, perceives: MediaTypes, ref: str | None = None) -> _Content:
-    """Render media as itself if the model perceives it, else its description or a mark."""
+    """Render media as itself if the model perceives it, else its description or a mark.
+
+    `ref` numbers media lifted from a tool call's arguments, which has no description.
+    """
     if perceives.covers(part.media_type):
         return _wrap("media", content=_Content(parts=(part,)), type=part.media_type, ref=ref)
     if part.description is not None:
@@ -239,7 +242,6 @@ def _render_media(part: MediaPart, *, perceives: MediaTypes, ref: str | None = N
             content=_escape(part.description.text),
             type=part.media_type,
             description_author=part.description.author.value,
-            ref=ref,
         )
     return _mark_unseen("omitted_media", unseen=part.media_type, type=part.media_type, ref=ref)
 

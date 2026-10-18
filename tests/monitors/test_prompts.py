@@ -13,25 +13,55 @@ PNG = MediaPart(media_type="image/png", data=b"\x89PNG\r\n\x1a\n")
 
 
 @pytest.mark.parametrize(
-    ("system", "request_text", "field"),
+    ("system", "request_text", "message"),
     [
-        ("Rate it.", "{task}\n{trajectory}\n{proposed_action}", r"\{task\}"),
-        ("Rate it.", "{}\n{trajectory}\n{proposed_action}", r"\{\}"),
-        ("Rate it.", "{0}\n{trajectory}\n{proposed_action}", r"\{0\}"),
-        ("Rate it.", "{trajectory.history}\n{proposed_action}", r"\{trajectory\.history\}"),
-        ("Score from {lowest_score:>3}.", REQUEST, r"\{lowest_score\}"),
-        ("Score from {lowest_score!r}.", REQUEST, r"\{lowest_score\}"),
-        ("Rate it.", "{proposed_action}", r"\{trajectory\}"),
-        ("Rate it.", "{trajectory}", r"\{proposed_action\}"),
-        ("Rate it.", "{trajectory}\n{trajectory}\n{proposed_action}", r"\{trajectory\}"),
-        ("Rate it.", "{trajectory}\n{proposed_action}\n{proposed_action}", r"\{proposed_action\}"),
-        ("Read {trajectory}.", REQUEST, r"\{trajectory\}"),
+        (
+            "Rate it.",
+            "{task}\n{trajectory}\n{proposed_action}",
+            r"the request has no field \{task\}",
+        ),
+        ("Rate it.", "{}\n{trajectory}\n{proposed_action}", r"the request has no field \{\}"),
+        ("Rate it.", "{0}\n{trajectory}\n{proposed_action}", r"the request has no field \{0\}"),
+        (
+            "Rate it.",
+            "{trajectory.history}\n{proposed_action}",
+            r"the request has no field \{trajectory\.history\}",
+        ),
+        (
+            "Rate it.",
+            '{{"a": 1}} {task}\n{trajectory}\n{proposed_action}',
+            r"the request has no field \{task\}",
+        ),
+        (
+            "Score from {lowest_score:>3}.",
+            REQUEST,
+            r"the field \{lowest_score\} takes no format spec or conversion",
+        ),
+        (
+            "Rate it.",
+            "{trajectory}\n{proposed_action}\nTo {highest_score!r}.",
+            r"the field \{highest_score\} takes no format spec or conversion",
+        ),
+        ("Rate it.", "{proposed_action}", r"the request must hold \{trajectory\} once"),
+        ("Rate it.", "{trajectory}", r"the request must hold \{proposed_action\} once"),
+        (
+            "Rate it.",
+            "{trajectory}\n{trajectory}\n{proposed_action}",
+            r"the request must hold \{trajectory\} once",
+        ),
+        (
+            "Rate it.",
+            "{trajectory}\n{proposed_action}\n{proposed_action}",
+            r"the request must hold \{proposed_action\} once",
+        ),
+        ("Read {trajectory}.", REQUEST, r"the system text has no field \{trajectory\}"),
     ],
     ids=[
         "unknown-name",
         "positional",
         "numbered",
         "attribute",
+        "unknown-name-after-a-literal-brace",
         "format-spec",
         "conversion",
         "missing-trajectory",
@@ -42,19 +72,24 @@ PNG = MediaPart(media_type="image/png", data=b"\x89PNG\r\n\x1a\n")
     ],
 )
 def test_a_prompt_with_a_field_that_cannot_work_raises_naming_it(
-    system: str, request_text: str, field: str
+    system: str, request_text: str, message: str
 ) -> None:
-    with pytest.raises(ConfigurationError, match=field):
+    with pytest.raises(ConfigurationError, match=message):
         MonitorPrompt(system=system, request=request_text)
 
 
 @pytest.mark.parametrize(
-    ("system", "request_text"),
-    [("Rate it {", REQUEST), ("Rate it.", "{trajectory}}\n{proposed_action}")],
+    ("system", "request_text", "message"),
+    [
+        ("Rate it {", REQUEST, "the system text is not a format string"),
+        ("Rate it.", "{trajectory}}\n{proposed_action}", "the request is not a format string"),
+    ],
     ids=["unclosed-brace", "unopened-brace"],
 )
-def test_a_prompt_that_is_not_a_format_string_raises(system: str, request_text: str) -> None:
-    with pytest.raises(ConfigurationError):
+def test_a_prompt_that_is_not_a_format_string_raises_naming_its_part(
+    system: str, request_text: str, message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
         MonitorPrompt(system=system, request=request_text)
 
 
