@@ -27,7 +27,8 @@ minor version.
   Anthropic's Messages format: a request into a trajectory, a response into
   the action to rate.
 - `Trajectory.from_openai_chat` and `Action.from_openai_chat`, which read the
-  OpenAI chat completions format with OpenRouter's reasoning fields.
+  OpenAI chat completions format with OpenRouter's reasoning fields and the
+  images an assistant message carries.
 - `Trajectory.from_open_responses` and `Action.from_open_responses`, which read
   the Open Responses format of 2026-04-24: a request into a trajectory, a
   response's output items into the action to rate.

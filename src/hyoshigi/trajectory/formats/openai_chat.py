@@ -1,4 +1,4 @@
-"""The OpenAI chat completions format, with OpenRouter's reasoning fields.
+"""The OpenAI chat completions format, with OpenRouter's reasoning fields and images.
 
 The format is OpenAI's OpenAPI specification, https://github.com/openai/openai-openapi,
 and OpenRouter's reasoning tokens guide,
@@ -271,13 +271,9 @@ def read_media_part(
             "type": "image_url",
             "image_url": {"url": str(url)},
         }:
-            url_path = f"{path}.image_url.url"
-            return read_data_url(
+            return read_image_url(
                 url,
-                path=url_path,
-            ) or MediaPart(
-                media_type="image/*",
-                url=url,
+                path=f"{path}.image_url.url",
             )
         case {
             "type": "input_audio",
@@ -304,6 +300,21 @@ def read_media_part(
                 path=path,
                 expected="an image_url or input_audio part",
             )
+
+
+def read_image_url(
+    url: str,
+    *,
+    path: str,
+) -> MediaPart:
+    """Read an image's URL: a data URL into media of its own type, another URL as an image."""
+    return read_data_url(
+        url,
+        path=path,
+    ) or MediaPart(
+        media_type="image/*",
+        url=url,
+    )
 
 
 def read_file_part(
@@ -373,9 +384,11 @@ def read_reasoning(
     *,
     path: str,
 ) -> tuple[Part, ...]:
-    """Read OpenRouter's reasoning_details, or else its reasoning text, into the thought."""
+    """Read OpenRouter's reasoning_details, or its reasoning text when it has no details, into
+    the thought.
+    """
     match message:
-        case {"reasoning_details": list(details)}:
+        case {"reasoning_details": list(details)} if details:
             return tuple(
                 read_reasoning_detail(
                     detail,
@@ -383,7 +396,10 @@ def read_reasoning(
                 )
                 for i, detail in enumerate(details)
             )
-        case {"reasoning_details": details} if details is not None:
+        case {"reasoning_details": details} if not isinstance(
+            details,
+            list | None,
+        ):
             raise FormatError(
                 path=f"{path}.reasoning_details",
                 expected="a list of reasoning details",
@@ -435,7 +451,9 @@ def read_assistant_parts(
     *,
     path: str,
 ) -> tuple[Part, ...]:
-    """Read what an assistant message says: its content, its refusal and its audio."""
+    """Read what an assistant message says: its content, its refusal, its audio and its
+    images.
+    """
     return (
         read_assistant_content(
             message,
@@ -448,6 +466,10 @@ def read_assistant_parts(
         + read_audio(
             message,
             path=f"{path}.audio",
+        )
+        + read_images(
+            message,
+            path=f"{path}.images",
         )
     )
 
@@ -546,6 +568,51 @@ def read_audio(
             )
         case _:
             return ()
+
+
+def read_images(
+    message: JSON,
+    *,
+    path: str,
+) -> tuple[Part, ...]:
+    """Read the images an assistant message carries, if it has any: OpenRouter's image
+    models return each as an image_url with its URL (the OpenRouter SDK's ChatAssistantMessage).
+    """
+    match message:
+        case {"images": list(images)}:
+            return tuple(
+                read_image(
+                    image,
+                    path=f"{path}[{i}]",
+                )
+                for i, image in enumerate(images)
+            )
+        case {"images": images} if images is not None:
+            raise FormatError(
+                path=path,
+                expected="a list of images",
+            )
+        case _:
+            return ()
+
+
+def read_image(
+    image: JSON,
+    *,
+    path: str,
+) -> MediaPart:
+    """Read one image an assistant message carries."""
+    match image:
+        case {"image_url": {"url": str(url)}}:
+            return read_image_url(
+                url,
+                path=f"{path}.image_url.url",
+            )
+        case _:
+            raise FormatError(
+                path=path,
+                expected="an image with an image_url and its url",
+            )
 
 
 def read_tool_calls(
