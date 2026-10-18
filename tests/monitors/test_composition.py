@@ -706,11 +706,10 @@ def test_honest_scores_that_cannot_be_ranked_among_are_refused_naming_the_proble
         (1.5, "random_seed must be an integer, got 1.5"),
         (True, "random_seed must be an integer, got True"),
         ("7", "random_seed must be an integer, got '7'"),
-        pytest.param(
+        (
             10**5000,
             "random_seed must be an integer Python can write out, "
             "got an integer too long to write out",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=["float", "bool", "string", "too-long-to-write-out"],

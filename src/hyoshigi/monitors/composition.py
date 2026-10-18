@@ -233,10 +233,24 @@ def _check_calibration(
     scores = _read_honest_scores(honest_scores)
     seed = calibrated.random_seed
     if seed is not None:
-        seed = read_integer(seed, name="random_seed")
+        seed = _read_seed(seed)
     # The dataclass is frozen, so the values are set past its guard.
     object.__setattr__(calibrated, "sorted_honest_scores", scores)
     object.__setattr__(calibrated, "random_seed", seed)
+
+
+def _read_seed(value: object) -> int:
+    """Read the seed as an int that Python can write out, since the draw is seeded with its text."""
+    seed = read_integer(value, name="random_seed")
+    try:
+        str(seed)
+    except ValueError:
+        # Python refuses to write an integer of more than 4,300 digits, by default.
+        raise ConfigurationError(
+            "random_seed must be an integer Python can write out, "
+            f"got {describe_option_value(seed)}"
+        ) from None
+    return seed
 
 
 def _read_honest_scores(honest_scores: object) -> tuple[float, ...]:
