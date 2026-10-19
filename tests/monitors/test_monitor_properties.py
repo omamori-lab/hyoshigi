@@ -435,30 +435,66 @@ def test_a_calibrated_monitor_returns_a_score_that_failed_closed_unranked(
 
 @FAMILIES
 @given(
-    failure=FAILURES,
-    careful=SETTLED,
+    fast_failure=FAILURES,
+    careful_failure=FAILURES,
     escalation_threshold=UNIT,
 )
-def test_a_cascade_escalates_from_a_fast_score_that_failed_closed(
+def test_a_cascade_gives_the_careful_failure_after_a_fast_score_that_failed_closed(
     family: Family,
-    failure: Refused | Unavailable,
-    careful: GenerationOutcome,
+    fast_failure: Refused | Unavailable,
+    careful_failure: Refused | Unavailable,
     escalation_threshold: float,
 ) -> None:
-    careful_monitor = build_scripted_llm(
-        family,
-        (careful,),
-    )
     cascade = family.cascade(
         fast=build_scripted_llm(
             family,
-            (failure,),
+            (fast_failure,),
         ),
-        careful=careful_monitor,
+        careful=build_scripted_llm(
+            family,
+            (careful_failure,),
+        ),
         escalation_threshold=escalation_threshold,
     )
-    careful_score = family.rate(careful_monitor)
 
     score = family.rate(cascade)
 
-    assert score == careful_score
+    assert (
+        score.value,
+        score.evidence,
+    ) == (
+        1.0,
+        FailedClosed(
+            model=MODEL_NAME,
+            cause=careful_failure,
+        ),
+    )
+
+
+@FAMILIES
+@given(
+    fast_failure=FAILURES,
+    careful_score=SCORES,
+    escalation_threshold=UNIT,
+)
+def test_a_cascade_gives_the_careful_score_after_a_fast_score_that_failed_closed(
+    family: Family,
+    fast_failure: Refused | Unavailable,
+    careful_score: int,
+    escalation_threshold: float,
+) -> None:
+    cascade = family.cascade(
+        fast=build_scripted_llm(
+            family,
+            (fast_failure,),
+        ),
+        careful=build_scripted_llm(
+            family,
+            (build_scored_reply(careful_score),),
+        ),
+        escalation_threshold=escalation_threshold,
+    )
+
+    score = family.rate(cascade)
+
+    assert score.value == careful_score / 10
