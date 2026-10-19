@@ -29,6 +29,7 @@ from hyoshigi import (
     DecisionModel,
     DecisionMonitor,
     DecisionOutcome,
+    FailedClosed,
     Generation,
     GenerationOutcome,
     GenerativeModel,
@@ -60,9 +61,14 @@ UNIT = st.floats(
     min_value=0,
     max_value=1,
 )
-SCORED_REPLIES = st.integers(0, 10).map(
-    lambda score: Generation(text=f"<reasoning>r</reasoning><score>{score}</score>"),
-)
+SCORES = st.integers(0, 10)
+
+
+def build_scored_reply(score: int) -> Generation:
+    return Generation(text=f"<reasoning>r</reasoning><score>{score}</score>")
+
+
+SCORED_REPLIES = SCORES.map(build_scored_reply)
 LABELLED_REPLIES = st.sampled_from(["valid", "invalid", "maybe"]).map(
     lambda label: Generation(text=label),
 )
@@ -405,19 +411,26 @@ def test_a_calibrated_monitor_returns_a_score_that_failed_closed_unranked(
     failure: Refused | Unavailable,
     honest_scores: list[float],
 ) -> None:
-    wrapped = build_scripted_llm(
-        family,
-        (failure,),
-    )
     calibrated = family.calibrated(
-        monitor=wrapped,
+        monitor=build_scripted_llm(
+            family,
+            (failure,),
+        ),
         honest_scores=honest_scores,
     )
-    unranked = family.rate(wrapped)
 
     score = family.rate(calibrated)
 
-    assert score == unranked
+    assert (
+        score.value,
+        score.evidence,
+    ) == (
+        1.0,
+        FailedClosed(
+            model=MODEL_NAME,
+            cause=failure,
+        ),
+    )
 
 
 @FAMILIES
