@@ -2041,7 +2041,6 @@ CODED_REJECTIONS = [
             400,
             CONTEXT_OVERFLOW_ERROR,
             id="context-length-message",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

@@ -78,6 +78,10 @@ REJECTED_INPUT = frozenset(
     },
 )
 
+# On 2026-10-19 (issue #30), the 400 for a prompt over the endpoint's context window had the
+# number 400 as its code and no error type. Only its message says what went wrong.
+CONTEXT_LENGTH_PHRASE = "maximum context length"
+
 # Every failure the SDK raises: the HTTP library's request errors (connection, timeout, decoding),
 # the SDK's errors for a status or an unreadable reply, and its error for no response.
 FAILURES = (
@@ -151,13 +155,26 @@ def build_state_item(part: PromptPart) -> str | ImageObject | None:
             assert_never(part)
 
 
+def read_overflow(payload: JSON) -> tuple[str, ...]:
+    """The code context_length_exceeded if the error's message holds the provider's wording for
+    a prompt over the context window, else no code. The message is never kept, because it can
+    echo the prompt.
+    """
+    match payload:
+        case {"error": {"message": str(message)}} if CONTEXT_LENGTH_PHRASE in message:
+            return ("context_length_exceeded",)
+        case _:
+            return ()
+
+
 def read_codes(body: str) -> tuple[str, ...]:
     """The machine-readable codes of an HTTP error body: its error code and its error type; a
     body that is not JSON has none.
 
     The error type is where https://openrouter.ai/docs/api_reference/errors-and-debugging puts
     it: in the error's metadata, in the error itself (the Anthropic skin) and at the top level
-    (a failed Responses reply). The error's message is not read; it can echo the prompt.
+    (a failed Responses reply). The code context_length_exceeded is added when the error's
+    message holds the provider's wording for a prompt over the context window.
     """
     try:
         payload = json.loads(body)
@@ -167,6 +184,7 @@ def read_codes(body: str) -> tuple[str, ...]:
     match payload:
         case {"error": {"code": str(code)}}:
             codes.append(code)
+    codes.extend(read_overflow(payload))
     match payload:
         case {"error": {"error_type": str(error_type)}}:
             codes.append(error_type)
