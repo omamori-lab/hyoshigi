@@ -5,7 +5,7 @@ from collections.abc import Callable
 from enum import Enum, auto
 
 import pytest
-from damage import MARKER, draw_edit, reads_cleanly, replace_each_node
+from damage import MARKED_BYTES, MARKED_STRINGS, draw_edit, reads_cleanly, replace_each_node
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -38,10 +38,7 @@ from hyoshigi import (
     Unreadable,
 )
 
-TEXT = st.one_of(
-    st.text(),
-    st.text().map(lambda text: MARKER + text),
-)
+TEXT = MARKED_STRINGS
 UNIT = st.floats(
     min_value=0,
     max_value=1,
@@ -57,7 +54,7 @@ MEDIA = st.one_of(
     st.builds(
         MediaPart,
         media_type=MEDIA_TYPES,
-        data=st.binary(),
+        data=MARKED_BYTES,
         description=DESCRIPTIONS,
     ),
     st.builds(

@@ -1,5 +1,6 @@
 """Payloads with one node replaced."""
 
+from base64 import b64decode
 from collections.abc import Callable, Iterator
 from enum import Enum, auto
 from functools import partial
@@ -75,6 +76,8 @@ def replace_node(
 
 
 MARKED_STRINGS = st.text().map(lambda text: MARKER + text)
+# Bytes whose base64 text starts with the marker.
+MARKED_BYTES = st.binary().map(lambda tail: b64decode(MARKER * 2) + tail)
 # Strings that break readers of URLs, each followed by the marker.
 HOSTILE_STRINGS = st.sampled_from(
     [
@@ -157,15 +160,16 @@ def reads_cleanly(
     read: Callable[[JSON], object],
     payload: JSON,
 ) -> bool:
-    """Whether reading the payload succeeds or raises a FormatError that quotes none of it."""
+    """Whether reading succeeds or raises a FormatError that quotes no value after its path."""
     error = capture_error(
         read,
         payload,
     )
-    return error is None or (
-        isinstance(
-            error,
-            FormatError,
-        )
-        and MARKER not in str(error)
-    )
+    if error is None:
+        return True
+    if not isinstance(
+        error,
+        FormatError,
+    ):
+        return False
+    return MARKER not in str(error).removeprefix(f"{error.path}: ")
