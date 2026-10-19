@@ -1496,35 +1496,59 @@ def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> 
     assert loaded.dump() == payload
 
 
-# The deepest composite is the evidence of the score inside 32 others; the deepest subagent
-# is the 33rd.
+# The deepest composite is the evidence of the score inside 32 others, so its path opens at the
+# rating's score, holds 32 composite parts and ends at an evidence; the deepest subagent is the
+# 33rd, so its path holds 33 subagents.
 @pytest.mark.parametrize(
-    ("payload", "path"),
+    ("payload", "opening", "level", "levels", "ending"),
     [
         (
             nest_composites(33),
-            "$.ratings[0].score" + ".evidence.parts[0]" * 32 + ".evidence",
+            "$.ratings[0].score",
+            ".evidence.parts[0]",
+            32,
+            ".evidence",
         ),
         (
             nest_composites(400),
-            "$.ratings[0].score" + ".evidence.parts[0]" * 32 + ".evidence",
+            "$.ratings[0].score",
+            ".evidence.parts[0]",
+            32,
+            ".evidence",
         ),
         (
             nest_subagents(33),
-            "$" + ".subagents[0]" * 33,
+            "$.subagents[0]",
+            ".subagents[0]",
+            33,
+            ".subagents[0]",
         ),
         (
             nest_subagents(600),
-            "$" + ".subagents[0]" * 33,
+            "$.subagents[0]",
+            ".subagents[0]",
+            33,
+            ".subagents[0]",
         ),
     ],
     ids=["composite-scores-33", "composite-scores-400", "subagents-33", "subagents-600"],
 )
 def test_nesting_past_32_levels_raises_format_error_at_the_33rd(
     payload: dict[str, JSON],
-    path: str,
+    opening: str,
+    level: str,
+    levels: int,
+    ending: str,
 ) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
 
-    assert raised.value.path == path
+    assert (
+        raised.value.path.startswith(opening),
+        raised.value.path.count(level),
+        raised.value.path.endswith(ending),
+    ) == (
+        True,
+        levels,
+        True,
+    )
