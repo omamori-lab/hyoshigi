@@ -113,3 +113,10 @@ minor version.
   its cause's class and its models. Nothing is sent when the span is not
   sampled or no tracer provider records it; a report that fails is logged by
   its class and error type, and the score is returned either way.
+
+### Fixed
+
+- A prompt over the model's context window now fails the rating closed, as
+  `Unavailable` with status 400, on the OpenRouter and Anthropic adapters, as it
+  already did on OpenAI's. Before, it raised `ConfigurationError`. Any other
+  rejected request still raises.
