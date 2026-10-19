@@ -322,6 +322,34 @@ OVERLOADED_ERROR: JSON = {
     },
 }
 
+
+def build_error(
+    error_type: str,
+    message: str,
+) -> JSON:
+    return {
+        "type": "error",
+        "error": {
+            "type": error_type,
+            "message": message,
+        },
+    }
+
+
+# Observed on 2026-10-19 (issue #30): the 400 for a prompt over the model's input limit. The
+# prefill error is the published 400 invalid_request_error of
+# https://platform.claude.com/docs/en/api/errors, "Prefill not supported".
+OVERFLOW_MESSAGE = "prompt is too long: 2300057 tokens > 1000000 maximum"
+CONTEXT_OVERFLOW_ERROR = build_error(
+    "invalid_request_error",
+    OVERFLOW_MESSAGE,
+)
+PREFILL_ERROR = build_error(
+    "invalid_request_error",
+    "This model does not support assistant message prefill. "
+    "The conversation must end with a user message.",
+)
+
 # https://platform.claude.com/docs/en/build-with-claude/vision, "Base64-encoded image" and
 # "URL-based image"; the bytes are JPEG's FF D8 FF E0 00 10 "JFIF", whose base64 is the prefix
 # of the page's example data.
@@ -1641,3 +1669,76 @@ def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
         None,
         None,
     )
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_prompt_over_the_input_limit_is_unavailable_with_status_400(
+    build_driver: BuildDriver,
+) -> None:
+    wire = Wire(
+        CONTEXT_OVERFLOW_ERROR,
+        status=400,
+    )
+    model = build_driver(wire.respond)
+
+    outcome = model.generate(HELLO)
+
+    assert (
+        outcome,
+        len(wire.requests),
+    ) == (
+        Unavailable(status=400),
+        1,
+    )
+
+
+# The published prefill error is another 400 invalid_request_error. The other bodies take the
+# overflow message under another status, under another error type, and after other text.
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        pytest.param(
+            400,
+            PREFILL_ERROR,
+            id="other-message",
+        ),
+        pytest.param(
+            404,
+            CONTEXT_OVERFLOW_ERROR,
+            id="other-status",
+        ),
+        pytest.param(
+            400,
+            build_error(
+                "not_found_error",
+                OVERFLOW_MESSAGE,
+            ),
+            id="other-error-type",
+        ),
+        pytest.param(
+            400,
+            build_error(
+                "invalid_request_error",
+                f"messages.0: {OVERFLOW_MESSAGE}",
+            ),
+            id="after-other-text",
+        ),
+    ],
+)
+def test_a_rejection_that_is_not_an_overlong_prompt_still_raises_naming_the_status(
+    build_driver: BuildDriver,
+    status: int,
+    body: JSON,
+) -> None:
+    model = build_driver(
+        Wire(
+            body,
+            status=status,
+        ).respond,
+    )
+
+    with pytest.raises(
+        ConfigurationError,
+        match=str(status),
+    ):
+        model.generate(HELLO)
