@@ -54,6 +54,10 @@ _FAILURES = (
 # the prompt's content can make a request too large (413), so these fail closed.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
 
+# The start of the message of the 400 for a prompt over the model's input limit, observed on
+# 2026-10-19 (issue #30).
+_PROMPT_TOO_LONG = "prompt is too long"
+
 # The media translate_url and translate_data send: the image types, PDF and plain text documents
 # of https://platform.claude.com/docs/en/build-with-claude/vision, pdf-support and citations.
 CARRIED_MEDIA = MediaTypes(
@@ -336,7 +340,10 @@ def read_reply(reply: Message | Failure) -> GenerationOutcome:
 def read_failure(failure: Failure) -> Unavailable:
     """The outcome of a failure that stood in for a reply.
 
-    A client error other than 408, 409, 413 and 429 raises ConfigurationError naming the
+    A 400 whose message starts "prompt is too long" is unavailable with status 400. The
+    message is read for that start and never kept.
+
+    Any other client error except 408, 409, 413 and 429 raises ConfigurationError naming the
     status only, since the API's text can quote the prompt. So does a plain ValueError, which is
     the SDK refusing the request's arguments before sending it; a body that is not JSON and
     text that cannot be encoded are its subclasses. Both are raised here, outside the handler
@@ -344,6 +351,16 @@ def read_failure(failure: Failure) -> Unavailable:
     unavailable.
     """
     match failure:
+        case APIStatusError(
+            status_code=400,
+            body={
+                "error": {
+                    "type": "invalid_request_error",
+                    "message": str(message),
+                },
+            },
+        ) if message.startswith(_PROMPT_TOO_LONG):
+            return Unavailable(status=400)
         case APIStatusError(status_code=status) if (
             400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
         ):

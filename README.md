@@ -42,7 +42,7 @@ monitor = LLMMonitor(
     model=GenerativeModel.from_anthropic(
         Anthropic(),
         model="claude-haiku-5-5",
-        max_tokens=1024,
+        max_tokens=4096,
     ),
 )
 score = monitor.rate(
@@ -216,7 +216,7 @@ careful = RepeatedMonitor(
         model=GenerativeModel.from_anthropic(
             Anthropic(),
             model="claude-haiku-5-5",
-            max_tokens=1024,
+            max_tokens=4096,
         ),
     ),
     ensemble_size=3,
@@ -258,7 +258,7 @@ async def main() -> None:
         model=AsyncGenerativeModel.from_anthropic(
             AsyncAnthropic(),
             model="claude-haiku-5-5",
-            max_tokens=1024,
+            max_tokens=4096,
         ),
     )
     score = await monitor.rate(
