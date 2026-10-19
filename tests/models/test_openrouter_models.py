@@ -260,6 +260,29 @@ def build_coded_error(code: str) -> JSON:
     }
 
 
+# Observed on 2026-10-19 (issue #30): the 400 for a prompt over the endpoint's context window,
+# and the 400 for an unknown model id. Both have the number 400 as the error code and no error
+# type, so only the message tells them apart.
+CONTEXT_OVERFLOW_ERROR: JSON = {
+    "error": {
+        "message": (
+            "This endpoint's maximum context length is 131072 tokens. However, you requested "
+            "about 240016 tokens (240000 of text input, 16 in the output). Please reduce the "
+            "length of either one, or use the context-compression plugin to compress your "
+            "prompt automatically."
+        ),
+        "code": 400,
+        "metadata": {"provider_name": None},
+    },
+}
+UNKNOWN_MODEL_ERROR: JSON = {
+    "error": {
+        "message": "openai/no-such-model-xyz is not a valid model ID",
+        "code": 400,
+    },
+}
+
+
 class Wire:
     """The stand-in for OpenRouter on the wire: it records each request and answers as told."""
 
@@ -1861,6 +1884,21 @@ def test_any_other_rejection_raises_naming_only_the_status(
     ) == (True, False, None, None)
 
 
+def test_an_unknown_model_id_raises_naming_only_the_status(ask: Ask) -> None:
+    client = Wire(
+        build_reply(
+            400,
+            UNKNOWN_MODEL_ERROR,
+        ),
+    ).build_client()
+
+    with pytest.raises(
+        ConfigurationError,
+        match="400",
+    ):
+        ask(client)
+
+
 def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask) -> None:
     client = Wire(build_page(403)).build_client()
 
@@ -1998,6 +2036,12 @@ CODED_REJECTIONS = [
                 error_type="context_length_exceeded",
             ),
             id="top-level",
+        ),
+        pytest.param(
+            400,
+            CONTEXT_OVERFLOW_ERROR,
+            id="context-length-message",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
