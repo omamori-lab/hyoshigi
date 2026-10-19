@@ -77,7 +77,10 @@ minor version.
 - `GuardMonitor` and `AsyncGuardMonitor`, which ask a guard model several
   times against the caller's policy and score the share of unsafe labels, with
   `GuardLabels` and presets for gpt-oss-safeguard and Qwen3Guard; `Labels`
-  evidence records each reply's label.
+  evidence records each reply's label. A suspicious label after a verdict key
+  counts whatever markup stands between them, as in `Label = INVALID` or
+  `<label>INVALID</label>`, so a reply that also quotes a safe label fails
+  closed.
 - `RepeatedMonitor`, `CalibratedMonitor` and `CascadeMonitor`, with their async
   twins: the mean of repeated ratings, a smoothed conformal p-value against
   honest scores, and a fast monitor escalating to a careful one.
@@ -89,7 +92,8 @@ minor version.
   `load`.
 - `Authorship`, `by_role` and `marked`: who wrote each user-role message.
 - `OpaquePart`, for content recorded but not read, and media ranges such as
-  `image/*` in `MediaPart`.
+  `image/*` in `MediaPart`. A data URL's `;base64` is read in any case, as RFC
+  2045, section 5.1, has it.
 - A span in OpenTelemetry for every rating of every monitor, wrappers
   included, when `opentelemetry-api` is installed (`hyoshigi[opentelemetry]`):
   named `rate` and the monitor's class, from the global tracer provider's
