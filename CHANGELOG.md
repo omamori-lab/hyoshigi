@@ -117,3 +117,10 @@ minor version.
 ### Changed
 
 - The package is marked as alpha on PyPI (`Development Status :: 3 - Alpha`).
+
+### Fixed
+
+- A prompt over the model's context window now fails the rating closed, as
+  `Unavailable` with status 400, on the OpenRouter and Anthropic adapters, as it
+  already did on OpenAI's. Before, it raised `ConfigurationError`. Any other
+  rejected request still raises.

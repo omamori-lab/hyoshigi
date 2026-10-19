@@ -1671,7 +1671,6 @@ def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_prompt_over_the_input_limit_is_unavailable_with_status_400(
     build_driver: BuildDriver,
 ) -> None:
