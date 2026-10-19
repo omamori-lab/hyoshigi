@@ -170,10 +170,6 @@ READERS = pytest.mark.parametrize(
             Trajectory.from_open_responses,
             OPEN_RESPONSES_REQUEST,
             id="Trajectory.from_open_responses",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="finding 9: open_responses raises ValueError on an unparsable URL",
-            ),
         ),
         pytest.param(
             Action.from_open_responses,
