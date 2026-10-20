@@ -106,7 +106,15 @@ validation:
   anchors: warn
 
 nav:
-  - hyoshigi: index.md
+  - Home: index.md
+  - Tutorials:
+      - Rating a first action: tutorials/first-rating.md
+  - How-to:
+      - Handling a failed rating: how-to/handling-a-failed-rating.md
+  - Explanation:
+      - The default view: explanation/the-default-view.md
+      - Failing closed: explanation/failing-closed.md
+      - Where the monitors miss: explanation/known-limits.md
   - Reference:
       - API: reference/api.md
   - The name: name.md
