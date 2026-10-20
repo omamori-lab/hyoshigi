@@ -117,7 +117,8 @@ alone on its last line, is read as giving that label. A reply whose lines
 name two different labels is unreadable, and fails the score closed.
 
 No preset ships for a taxonomy guard such as Llama Guard 4, which is trained
-to label content against the 14 categories of the MLCommons hazard taxonomy
+to label content against 14 categories, S1 to S14, based on the MLCommons
+safety taxonomy, of which S14, Code Interpreter Abuse, is Meta's addition
 [@meta2025llamaguard4, {Section} "Hazard Taxonomy and Policy"]. Such a guard takes
 `GuardLabels` of the caller's. It is trained on its taxonomy, while the guard
 monitor's prompt states the caller's policy.
