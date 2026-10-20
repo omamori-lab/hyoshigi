@@ -59,7 +59,8 @@ limits did when every call of two or more items was spread one per line.
 ## Documentation
 
 The site is built with MkDocs from `docs/` and deployed to GitHub Pages from
-`main`. Its citations, written as `[@key, sec. 3.2]`, are formatted by
+`main` by the Docs workflow, which needs the repository's Pages source set to
+GitHub Actions. Its citations, written as `[@key, sec. 3.2]`, are formatted by
 Pandoc 2.11 or newer, which the docs build needs on your `PATH`, for example
 from `brew install pandoc`.
 
