@@ -15,7 +15,7 @@ Closes #
       a published example or a property, never from the code.
 - [ ] Behaviour of a monitor or a model is tested under the sync and the
       async class in one parametrised test.
-- [ ] Ideas taken from a paper, post or code base are cited at the point of
-      use.
+- [ ] Ideas taken from a paper, post or code base are cited on the docs page
+      that explains them, with a locator.
 - [ ] `CHANGELOG.md` has an entry under `## [Unreleased]` for anything a user
       would notice.

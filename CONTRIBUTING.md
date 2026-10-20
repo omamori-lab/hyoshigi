@@ -55,6 +55,11 @@ fired, run `uvx --python 3.13 lanorme==0.21.1 rule CODE`. Its limits in
 helper. A limit rises only in a reviewed change that says why, as the line
 limits did when every call of two or more items was spread one per line.
 
+## Documentation
+
+A docs page cites a source as `[@key, sec. 3.2]`, with the key of its
+bibliography entry and the locator inside the same brackets.
+
 ## Sending a pull request
 
 1. Branch off an up-to-date `main`: `feat/...` for a feature, `fix/...` for a
