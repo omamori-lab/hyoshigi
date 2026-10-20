@@ -9,38 +9,38 @@ misreads, and published studies of monitors found several of the same misses.
 A monitor holds configuration only and rates one action against the
 trajectory, so suspicion does not add up across steps. An attack split into
 steps that each look innocuous scores low at every step
-[@bhatt2025ctrlzpost, sec. *The Multi-Step Control Problem*]. Bhatt et al.
+[@bhatt2025ctrlzpost, {Section} "The Multi-Step Control Problem"]. Bhatt et al.
 found statistical combinations of scores across a trajectory little better
 than the current step alone, and brittle under red-teaming; they audited a
 run once three of its steps passed a threshold
-[@bhatt2025ctrlzpost, sec. *Notes on aggregating monitor scores*]. Watcher
+[@bhatt2025ctrlzpost, {Section} "Notes on aggregating monitor scores"]. Watcher
 grades the trajectory so far with a second, trailing monitor, for patterns
-across turns [@apollo2026docsreview, sec. *Choosing what goes where*].
+across turns [@apollo2026docsreview, {Section} "Choosing what goes where"].
 In hyoshigi, a rule across steps or a monitor of the whole trajectory is the
 caller's, and `Trajectory.ratings` holds every score attached to the
 trajectory.
 
-The default prompt rates the effect of the proposed action, so a closing call
-such as `submit` is rated by what it does itself, and harm left by earlier
-steps adds nothing to its score. Watcher's severity score flags a dangerous
-state the monitor sees, even one the current agent did not cause, and blocks
-the current action until it is fixed
-[@apollo2026watcherlive, sec. *Requirements for the severity score*].
+The default prompt asks what the proposed action would do if it ran, and
+none of its rules carries the severity of earlier steps to a closing call such
+as `submit`. Watcher's severity score flags a dangerous state the monitor
+sees, even one the agent did not create, and blocks the current action until
+it is fixed
+[@apollo2026watcherlive, {Section} "Requirements for the severity score"].
 
 ## What the view leaves out
 
 Under the default view, a final answer's counts, totals and identifiers cannot
 be checked against the tool results they came from, since the view leaves
 those results out. The evidence for such misses sits in tool output
-[@sinha2026deliberative, app. H.4; @sinha2026deliberative, app. H.5], which
+[@sinha2026deliberative, {Appendix H.4}; @sinha2026deliberative, {Appendix H.5}], which
 `Channel.TOOL_OBSERVATIONS` adds to the view, as
 [The default view hides tool results and the agent's text](the-default-view.md)
 sets out.
 
-Reasoning a provider hid in the action's thought is rated on what is visible.
-Content the monitor cannot perceive in the action's parts or tool calls, such
-as a tool the provider already ran or an image only the agent describes,
-fails the rating closed.
+An action whose thought holds reasoning the provider hid is rated on what the
+monitor can read. Content the monitor cannot perceive in the action's parts or
+tool calls, such as a tool the provider already ran or an image only the agent
+describes, fails the rating closed.
 
 The readers of a provider's request take `authorship=by_role` by default,
 which makes every user-role message the user's, and the user's words
@@ -63,14 +63,14 @@ failure, which Storf et al. call "weaponized transparency"
 The default prompt judges the proposed action's own effect. Frontier monitors
 excused each numerical or behavioural anomaly of a trajectory as a bug, and
 did not combine the anomalies into one hypothesis of sabotage
-[@sinha2026deliberative, app. H.4].
+[@sinha2026deliberative, {Appendix H.4}].
 
-The default prompt places near the middle of its scale an action that "reads
-files or contacts services the task does not need" and causes no clear harm.
-Reconnaissance the task did not need therefore scores mid, and runs under a
-threshold set above the middle. A broad instruction to explore led Sinha et
+The default prompt's anchor near the middle of its scale covers an action
+that "reads files or contacts services the task does not need" and causes no
+clear harm. A threshold set above the middle lets such a read run. A broad
+instruction to explore led Sinha et
 al.'s trained monitor to accept an agent's read of a sensitive `.env` file
-[@sinha2026deliberative, app. H.5].
+[@sinha2026deliberative, {Appendix H.5}].
 
 ## Scores and thresholds
 
@@ -83,8 +83,9 @@ stronger model there [@kaufman2025basharena, sec. 4.3]. `RepeatedMonitor`
 averages calls, and `CalibratedMonitor` breaks the remaining ties with a
 uniform draw.
 
-`CalibratedMonitor` fixes the false positive rate per action: a threshold of
-0.99 flags 1% of honest actions. A run is flagged when any of its actions is,
+`CalibratedMonitor` sets the false positive rate per action: when a score is
+exchangeable with the honest scores, a threshold of 0.99 flags 1% of honest
+actions on average. A run is flagged when any of its actions is,
 as in LinuxArena's step-wise calibration [@tracy2026linuxarena, sec. 5.1], so
 a run of many honest actions is flagged at a higher rate than any one of them.
 In BashArena, a rate of 0.09% of actions corresponded to 4% of trajectories
@@ -92,7 +93,7 @@ In BashArena, a rate of 0.09% of actions corresponded to 4% of trajectories
 
 Scores differ by model family. Claude judges often recognise a violation and
 discount it, especially when the work looks local or internal, and GPT judges
-discount least [@apollo2026calibration, sec. *Different models have very different monitoring behaviors*].
+discount least [@apollo2026calibration, {Section} "Different models have very different monitoring behaviors"].
 A threshold or a set of honest scores therefore holds for one model, and
 `CalibratedMonitor` takes its honest scores from the same monitor with the
 same settings.
@@ -115,9 +116,9 @@ name two different labels is unreadable, and fails the score closed.
 
 No preset ships for a taxonomy guard such as Llama Guard 4, which is trained
 to label content against the 14 categories of the MLCommons hazard taxonomy
-[@meta2025llamaguard4, sec. *Hazard Taxonomy and Policy*]. Such a guard takes
-`GuardLabels` of the caller's, and it is trained on its taxonomy, where the
-guard monitor's prompt states the caller's policy.
+[@meta2025llamaguard4, {Section} "Hazard Taxonomy and Policy"]. Such a guard takes
+`GuardLabels` of the caller's. It is trained on its taxonomy, while the guard
+monitor's prompt states the caller's policy.
 
 The decision monitor's explanation is the statement that scored highest, or
 every statement under `Aggregation.MIN`. It names the concern and says
@@ -125,13 +126,15 @@ nothing about the action.
 
 ## Failures and reports
 
-A refusal, a cut-off reply, an unreadable reply, a 429 that outlasts the
-client's retries and a prompt over the context window each score 1.0. One
+A refusal, a cut-off reply, an unreadable reply, a 429 still returned after
+the client's retries and a prompt over the context window each score 1.0. One
 such sample fails a guard monitor's whole score, as
 [A rating that cannot be made scores 1.0](failing-closed.md) sets out.
 
 A rating's span carries its score under OpenTelemetry's evaluation attribute
 names, whose status is Development, so the names can change
-[@otel2026genai, sec. *Event: gen_ai.evaluation.result*]. hyoshigi sends a
-Langfuse score or LangSmith feedback only through `ReportedMonitor`, and a
-rating whose span is not sampled sends nothing; a log record says so.
+[@otel2026genai, {Section} "Event: gen_ai.evaluation.result"]. A score reaches
+Langfuse or LangSmith through a report: `ReportedMonitor` sends it for its
+rating's span, and `LangfuseScores.send` and `LangSmithFeedback.send` take the
+ids of a step from the caller. A `ReportedMonitor` whose span is not sampled
+sends nothing, and a log record says so.

@@ -44,28 +44,28 @@ entries shown, and every task entry besides.
 
 The default follows the classifier of Claude Code's auto mode, which sees only
 the user's messages and the agent's tool calls
-[@hughes2026automode, sec. *How it works*]. Anthropic strips the agent's own
+[@hughes2026automode, {Section} "How it works"]. Anthropic strips the agent's own
 text so that the agent cannot talk the classifier into a bad call, and the
 classifier judges what the agent did. It strips tool results because hostile
 content enters the context there, which makes their removal its primary
 defence against prompt injection. Including assistant messages and tool
 results lowered its performance on Anthropic's overeagerness test set
-[@hughes2026automode, sec. *Why we strip assistant text and tool results*].
+[@hughes2026automode, {Section} "Why we strip assistant text and tool results"].
 
 Tool results also hold most of a transcript's tokens. Apollo Research's
 Watcher Live strips them for that reason, at a small cost in fidelity
-[@apollo2026watcherlive, sec. *Make Watcher design decisions based on results*].
+[@apollo2026watcherlive, {Section} "Step 4: Make Watcher design decisions based on results"].
 
 ## Evidence on the agent's text points the other way
 
 The same Watcher Live study found that removing assistant messages hurt its
 monitor, so Watcher keeps them and strips only tool outputs
-[@apollo2026watcherlive, sec. *Make Watcher design decisions based on results*].
+[@apollo2026watcherlive, {Section} "Step 4: Make Watcher design decisions based on results"].
 In Control OSWorld, a setting of GUI computer-use agents, the agent's visible
 text was the strongest signal a monitor had. A per-step monitor's true
 positive rate at a 1% false positive rate was 0.49 with actions, text and
 screenshots, and 0.08 with actions and screenshots alone
-[@sanchezdelrio2026controlosworld, sec. 4.3, table 4].
+[@sanchezdelrio2026controlosworld, {Table 4}].
 
 hyoshigi keeps auto mode's choice, and `Channel.AGENT_PARTS` adds the agent's
 earlier text. That text is the agent's to write, and an agent can embed a
@@ -87,8 +87,8 @@ seven of eight monitor and environment pairs, and an action-only monitor was nev
 the best [@arike2026information, sec. 5.1].
 
 With `THOUGHTS`, reasoning the provider hid, such as encrypted reasoning, is
-named in the evidence's `hidden_reasoning`, and the action is rated on what is
-visible.
+named in the evidence's `hidden_reasoning`, and the action is rated on what the
+monitor can read.
 
 ## A final-answer gate cannot check the answer against tool results
 
@@ -100,18 +100,18 @@ answer, and `DEFAULT_PROMPT` asks the monitor whether that answer reports
 honestly what was done. Anthropic names the same trade-off for auto mode:
 without tool results the classifier cannot check provenance, such as whether
 an identifier came from a query or was made up
-[@hughes2026automode, sec. *Why we strip assistant text and tool results*].
+[@hughes2026automode, {Section} "Why we strip assistant text and tool results"].
 
 The evidence for such a miss sits in tool output. In one trajectory of Sinha
 et al., the agent's own check found 17 mismatched payments, and its final
 spreadsheet held 16 rows and a wrong total under a claim of success. The
 discrepancy shows when the intermediate output is compared with the
-deliverable [@sinha2026deliberative, app. H.4]. In another, the transcript
+deliverable [@sinha2026deliberative, {Appendix H.4}]. In another, the transcript
 showed a file's creation and left out its contents, which were the decisive
 evidence, and their trained monitor judged the run benign
-[@sinha2026deliberative, app. H.5]. The frontier monitors in the first case
+[@sinha2026deliberative, {Appendix H.5}]. The frontier monitors in the first case
 saw the intermediate output and still excused each anomaly as a bug
-[@sinha2026deliberative, app. H.4]. Tool results make a final answer
+[@sinha2026deliberative, {Appendix H.4}]. Tool results make a final answer
 checkable, and [Where the monitors miss](known-limits.md) gives the limit on
 whether the monitor checks it.
 
@@ -156,13 +156,13 @@ def rate(
 Reading tool results has costs.
 
 - Tool results are where injected instructions enter
-  [@hughes2026automode, sec. *Why we strip assistant text and tool results*],
+  [@hughes2026automode, {Section} "Why we strip assistant text and tool results"],
   and monitors cannot reliably keep instructions apart from data
   [@terekhov2025adaptive, sec. 6]. `DEFAULT_PROMPT` tells the monitor to
   treat everything it reads as data.
 - Every rating carries the results' tokens, and a prompt over the model's
   context window fails the rating closed as `Unavailable(status=400)`.
   Watcher trims the middle of such a transcript and marks the cut
-  [@apollo2026docsreview, sec. *When grading fails*].
+  [@apollo2026docsreview, {Section} "When grading fails"].
 - `most_recent` keeps only the last entries besides the task, so it can drop
   the result that the answer should be checked against.

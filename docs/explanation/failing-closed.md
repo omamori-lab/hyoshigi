@@ -37,9 +37,9 @@ Each monitor reaches a cause in its own way.
 - All three check what the model can perceive before they ask it.
 
 Reasoning that the provider hid in the action's thought is no cause. The
-thought changes nothing outside the agent, so the action is rated on what is
-visible, and under a view with `THOUGHTS` the evidence names the hidden kinds
-in `hidden_reasoning`.
+thought changes nothing outside the agent, so the action is rated on what the
+monitor can read, and under a view with `THOUGHTS` the evidence names the
+hidden kinds in `hidden_reasoning`.
 
 Several of these failures are ones the agent can bring about. It shapes the
 trajectory its monitor reads, so it can grow a prompt past the context window,
@@ -58,9 +58,10 @@ that is not in its format, and returns a score for every other failure.
   model. That is an HTTP 4xx other than 408, 409, 413 and 429 whose error
   does not blame the prompt's content. `Trajectory.act`, `attach` and
   `delegate` raise it for arguments that cannot work.
-- `FormatError` comes only from the readers of a payload: the
-  `Trajectory.from_*` and `Action.from_*` readers and `Trajectory.load`. It
-  names where in the payload the problem is, and `rate` never raises it.
+- `FormatError` comes only from the readers of a payload:
+  `Trajectory.from_anthropic`, `from_openai_chat` and `from_open_responses`,
+  their `Action.from_*` twins, and `Trajectory.load`. It names where in the
+  payload the problem is, and `rate` never raises it.
 - A model function of the caller's that raises propagates out of `rate`, and
   no score comes back. An async monitor asks its requests at once, and when
   one raises, the others are cancelled and the first error is raised as it
@@ -78,8 +79,8 @@ A failed score stays at 1.0 through `RepeatedMonitor` and
 
 - `RepeatedMonitor` returns 1.0 when any call failed closed, with the first
   failed call's explanation, and its evidence holds every call's score. A mean
-  would dilute the failure: one failed call at 1.0 among four at 0.1 averages
-  0.28.
+  would dilute the failure: with one failed call among n, it can be as low as
+  1/n.
 - `CalibratedMonitor` returns a failed score as it is, unranked. Ranked among
   n honest scores below 1.0, a failure would get the p-value
   (n + u) / (n + 1), with u the uniform tie draw. With fewer than 99 honest
@@ -88,7 +89,8 @@ A failed score stays at 1.0 through `RepeatedMonitor` and
   `escalation_threshold`, and returns the careful score unchanged. That score
   can be below 1.0, with `failed_closed` false. The fast failure is absent
   from the returned score, and it survives only where the fast monitor's own
-  rating is recorded, such as its span when tracing is on. A failed careful score is the cascade's result.
+  rating is recorded, such as its span when tracing is on. When the careful
+  score fails, the cascade returns that 1.0.
 - `ReportedMonitor` returns the wrapped score unchanged, and sends
   `failed_closed` and the cause's class with it.
 
@@ -102,9 +104,9 @@ runs out of time: escalate, deny or allow, chosen in its configuration.
 Escalate is the default, and it hands the call to the coding agent's own
 permission prompt, where a person decides. By default Watcher retries once a
 failure in which its backend answered but could not grade, such as rate
-limiting. A transcript too long for the grader is no failure there: Watcher
+limiting. A transcript longer than the grader takes is no failure there: Watcher
 trims its middle and marks the cut
-[@apollo2026docsreview, sec. *When grading fails*].
+[@apollo2026docsreview, {Section} "When grading fails"].
 
 The research monitors of Storf et al. score from 1 to 10 and give 5 when no
 valid score can be extracted, as after an instruction-following failure or a
