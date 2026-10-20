@@ -52,7 +52,8 @@ echo "==> ty (type checking)"
 uv run --group dev ty check
 
 echo "==> test suite"
-uv run --group dev pytest -q
+# The docs group builds the site that tests/docs checks.
+uv run --group dev --group docs pytest -q
 
 echo "==> lanorme standards"
 # lanorme needs Python 3.13+; it only parses the code, so it checks 3.12 source correctly.

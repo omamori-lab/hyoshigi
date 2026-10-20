@@ -122,10 +122,13 @@ xfail_strict = true
 paths_to_mutate = ["src/hyoshigi/"]
 tests_dir = ["tests/"]
 # mutmut runs each function through its trampoline, which adds stack frames, so the line a
-# warning points at cannot be checked in its runs.
+# warning points at cannot be checked in its runs. Its copy of the project holds no docs/, which
+# the docs tests read and build.
 pytest_add_cli_args = [
     "--deselect",
     "tests/monitors/test_guard.py::test_the_one_sample_warning_points_at_the_line_that_builds_the_monitor",
+    "--ignore",
+    "tests/docs",
 ]
 
 # The limits below are a ratchet: lower them as the code allows, and raise one only in a
