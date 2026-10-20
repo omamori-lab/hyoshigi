@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 
 import bibtexparser
-import pytest
 
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 # A citation group is a bracket that opens with a key, as [@key, sec. 3.2] or [@first; @second].
@@ -41,7 +40,6 @@ def test_every_cited_key_names_a_bibliography_entry() -> None:
     assert cited_keys - entry_keys == set()
 
 
-@pytest.mark.xfail(strict=True)
 def test_every_bibliography_entry_is_cited() -> None:
     cited_keys = read_cited_keys()
 
