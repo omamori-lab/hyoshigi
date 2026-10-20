@@ -1,0 +1,12 @@
+site_name: hyoshigi
+docs_dir: docs
+theme:
+  name: material
+plugins:
+  - search
+  - bibtex:
+      bib_file: docs/references.bib
+      csl_file: docs/csl/apa.csl
+      enable_inline_citations: false
+markdown_extensions:
+  - footnotes
