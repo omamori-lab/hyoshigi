@@ -61,10 +61,13 @@ limits did when every call of two or more items was spread one per line.
 The site is built with MkDocs from `docs/` and deployed to GitHub Pages from
 `main` by the Docs workflow, which needs the repository's Pages source set to
 GitHub Actions. Its citations are formatted by Pandoc 2.11 or newer, which the
-docs build needs on your `PATH`, for example from `brew install pandoc`. A
-citation stays on one line, with its locator inside the brackets:
+docs build needs on your `PATH`, for example from `brew install pandoc`.
 
-- `sec.`, `p.`, `pp.` and `fig.` are written plainly: `[@key, sec. 3.2]`.
+A docs page cites a source as `[@key, sec. 3.2]`: the key of its entry in
+`docs/references.bib`, then the locator, inside the same brackets and on one
+line.
+
+- `sec.`, `secs.`, `p.`, `pp.` and `fig.` are written plainly.
 - An appendix, equation or table goes in braces: `[@key, {Appendix C}]`.
 - A named section has its label in braces: `[@key, {Section} "How it works"]`.
 - A chapter follows empty braces: `[@key, {}Chapter 3]`.
