@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="601" viewBox="0 0 1000 601" role="img" aria-labelledby="title desc">
+  <title id="title">When a rating cannot be made</title>
+  <desc id="desc">A monitor always returns a score. When it cannot rate the action, for one of five causes, the score fails closed. Unreadable: no readable score or label in the model&#x27;s replies, after any retries. Unperceivable: content in the action that the model cannot perceive. Truncated: a reply cut off at the model&#x27;s output limit. Refused: the model or its provider declined. Unavailable: no answer after the caller&#x27;s retries. The score that fails closed has suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A wrapper carries it on. RepeatedMonitor fails the whole score closed when any call did, with the first failed call&#x27;s explanation. CascadeMonitor escalates a failed fast score, which is 1.0, to its careful monitor, whose score replaces it, and a failed careful score is the result. CalibratedMonitor returns a failed score as it is, unranked. A failed score is 1.0; only CascadeMonitor can replace it, with its careful monitor&#x27;s score.</desc>
+  <!-- Colours come from the brand tokens: diagrams/render.py fills this style block. -->
+  <style>
+    svg { color-scheme: dark; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans JP", Helvetica, Arial, sans-serif; font-size: 15px; fill: #ECEBE6; }
+    .title { font-size: 17px; font-weight: 600; }
+    .small { font-size: 14px; fill: #A9A8A2; }
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13.5px; }
+    .soft { fill: #A9A8A2; }
+    .dashed { stroke-dasharray: 5 4; fill: none; stroke: #6A6A66; }
+    .box { fill: #141414; stroke: #ECEBE6; stroke-width: 1.4; }
+    .charm { fill: #ECEBE6; }
+    .on-charm { fill: #111111; }
+    .charm-cord { fill: none; stroke: #ECEBE6; stroke-width: 2.2; }
+    .seal { fill: #E0563B; }
+    .allow { fill: #141414; stroke: #ECEBE6; stroke-width: 1.4; }
+    .resample { fill: #1F1F1E; stroke: #ECEBE6; stroke-width: 1.4; }
+    .defer { fill: #34332F; stroke: #ECEBE6; stroke-width: 1.4; }
+    .steer { fill: #D9D8D2; stroke: #D9D8D2; stroke-width: 1.4; }
+    .on-steer { fill: #111111; }
+    .halt { fill: #E0563B; stroke: #E0563B; stroke-width: 1.4; }
+    .on-halt { fill: #111111; }
+    .frame { fill: none; stroke: #6A6A66; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .edge { fill: none; stroke: #D6D5CF; stroke-width: 1.5; }
+    .loop { fill: none; stroke: #D6D5CF; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .bold { stroke-width: 2.75; }
+    .lifeline { fill: none; stroke: #A9A8A2; stroke-width: 1.2; stroke-dasharray: 6 4; }
+    .head { fill: #D6D5CF; }
+    .brush { fill: #ECEBE6; }
+  </style>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head"/></marker></defs>
+  <text x="32.0" y="44.0" text-anchor="start"><tspan class="title">When a rating cannot be made, the score fails closed</tspan></text>
+  <text x="32.0" y="96.0" text-anchor="start"><tspan class="small">the cause, a </tspan><tspan class="mono">Cause</tspan></text>
+  <rect class="box" x="32.0" y="112.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="134.0" text-anchor="start" class="mono">Unreadable</text>
+  <text x="182.0" y="134.0" text-anchor="start" class="small">no readable score or label in its replies</text>
+  <rect class="box" x="32.0" y="158.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="180.0" text-anchor="start" class="mono">Unperceivable</text>
+  <text x="182.0" y="180.0" text-anchor="start" class="small">content in the action it cannot perceive</text>
+  <rect class="box" x="32.0" y="204.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="226.0" text-anchor="start" class="mono">Truncated</text>
+  <text x="182.0" y="226.0" text-anchor="start" class="small">a reply cut off at the output limit</text>
+  <rect class="box" x="32.0" y="250.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="272.0" text-anchor="start" class="mono">Refused</text>
+  <text x="182.0" y="272.0" text-anchor="start" class="small">the model or its provider declined</text>
+  <rect class="box" x="32.0" y="296.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="318.0" text-anchor="start" class="mono">Unavailable</text>
+  <text x="182.0" y="318.0" text-anchor="start" class="small">no answer after the caller&#x27;s retries</text>
+  <rect class="box" x="578.0" y="170.0" width="390.0" height="102.0" rx="6"/>
+  <text x="773.0" y="201.0" text-anchor="middle" class="title">The score fails closed</text>
+  <text x="773.0" y="223.0" text-anchor="middle" class="small">suspicion 1.0, the cause as evidence:</text>
+  <text x="773.0" y="244.0" text-anchor="middle"><tspan class="mono">FailedClosed(model, cause)</tspan></text>
+  <path class="edge bold" d="M540.0,129.0 L540.0,313.0"/>
+  <path class="edge bold" d="M502.0,129.0 L540.0,129.0"/>
+  <path class="edge bold" d="M502.0,175.0 L540.0,175.0"/>
+  <path class="edge bold" d="M502.0,221.0 L540.0,221.0"/>
+  <path class="edge bold" d="M502.0,267.0 L540.0,267.0"/>
+  <path class="edge bold" d="M502.0,313.0 L540.0,313.0"/>
+  <path class="edge bold" d="M540.0,221.0 L576.0,221.0" marker-end="url(#arrow)"/>
+  <rect class="box" x="32.0" y="402.0" width="293.3" height="123.0" rx="6"/>
+  <text x="178.7" y="433.0" text-anchor="middle" class="title">Fails the whole score</text>
+  <text x="178.7" y="455.0" text-anchor="middle"><tspan class="mono">RepeatedMonitor</tspan></text>
+  <text x="178.7" y="476.0" text-anchor="middle" class="small">when any call failed closed, with</text>
+  <text x="178.7" y="497.0" text-anchor="middle" class="small">the first failed call&#x27;s explanation</text>
+  <rect class="box" x="353.3" y="402.0" width="293.3" height="123.0" rx="6"/>
+  <text x="500.0" y="433.0" text-anchor="middle" class="title">Escalates a failed score</text>
+  <text x="500.0" y="455.0" text-anchor="middle"><tspan class="mono">CascadeMonitor</tspan></text>
+  <text x="500.0" y="476.0" text-anchor="middle" class="small">a failed fast score is 1.0, so it</text>
+  <text x="500.0" y="497.0" text-anchor="middle" class="small">escalates; a failed careful one stands</text>
+  <rect class="box" x="674.7" y="402.0" width="293.3" height="123.0" rx="6"/>
+  <text x="821.3" y="433.0" text-anchor="middle" class="title">Returns it unranked</text>
+  <text x="821.3" y="455.0" text-anchor="middle"><tspan class="mono">CalibratedMonitor</tspan></text>
+  <text x="821.3" y="476.0" text-anchor="middle" class="small">a failed score is returned</text>
+  <text x="821.3" y="497.0" text-anchor="middle" class="small">as it is, never ranked</text>
+  <path class="edge" d="M773.0,272.0 L773.0,362.0"/>
+  <path class="edge" d="M178.7,362.0 L821.3,362.0"/>
+  <path class="edge" d="M178.7,362.0 L178.7,400.0" marker-end="url(#arrow)"/>
+  <path class="edge" d="M500.0,362.0 L500.0,400.0" marker-end="url(#arrow)"/>
+  <path class="edge" d="M821.3,362.0 L821.3,400.0" marker-end="url(#arrow)"/>
+  <text x="32.0" y="569.0" text-anchor="start"><tspan class="small">A failed score is 1.0; only </tspan><tspan class="mono">CascadeMonitor</tspan><tspan class="small"> can replace it, with its careful monitor&#x27;s score.</tspan></text>
+</svg>

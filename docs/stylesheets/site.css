@@ -1,0 +1,93 @@
+/*
+ * The site's own styles, loaded after brand.css.
+ *
+ * brand.css is copied unchanged from the omamori lab brand repository
+ * (diagrams/out/brand.css), so it can be copied again when the brand changes.
+ * It sets the primary, accent and link colours of both schemes. This
+ * file adds the rest of the custom palette, the header's lower edge in dark
+ * mode, the logo size, the links that open each diagram at full size, the gap
+ * between neighbouring citations, and unbroken code names in tables.
+ */
+
+/* The rest of the custom palette -----------------------------------------
+ *
+ * mkdocs.yml sets `primary: custom` and `accent: custom`, so Material leaves
+ * these shades to the site. They come from the brand tokens, some with an
+ * alpha: line for the light primary shade, paper and ink for faded text on the
+ * header, seal (vermilion) for the accent and on-seal for text on it. The dark
+ * primary shade is black, one step below the sumi header, which no token
+ * defines; Material paints only the repository link in the phone's navigation
+ * drawer with it.
+ */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color--light: #2B2B2B;
+  --md-primary-fg-color--dark: #000000;
+  --md-primary-bg-color--light: #FFFFFFB3;
+  --md-accent-fg-color--transparent: #BF3A221A;
+  --md-accent-bg-color: #FFFFFF;
+  --md-accent-bg-color--light: #FFFFFFB3;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color--light: #2B2B2B;
+  --md-primary-fg-color--dark: #000000;
+  --md-primary-bg-color--light: #ECEBE6B3;
+  --md-accent-fg-color--transparent: #E0563B1A;
+  --md-accent-bg-color: #111111;
+  --md-accent-bg-color--light: #111111B3;
+}
+
+/* The header in dark mode: the sumi header (#111111) and the dark page (paper,
+ * #141414) are nearly the same shade, so a line in the rule token (#6A6A66)
+ * marks the header's lower edge. An inset shadow draws it inside the header,
+ * so nothing moves; it replaces Material's scroll shadow, which does not show
+ * on a dark page. */
+[data-md-color-scheme="slate"] .md-header {
+  box-shadow: inset 0 -1px 0 #6A6A66;
+}
+
+/* The logo: the mark's white charm reads on the sumi header in both schemes,
+ * so it is shown a little larger than Material's default. */
+.md-header__button.md-logo {
+  padding: 0.2rem;
+}
+
+.md-header__button.md-logo img {
+  height: 1.6rem;
+}
+
+/* Diagrams -----------------------------------------------------------------
+ *
+ * Each diagram on a page links to its own SVG, so a reader can open it at full
+ * size. Material hides the image drawn for the other colour scheme; these
+ * rules hide its link too, so it leaves no empty link to tab to.
+ */
+[data-md-color-scheme="default"] a:has(> img[src$="#only-dark"]),
+[data-md-color-scheme="slate"] a:has(> img[src$="#only-light"]) {
+  display: none;
+}
+
+/* Citations ----------------------------------------------------------------
+ *
+ * mkdocs-bibtex follows each author-date citation with footnote superscripts,
+ * one per key, and a group such as [@a; @b] gives neighbouring superscripts,
+ * which run together, so 2, 3 and 4 read as 234. A gap sets each number apart.
+ * It is a gap, not a comma, because a sibling selector skips text: the rule
+ * also matches two citations with words between them, where a comma would be
+ * wrong and a slightly wider space does no harm.
+ */
+.md-typeset sup[id^="fnref"] + sup[id^="fnref"] {
+  margin-left: 0.3em;
+}
+
+/* Code in tables -----------------------------------------------------------
+ *
+ * Material lets inline code break anywhere (word-break: break-word), so a
+ * narrow column splits a name mid-token, as in GPT_OSS_SAFE|GUARD. In a table
+ * cell, code breaks only at its spaces; a table too wide for the page scrolls
+ * inside the wrapper Material gives every table.
+ */
+.md-typeset td code,
+.md-typeset th code {
+  word-break: normal;
+}

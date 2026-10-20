@@ -15,6 +15,9 @@ minor version.
 
 ### Added
 
+- A documentation site at <https://omamori-lab.github.io/hyoshigi/>: a tutorial, a how-to on failed
+  ratings, explanations of the default view, failing closed and the monitors' known limits, and
+  the API reference.
 - `Trajectory`, a run's append-only history of actions and observations:
   `from_run` for a black-box agent, `act`, `observe`, `delegate` to a subagent
   under the tool call that delegated it, and `dump` and `load` in a
