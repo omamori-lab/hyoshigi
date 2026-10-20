@@ -105,7 +105,9 @@ class StatementDecision:
     kw_only=True,
 )
 class Decisions:
-    """The decisions a model gave on the monitor's statements, and its hidden reasoning."""
+    """The decisions a model gave on the monitor's statements, and the rated action's hidden
+    reasoning, which the monitor names only when its view shows thoughts.
+    """
 
     model: str
     decisions: tuple[StatementDecision, ...]
@@ -118,7 +120,9 @@ class Decisions:
     kw_only=True,
 )
 class Labels:
-    """The label a guard model gave in each sampled reply, in order, and its hidden reasoning."""
+    """The label a guard model gave in each sampled reply, in order, and the rated action's
+    hidden reasoning, which the monitor names only when its view shows thoughts.
+    """
 
     model: str
     labels: tuple[str, ...]
