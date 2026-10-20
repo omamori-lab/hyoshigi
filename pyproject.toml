@@ -67,7 +67,6 @@ docs = [
     "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.8",
     "mkdocs-bibtex>=4.4.0",
-    "pypandoc-binary>=1.17",
 ]
 
 [tool.hatch.version]
