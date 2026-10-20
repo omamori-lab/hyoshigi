@@ -121,7 +121,7 @@ A final-answer gate reads tool results when its view adds
 `Channel.TOOL_OBSERVATIONS`, and the monitor for other actions keeps the
 default. The research monitors of Storf et al. and Sinha et al. read tool
 outputs in the same way
-[@storf2026constitutional, sec. 4.1; @sinha2026deliberative, sec. 3.1].
+[@sinha2026deliberative, sec. 3.1; @storf2026constitutional, sec. 4.1].
 
 ```python
 from anthropic import Anthropic

@@ -32,7 +32,7 @@ it is fixed
 Under the default view, a final answer's counts, totals and identifiers cannot
 be checked against the tool results they came from, since the view leaves
 those results out. The evidence for such misses sits in tool output
-[@sinha2026deliberative, {Appendix H.4}; @sinha2026deliberative, {Appendix H.5}], which
+[@sinha2026deliberative, {Appendices H.4, H.5}], which
 `Channel.TOOL_OBSERVATIONS` adds to the view, as
 [The default view hides tool results and the agent's text](the-default-view.md)
 sets out.
