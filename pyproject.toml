@@ -135,7 +135,8 @@ pytest_add_cli_args = [
 root = true
 # Hexagonal-architecture rules: hyoshigi is not layered that way.
 # AAA-001 asks for "# Arrange" comments; AGENTS.md separates the three parts by blank lines.
-ignore = ["LAYER", "PORT", "AAA-001"]
+# DOCS-003 asks each page to open with "This page" or the like; no page talks about itself.
+ignore = ["LAYER", "PORT", "AAA-001", "DOCS-003"]
 promote = ["NAMING-006", "NAMING-007", "NAMING-008", "NAMING-011", "SIMILAR-001"]
 exclude = [
     ".venv/*",
@@ -169,6 +170,12 @@ param_error = 8
 
 [tool.lanorme.prose]
 enabled = true
+
+# The Diataxis structure of docs/: a page lives in tutorials, how-to, reference or explanation,
+# or is one of the top-level pages listed here.
+[tool.lanorme.docs]
+enabled = true
+known_top_level = ["index.md", "name.md"]
 
 [tool.lanorme.comments]
 em_dash = true

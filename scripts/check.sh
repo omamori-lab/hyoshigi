@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run every gate: the gitleaks secrets scan, ruff, the spread check, ty, the
-# test suite, the lanorme standards, a package build, and an import of the
-# built wheel in a fresh environment. Run this before committing or finishing
-# a change. No arguments.
+# test suite, the lanorme standards, a strict build of the docs site, a package
+# build, and an import of the built wheel in a fresh environment. Run this
+# before committing or finishing a change. No arguments.
 #
 #   scripts/check.sh
 #
@@ -12,6 +12,13 @@
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
+
+# The docs build formats citations with Pandoc 2.11 or newer, found on PATH.
+pandoc_version="$(pandoc --version 2>/dev/null | head -n 1 | cut -d ' ' -f 2 || true)"
+if [[ -z "$pandoc_version" ]] || ! printf '2.11\n%s\n' "$pandoc_version" | sort -V -C; then
+  echo "The docs build needs Pandoc 2.11 or newer on PATH: brew install pandoc, or apt-get install pandoc." >&2
+  exit 1
+fi
 
 echo "==> secrets (gitleaks)"
 if command -v gitleaks >/dev/null 2>&1; then
@@ -50,6 +57,9 @@ uv run --group dev pytest -q
 echo "==> lanorme standards"
 # lanorme needs Python 3.13+; it only parses the code, so it checks 3.12 source correctly.
 uvx --python 3.13 lanorme==0.21.1 check .
+
+echo "==> docs build"
+uv run --group docs mkdocs build --strict
 
 echo "==> build"
 uv build >/dev/null

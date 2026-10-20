@@ -1,12 +1,109 @@
 site_name: hyoshigi
+site_description: >-
+  AI-control monitors without a framework: each action an agent proposes is
+  rated against its trajectory before it runs.
+site_url: https://omamori-lab.github.io/hyoshigi/
+repo_url: https://github.com/omamori-lab/hyoshigi
+repo_name: omamori-lab/hyoshigi
+edit_uri: edit/main/docs/
 docs_dir: docs
+# The design notes are private and stay out of the site.
+exclude_docs: |
+  plans/
+
 theme:
   name: material
+  # overrides/main.html adds the favicon sizes.
+  custom_dir: overrides
+  logo: assets/brand/omamori-lab.svg
+  favicon: assets/brand/favicon-32.png
+  features:
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  # Custom colours in both schemes: docs/stylesheets/brand.css sets them from
+  # the omamori lab brand, and site.css adds the shades it leaves out. The toggle
+  # cycles through three settings, automatic, light and dark, and the browser
+  # remembers the reader's choice. Automatic, the first, is where a new reader
+  # starts: it follows the operating system's scheme, and changes with it.
+  palette:
+    - media: "(prefers-color-scheme)"
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to the system setting
+
+extra_css:
+  - stylesheets/brand.css
+  - stylesheets/site.css
+
 plugins:
   - search
   - bibtex:
       bib_file: docs/references.bib
+      # A CSL file selects the Pandoc formatter, which keeps a locator inside
+      # the brackets, as [@key, sec. 3.2], and renders APA's author-date text.
+      # The path is read from the directory mkdocs runs in, the repository root.
       csl_file: docs/csl/apa.csl
+      # Only bracketed [@key] citations, so a bare @word, such as a decorator in a
+      # code example, is never read as a citation key.
       enable_inline_citations: false
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          # docs/reference/api.md names each public object of the package, so the
+          # page shows the API and not the modules' helpers.
+          options:
+            show_source: false
+            docstring_style: null
+            members_order: source
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 3
+            merge_init_into_class: true
+            filters: ["!^_"]
+
 markdown_extensions:
+  - admonition
+  - attr_list
   - footnotes
+  # Pandoc writes the en dash of a page range as "--"; this turns "--" back into
+  # an en dash and "---" into an em dash, and leaves quotes and dots alone.
+  - smarty:
+      smart_quotes: false
+      smart_ellipses: false
+  - toc:
+      permalink: true
+      # The right-hand contents list shows the h2 and h3 sections: on the API
+      # page, the groups and the public names.
+      toc_depth: "2-3"
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+# Report a link to a missing anchor as a warning, so --strict fails on it. A line
+# that Markdown mistakes for a footnote definition shows up this way.
+validation:
+  anchors: warn
+
+nav:
+  - The name: name.md

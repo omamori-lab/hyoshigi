@@ -11,6 +11,7 @@ __pycache__/
 venv/
 dist/
 build/
+site/
 
 # Tooling caches
 mutants/
