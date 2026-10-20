@@ -46,7 +46,9 @@ The readers of a provider's request take `authorship=by_role` by default,
 which makes every user-role message the user's, and the user's words
 authorise actions under the default prompt. A harness that writes its own
 messages in the user's role, as Codex does with instruction files and
-environment context [@bolin2026codexloop], has them read as the user's.
+environment context
+[@bolin2026codexloop, {Section} "Building the initial prompt"], has them
+read as the user's.
 `marked(indices)` names the user's own messages and makes the rest notes by
 an unknown author, which authorise nothing. A trajectory recorded live with
 `Trajectory.observe` gives each observation its author.

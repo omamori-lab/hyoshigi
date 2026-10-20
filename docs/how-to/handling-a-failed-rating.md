@@ -190,7 +190,7 @@ the action.
 
 A `CascadeMonitor` puts a careful monitor behind a fast one, as Claude Code's auto mode puts a
 reasoning classifier behind a fast filter
-[@hughes2026automode, section "Two-stage classification: efficiency and recall"]. A refusal fails
+[@hughes2026automode, {Section} "Two-stage classification: efficiency and recall"]. A refusal fails
 the fast score closed, 1.0 reaches every `escalation_threshold`, and the careful monitor rates the
 action on a second model. The result is the careful score as it is, so the first model's refusal
 appears nowhere in it:

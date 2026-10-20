@@ -3,13 +3,13 @@
 hyoshigi rates each action an AI agent proposes against the trajectory it would join, before the
 action runs, and returns a suspicion score from 0 to 1. The library holds the trajectory, the models
 a monitor asks and the monitors. The control protocol that acts on a score, to audit an action or
-defer it to a trusted model [@greenblatt2023aicontrol, sec. 3.2 and 3.3], is the caller's own.
+defer it to a trusted model [@greenblatt2023aicontrol, secs. 3.2, 3.3], is the caller's own.
 
 The check follows security practice and AI control. A reference monitor validates each reference a
 program makes before it is granted [@anderson1972planning, sec. 4.1.1, p. 22]. In AI control, a
 trusted model rates how suspicious each action is [@greenblatt2023aicontrol, sec. 3.2], given the
-history of the task [@bhatt2025ctrlz, app. D]. Claude Code's auto mode checks each action against
-its criteria before it executes [@hughes2026automode, section "How it works"].
+history of the task [@bhatt2025ctrlz, {Appendix D}]. Claude Code's auto mode checks each action
+against its criteria before it executes [@hughes2026automode, {Section} "How it works"].
 
 Three kinds of monitor rate an action:
 
