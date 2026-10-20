@@ -81,9 +81,9 @@ Red-Handed, reading it raised the detection of subtle sabotage and lowered the
 detection of obvious sabotage, where the agent's rationalisations can talk the
 monitor down [@arnav2025cotredhanded, sec. 3.1]. A hybrid that scored the
 reasoning and the actions separately beat both
-[@arnav2025cotredhanded, sec. 3.2]. More information is not always better:
-monitors given filtered information beat monitors given everything in seven
-of eight monitor and environment pairs, and an action-only monitor was never
+[@arnav2025cotredhanded, sec. 3.2]. Filtering what a monitor reads also
+helped: monitors given filtered information beat monitors given everything in
+seven of eight monitor and environment pairs, and an action-only monitor was never
 the best [@arike2026information, sec. 5.1].
 
 With `THOUGHTS`, reasoning the provider hid, such as encrypted reasoning, is
