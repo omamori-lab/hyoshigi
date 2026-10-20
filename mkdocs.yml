@@ -106,4 +106,7 @@ validation:
   anchors: warn
 
 nav:
+  - hyoshigi: index.md
+  - Reference:
+      - API: reference/api.md
   - The name: name.md
