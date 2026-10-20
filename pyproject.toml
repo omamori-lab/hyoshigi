@@ -55,6 +55,7 @@ Changelog = "https://github.com/omamori-lab/hyoshigi/blob/main/CHANGELOG.md"
 [dependency-groups]
 dev = [
     "hyoshigi[openai,anthropic,openrouter,typesafe,opentelemetry,langfuse,langsmith]",
+    "bibtexparser>=2.1.0",
     "hypothesis>=6.170.1",
     "mutmut>=3.8.0",
     "opentelemetry-sdk>=1.45.1",
