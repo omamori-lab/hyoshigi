@@ -221,6 +221,59 @@ def rate(request: pytest.FixtureRequest) -> Rate:
     return request.param
 
 
+class RateLatestStep(Protocol):
+    def __call__(
+        self,
+        script: Script,
+        *,
+        trajectory: Trajectory,
+    ) -> SuspicionScore: ...
+
+
+def rate_latest_step_synchronously(
+    script: Script,
+    *,
+    trajectory: Trajectory,
+) -> SuspicionScore:
+    model = GenerativeModel(
+        name=MODEL_NAME,
+        generate=script.generate,
+        perceives=script.perceives,
+    )
+    return LLMMonitor(
+        model=model,
+        prompt=ECHO,
+    ).rate_latest_step(trajectory)
+
+
+def rate_latest_step_asynchronously(
+    script: Script,
+    *,
+    trajectory: Trajectory,
+) -> SuspicionScore:
+    model = AsyncGenerativeModel(
+        name=MODEL_NAME,
+        generate=script.generate_asynchronously,
+        perceives=script.perceives,
+    )
+    monitor = AsyncLLMMonitor(
+        model=model,
+        prompt=ECHO,
+    )
+    return asyncio.run(monitor.rate_latest_step(trajectory))
+
+
+@pytest.fixture(
+    params=[
+        rate_latest_step_synchronously,
+        rate_latest_step_asynchronously,
+    ],
+    ids=["sync", "async"],
+)
+def rate_latest_step(request: pytest.FixtureRequest) -> RateLatestStep:
+    return request.param
+
+
 def build_reply(score_text: str) -> Generation:
     return Generation(text=f"<reasoning>r</reasoning><score>{score_text}</score>")
 
@@ -504,6 +557,45 @@ def test_the_view_chooses_what_of_the_trajectory_the_model_reads(rate: Rate) -> 
     assert [prompt.content for prompt in script.received] == [
         (TextPart(text='|<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>'),),
     ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_latest_step_is_read_once_as_the_proposed_action(
+    rate_latest_step: RateLatestStep,
+) -> None:
+    trajectory = build_trajectory()
+    trajectory.act(ACTION)
+    script = Script(Generation(text=CALM_REPLY))
+
+    rate_latest_step(
+        script,
+        trajectory=trajectory,
+    )
+
+    assert script.received == [
+        Prompt(
+            system="Scale 0 to 10.",
+            content=(
+                TextPart(
+                    text="<user>Summarise q3.md</user>|"
+                    '<tool_call id="c1" name="read">{"path": "q3.md"}</tool_call>',
+                ),
+            ),
+        ),
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_rating_the_latest_step_of_a_trajectory_ending_in_an_observation_raises(
+    rate_latest_step: RateLatestStep,
+) -> None:
+    script = Script(Generation(text=CALM_REPLY))
+
+    with pytest.raises(ConfigurationError):
+        rate_latest_step(
+            script,
+            trajectory=build_trajectory(),
+        )
 
 
 def test_the_default_prompt_asks_for_a_score_on_the_scale(rate: Rate) -> None:

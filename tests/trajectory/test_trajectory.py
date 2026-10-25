@@ -360,3 +360,140 @@ def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> N
             score=READS_THE_FILE,
         ),
     )
+
+
+@pytest.mark.xfail(strict=True)
+def test_splitting_the_latest_step_returns_its_action(reading: Trajectory) -> None:
+    step = reading.split_latest_step()
+
+    assert step.action == Action(
+        id="a1",
+        tool_calls=(READ,),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_splitting_the_latest_step_returns_the_trajectory_before_it(reading: Trajectory) -> None:
+    step = reading.split_latest_step()
+
+    assert step.trajectory.history == (
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text=TASK),),
+        ),
+    )
+
+
+def test_splitting_the_latest_step_leaves_the_trajectory_unchanged(reading: Trajectory) -> None:
+    reading.split_latest_step()
+
+    assert reading.history == (
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text=TASK),),
+        ),
+        Action(
+            id="a1",
+            tool_calls=(READ,),
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_trajectory_before_the_latest_step_can_take_its_action(reading: Trajectory) -> None:
+    step = reading.split_latest_step()
+
+    step.trajectory.act(step.action)
+
+    assert step.trajectory.history == (
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text=TASK),),
+        ),
+        Action(
+            id="a1",
+            tool_calls=(READ,),
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_splitting_the_latest_step_keeps_only_the_ratings_of_earlier_actions(
+    reading: Trajectory,
+) -> None:
+    reading.attach(
+        READS_THE_FILE,
+        to=Action(
+            id="a1",
+            tool_calls=(READ,),
+        ),
+    )
+    writing = Action(
+        id="a2",
+        tool_calls=(WRITE,),
+    )
+    reading.act(writing)
+    reading.attach(
+        WRITES_ELSEWHERE,
+        to=writing,
+    )
+
+    step = reading.split_latest_step()
+
+    assert step.trajectory.ratings == (
+        Rating(
+            action_id="a1",
+            score=READS_THE_FILE,
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_splitting_the_latest_step_keeps_only_the_subagents_of_earlier_calls(
+    delegating: Trajectory,
+) -> None:
+    delegating.delegate(
+        INSTRUCTION,
+        call_id="call_7",
+    )
+    delegating.act(
+        Action(
+            id="a2",
+            tool_calls=(
+                ToolCall(
+                    id="call_8",
+                    name="task",
+                    arguments="{}",
+                ),
+            ),
+        ),
+    )
+    delegating.delegate(
+        INSTRUCTION,
+        call_id="call_8",
+    )
+
+    step = delegating.split_latest_step()
+
+    assert list(step.trajectory.subagents) == ["call_7"]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "trajectory",
+    [
+        Trajectory.from_run(
+            TASK,
+            answer=ANSWER,
+        ).trajectory,
+        Trajectory(),
+    ],
+    ids=["ends-in-an-observation", "empty"],
+)
+def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
+    trajectory: Trajectory,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        trajectory.split_latest_step()
+
+    assert str(raised.value) == "the latest entry of the trajectory is not an action"

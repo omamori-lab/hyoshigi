@@ -34,6 +34,13 @@ class BlackBoxRun(NamedTuple):
     answer: Action
 
 
+class Step(NamedTuple):
+    """An action to rate, and the trajectory before it."""
+
+    trajectory: Trajectory
+    action: Action
+
+
 @dataclass(
     frozen=True,
     slots=True,
@@ -165,6 +172,18 @@ class Trajectory:
     def ratings(self) -> tuple[Rating, ...]:
         """The ratings of the actions in the history, in the order they were attached."""
         return tuple(self._ratings)
+
+    def split_latest_step(self) -> Step:
+        """Return the latest action, and a new trajectory of everything before it.
+
+        The new trajectory keeps the ratings and subagents of the earlier actions, and shares
+        the subagents' trajectories; this trajectory is unchanged. A trajectory whose latest
+        entry is not an action raises ConfigurationError.
+        """
+        return Step(
+            trajectory=Trajectory(),
+            action=Action(),
+        )
 
     def attach(
         self,
