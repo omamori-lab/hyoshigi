@@ -546,6 +546,28 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
         ),
         pytest.param(
             (
+                Unavailable(status=503),
+                Generation(text="maybe"),
+                SAFE,
+                SAFE,
+                SAFE,
+            ),
+            UNREADABLE_SCORE,
+            id="a-reply-with-no-label-after-an-unavailable-sample",
+        ),
+        pytest.param(
+            (
+                Unavailable(status=503),
+                Truncated(text="safe"),
+                SAFE,
+                SAFE,
+                SAFE,
+            ),
+            TRUNCATED_SCORE,
+            id="a-reply-cut-off-after-an-unavailable-sample",
+        ),
+        pytest.param(
+            (
                 Truncated(text="safe"),
                 REFUSAL,
                 SAFE,
