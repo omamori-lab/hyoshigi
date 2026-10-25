@@ -110,9 +110,13 @@ nav:
   - Tutorials:
       - Rating a first action: tutorials/first-rating.md
   - How-to:
+      - Choosing a monitor: how-to/choosing-a-monitor.md
+      - Rating with an LLM monitor: how-to/rating-with-an-llm-monitor.md
+      - Rating with a decision model: how-to/rating-with-a-decision-model.md
       - Handling a failed rating: how-to/handling-a-failed-rating.md
   - Explanation:
       - The default view: explanation/the-default-view.md
+      - The default prompt: explanation/the-default-prompt.md
       - Failing closed: explanation/failing-closed.md
       - Where the monitors miss: explanation/known-limits.md
   - Reference:
