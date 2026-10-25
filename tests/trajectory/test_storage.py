@@ -711,7 +711,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
             },
             "$.history[0].parts[0].description.author",
         ),
-        (
+        pytest.param(
             {
                 **ENVELOPE,
                 "history": [
@@ -727,7 +727,82 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                     },
                 },
             },
-            "$.subagents[0].history[0]",
+            "$.subagents['call_7'].history[0]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [
+                            TASK_CALL,
+                            {
+                                **TASK_CALL,
+                                "id": "call_8",
+                            },
+                        ],
+                    },
+                ],
+                "subagents": {
+                    "call_7": {
+                        **ENVELOPE,
+                        "history": [],
+                    },
+                    "call_8": {
+                        **ENVELOPE,
+                        "history": [AUDIO],
+                    },
+                },
+            },
+            "$.subagents['call_8'].history[0]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [
+                            TASK_CALL,
+                            {
+                                **TASK_CALL,
+                                "id": "call_8",
+                            },
+                        ],
+                    },
+                ],
+                "subagents": {
+                    "call_7": {
+                        **ENVELOPE,
+                        "history": [],
+                    },
+                    "call_8": {
+                        **ENVELOPE,
+                        "history": [
+                            {
+                                **ACTION,
+                                "tool_calls": [
+                                    {
+                                        **TASK_CALL,
+                                        "id": "call_9",
+                                    },
+                                ],
+                            },
+                        ],
+                        "subagents": {
+                            "call_9": {
+                                **ENVELOPE,
+                                "history": [AUDIO],
+                            },
+                        },
+                    },
+                },
+            },
+            "$.subagents['call_8'].subagents['call_9'].history[0]",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -740,7 +815,8 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                     },
                 },
             },
-            "$.subagents[0]",
+            "$.subagents['call_7']",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -761,6 +837,8 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "description-without-author",
         "description-with-unknown-author",
         "malformed-subagent",
+        "malformed-second-subagent",
+        "malformed-subagent-of-a-subagent",
         "subagent-without-its-call",
     ],
 )
@@ -770,6 +848,62 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
 ) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
+
+    assert raised.value.path == path
+
+
+# Each expected path writes the call id as RFC 9535, sec. 2.7, writes a member name in a
+# Normalized Path.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("call_id", "path"),
+    [
+        (
+            "it's",
+            r"$.subagents['it\'s']",
+        ),
+        (
+            "a\\b",
+            r"$.subagents['a\\b']",
+        ),
+        (
+            "\b\f\n\r\t",
+            r"$.subagents['\b\f\n\r\t']",
+        ),
+        (
+            "\x00\x07\x0b\x0e\x1f",
+            r"$.subagents['\u0000\u0007\u000b\u000e\u001f']",
+        ),
+        (
+            'call-3/"x" é\x7f\U0001f041',
+            "$.subagents['call-3/\"x\" é\x7f\U0001f041']",
+        ),
+    ],
+    ids=[
+        "apostrophe",
+        "backslash",
+        "escapes-with-a-letter",
+        "other-control-characters",
+        "unescaped-characters",
+    ],
+)
+def test_a_format_error_names_a_subagent_by_its_call_id_escaped_as_in_a_normalized_path(
+    call_id: str,
+    path: str,
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(
+            {
+                **ENVELOPE,
+                "history": [],
+                "subagents": {
+                    call_id: {
+                        **ENVELOPE,
+                        "history": [],
+                    },
+                },
+            },
+        )
 
     assert raised.value.path == path
 
@@ -1014,8 +1148,9 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     },
                 },
             },
-            "$.subagents[0]",
+            "$.subagents['call_7']",
             id="subagent-ratings-missing",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_rating_payload("a1"),
@@ -1516,19 +1651,21 @@ def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> 
             32,
             ".evidence",
         ),
-        (
+        pytest.param(
             nest_subagents(33),
-            "$.subagents[0]",
-            ".subagents[0]",
+            "$.subagents['call_7']",
+            ".subagents['call_7']",
             33,
-            ".subagents[0]",
+            ".subagents['call_7']",
+            marks=pytest.mark.xfail(strict=True),
         ),
-        (
+        pytest.param(
             nest_subagents(600),
-            "$.subagents[0]",
-            ".subagents[0]",
+            "$.subagents['call_7']",
+            ".subagents['call_7']",
             33,
-            ".subagents[0]",
+            ".subagents['call_7']",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=["composite-scores-33", "composite-scores-400", "subagents-33", "subagents-600"],
