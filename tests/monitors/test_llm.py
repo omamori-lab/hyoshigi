@@ -559,7 +559,6 @@ def test_the_view_chooses_what_of_the_trajectory_the_model_reads(rate: Rate) -> 
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_latest_step_is_read_once_as_the_proposed_action(
     rate_latest_step: RateLatestStep,
 ) -> None:
@@ -585,7 +584,6 @@ def test_the_latest_step_is_read_once_as_the_proposed_action(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_rating_the_latest_step_of_a_trajectory_ending_in_an_observation_raises(
     rate_latest_step: RateLatestStep,
 ) -> None:

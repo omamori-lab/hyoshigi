@@ -180,10 +180,30 @@ class Trajectory:
         the subagents' trajectories; this trajectory is unchanged. A trajectory whose latest
         entry is not an action raises ConfigurationError.
         """
-        return Step(
-            trajectory=Trajectory(),
-            action=Action(),
-        )
+        match self._history:
+            case [
+                *earlier_history,
+                Action() as action,
+            ]:
+                call_ids = {call.id for call in action.tool_calls}
+                earlier = Trajectory()
+                earlier._history = earlier_history
+                earlier._action_ids = self._action_ids - {action.id}
+                earlier._call_ids = self._call_ids - call_ids
+                earlier._ratings = [
+                    rating for rating in self._ratings if rating.action_id != action.id
+                ]
+                earlier._subagents = {
+                    call_id: child
+                    for call_id, child in self._subagents.items()
+                    if call_id not in call_ids
+                }
+                return Step(
+                    trajectory=earlier,
+                    action=action,
+                )
+            case _:
+                raise ConfigurationError("the latest entry of the trajectory is not an action")
 
     def attach(
         self,
