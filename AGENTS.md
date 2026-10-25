@@ -17,7 +17,8 @@ langchain-sync-monitors will be rebuilt on it.
   depends on is agreed and recorded with its evidence.
 - **Primary sources only**: arXiv, Science, AI lab blogs, known AI safety
   organisations, LessWrong, canonical computer science, AI and security venues.
-  Never news sites, aggregators or summaries. Cite at the point of use.
+  Never news sites, aggregators or summaries. Cite at the point of use, on the
+  docs page.
 - **Canonical terms.** A name comes from RL, AI control, security or software
   engineering before it is coined; a coined term is defined once.
 - **No metaspeech.** Pages, docs and docstrings say what things are and do,
@@ -65,8 +66,16 @@ langchain-sync-monitors will be rebuilt on it.
    Misuse raises: `ConfigurationError` when an object is built, or a method
    called, with arguments that cannot work, `FormatError` when a reader is
    given a payload that is not its format. Any other exception from hyoshigi's own code is a bug.
-9. **Docstrings and comments say what the code does now, and stay dry.**
-   History belongs in git and in the recorded decisions.
+9. **Docstrings and comments say what the code does, minimally, and stay dry.**
+   Short plain sentences state the behaviour and the contract a caller needs: a
+   formula, what raises, the format a parser reads. They give no rationale. A
+   source is named only where the code implements its definition, in plain text
+   with its locator, as in "Vovk et al. 2016, sec. 2, eq. 2", and never as
+   `[@key]`. Where a reason exists, the docstring ends with the URL of the docs
+   page that gives the reason and its sources, in angle brackets, such as
+   `<https://omamori-lab.github.io/hyoshigi/explanation/failing-closed/>`. It is
+   a URL because the wheel carries no `docs/` folder, and the API page renders it
+   as a link. History belongs in git and in the recorded decisions.
 10. **Design patterns we keep.** Monitors and protocols hold configuration
     only, never state between calls; the state is the trajectory. Behaviour
     that varies is a strategy object or an enum, never a bool or a plain

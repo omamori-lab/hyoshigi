@@ -36,9 +36,10 @@ scripts/check.sh
 
 It scans for secrets with gitleaks and `.gitleaks.toml`, then runs ruff, the
 spread check, ty (type checking), the test suite and the lanorme standards
-(naming, complexity, docstrings, prose), builds the package and imports the
-built wheel in a fresh environment. CI runs the same script on Python 3.12,
-3.13 and 3.14, and scans the whole history for secrets.
+(naming, complexity, docstrings, prose), builds the docs site with
+`--strict`, builds the package and imports the built wheel in a fresh
+environment. CI runs the same script on Python 3.12, 3.13 and 3.14, and
+scans the whole history for secrets.
 
 The domain is mutation-tested: run `uv run --group dev mutmut run`, then
 `uv run --group dev mutmut results`, and explain every surviving mutant in
@@ -54,6 +55,22 @@ fired, run `uvx --python 3.13 lanorme==0.21.1 rule CODE`. Its limits in
 `pyproject.toml` are a ratchet: meet them by naming steps or sharing a
 helper. A limit rises only in a reviewed change that says why, as the line
 limits did when every call of two or more items was spread one per line.
+
+## Documentation
+
+The site is built with MkDocs from `docs/` and deployed to GitHub Pages from
+`main` by the Docs workflow, which needs the repository's Pages source set to
+GitHub Actions. Its citations are formatted by Pandoc 2.11 or newer, which the
+docs build needs on your `PATH`, for example from `brew install pandoc`.
+
+A docs page cites a source as `[@key, sec. 3.2]`: the key of its entry in
+`docs/references.bib`, then the locator, inside the same brackets and on one
+line.
+
+- `sec.`, `secs.`, `p.`, `pp.` and `fig.` are written plainly.
+- An appendix, equation or table goes in braces: `[@key, {Appendix C}]`.
+- A named section has its label in braces: `[@key, {Section} "How it works"]`.
+- A chapter follows empty braces: `[@key, {}Chapter 3]`.
 
 ## Sending a pull request
 
