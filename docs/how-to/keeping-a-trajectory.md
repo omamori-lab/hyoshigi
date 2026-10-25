@@ -82,8 +82,8 @@ trajectory. The comparison with a threshold is the scaffold's own code. A score 
 has the value 1.0, so `score.value >= threshold` blocks it under every threshold up to 1.0
 ([Handling a failed rating](handling-a-failed-rating.md)).
 
-The scripted agent proposes a rename and then an upload, and the scripted monitor rates them 1 and
-9:
+The scripted agent proposes a rename and then an upload, the scripted monitor rates them 1 and 9,
+and each tool result is the placeholder `ran`:
 
 ```python
 RENAME = ToolCall(
@@ -239,8 +239,8 @@ Only the user, or the delegator inside a subagent's trajectory, authorises what 
 ([what the default prompt asks](../explanation/the-default-prompt.md)). A tool's result written as
 `Observation(author=Author.TOOL, ...)` is a context note, so a tool result is always a
 `ToolObservation`. [The default view](../explanation/the-default-view.md) lists the channel of each
-reading. `observe` records a `ToolObservation` whatever its `call_id`, so the scaffold pairs each
-result with its call:
+reading. `observe` records a `ToolObservation` whatever its `call_id`, and checks it against no
+recorded call, so pairing each result with its call is the scaffold's job:
 
 ```python
 notes = Trajectory()

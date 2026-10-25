@@ -9,7 +9,7 @@ formats](../reference/formats.md) gives what each role, item and block becomes.
 
 A request is the JSON body the harness sent, as a `dict`. A reader ignores the keys it does not use,
 such as `model` and `tools`. `Action.from_openai_chat` takes the response's assistant message,
-`choices[0].message`, `Action.from_anthropic` takes the whole response, and
+`choices[0].message`. `Action.from_anthropic` takes the whole response, and
 `Action.from_open_responses` takes the response's `output` list. The monitor rates each action
 before the harness runs its tool calls:
 

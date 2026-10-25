@@ -257,7 +257,8 @@ print("\n".join(thinking.proposed_action))
 
 ## A channel left out of the view is not read
 
-A view reads only the channels it names. `View(channels=Channel.TOOL_CALLS)` reads the tool calls
+Of the trajectory, a view reads only the channels it names; the rated action keeps its parts and
+tool calls under every view. `View(channels=Channel.TOOL_CALLS)` reads the trajectory's tool calls
 and their errors, and leaves out the user's task:
 
 ```python
