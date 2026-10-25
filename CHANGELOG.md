@@ -35,8 +35,12 @@ minor version.
   still fails the rating closed, with its cause even after an unanswered
   sample or call. `Labels.unavailable` keeps the unanswered samples, which
   `Trajectory.dump` writes and `load` reads; a dump written without them
-  loads with none. A `Composite` fails closed by the same rule, which
+  loads with none, and 0.1.0 cannot read a stored mean of the calls that
+  answered. A `Composite` fails closed by the same rule, which
   `failed_closed` and the cause on a span or a report follow.
+- A completed reply from OpenAI or OpenRouter that holds no message is an
+  empty generation, which a monitor reads as unreadable, as an empty
+  Anthropic reply already was, so it is no longer set aside as unavailable.
 
 ### Fixed
 

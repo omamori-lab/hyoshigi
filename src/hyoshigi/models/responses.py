@@ -165,9 +165,9 @@ def read_reply(body: JSON) -> GenerationOutcome:
 
 
 def read_completed(messages: list[Message]) -> GenerationOutcome:
-    """A completed reply: its first refusal if it holds one, nothing readable if it holds no
-    message, the text so far if a message was not completed or held a part of another type,
-    else the text.
+    """A completed reply: its first refusal if it holds one, the text so far if a message was
+    not completed or held a part of another type, else the text, which is empty when it holds
+    no message.
     """
     refusals = [
         piece
@@ -180,8 +180,6 @@ def read_completed(messages: list[Message]) -> GenerationOutcome:
     ]
     if refusals:
         return refusals[0]
-    if not messages:
-        return Unavailable()
     if all(message.whole for message in messages):
         return Generation(text=join_text(messages))
     return Truncated(text=join_text(messages))
