@@ -814,6 +814,20 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
             },
             "$.subagents['call_7']",
         ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [],
+                "subagents": {
+                    7: {
+                        **ENVELOPE,
+                        "history": [],
+                    },
+                },
+            },
+            "$.subagents",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "not-a-mapping",
@@ -836,6 +850,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "malformed-second-subagent",
         "malformed-subagent-of-a-subagent",
         "subagent-without-its-call",
+        "subagent-keyed-by-a-number",
     ],
 )
 def test_loading_a_malformed_payload_raises_format_error_at_its_path(
