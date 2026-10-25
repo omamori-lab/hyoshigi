@@ -22,6 +22,9 @@ minor version.
 - Docs pages on choosing a monitor, rating with an LLM monitor, rating with a
   decision model, and what the default prompt asks, with the reasons and
   sources the `llm.py`, `decision.py` and `prompts.py` docstrings held.
+- Docs pages on what a trajectory is, keeping one, reading an agent's own
+  format, and choosing what a monitor reads, and a reference page on what
+  each provider format's roles, items and blocks become.
 
 ### Fixed
 
