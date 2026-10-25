@@ -13,6 +13,8 @@ minor version.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-25
+
 ### Added
 
 - A documentation site at <https://omamori-lab.github.io/hyoshigi/>: a tutorial, a how-to on failed
@@ -129,3 +131,6 @@ minor version.
 - The README's Claude Haiku 5.5 examples set `max_tokens` to 4096. The model
   thinks before it answers, and at 1024 tokens a rating could be cut off and
   fail closed.
+
+[Unreleased]: https://github.com/omamori-lab/hyoshigi/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/omamori-lab/hyoshigi/releases/tag/v0.1.0
