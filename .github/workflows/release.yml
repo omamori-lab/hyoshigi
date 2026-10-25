@@ -12,6 +12,8 @@ name: Release
 #      trusted publishing, so no token is stored;
 #   5. checks the files against the digests again, creates the GitHub Release
 #      and attaches the built distributions to it.
+# After a failure past the upload, re-run the failed jobs only. A full re-run
+# builds new files, which PyPI refuses because it holds the release already.
 # These checks guard against mistakes. Someone with write access could tag a
 # commit whose own copy of this file drops them, so the real controls are the
 # required reviewers on the "pypi" environment and the v* tag ruleset.
