@@ -24,6 +24,7 @@ from hyoshigi.trajectory.storage import (
     dump_score,
     load_event,
     load_score,
+    select_member,
 )
 
 
@@ -446,22 +447,23 @@ class Trajectory:
         """Load the subagents of a trajectory `depth` levels deep. A subagent deeper than
         NESTING_LIMIT raises FormatError.
         """
-        for index, (
-            call_id,
-            data,
-        ) in enumerate(subagents.items()):
+        for call_id, data in subagents.items():
+            subagent_path = select_member(
+                call_id,
+                path=path,
+            )
             if call_id not in self._call_ids:
                 raise FormatError(
-                    path=f"{path}[{index}]",
+                    path=subagent_path,
                     expected="a subagent under a tool call in the history",
                 )
             if depth == NESTING_LIMIT:
                 raise FormatError(
-                    path=f"{path}[{index}]",
+                    path=subagent_path,
                     expected=f"subagents nested at most {NESTING_LIMIT} deep",
                 )
             self._subagents[call_id] = Trajectory._load(
                 data,
-                path=f"{path}[{index}]",
+                path=subagent_path,
                 depth=depth + 1,
             )
