@@ -191,7 +191,7 @@ earlier turns in the context they give their model:
 |---|---|
 | SWE-agent | Each observation before the last five, collapsed into one line [@yang2024sweagent, sec. 3] |
 | Observation masking | A placeholder for each observation older than a window of turns [@lindenbauer2025complexity, {Equation 4}] |
-| LLM summary | A summary of the older turns, written by a summariser model [@lindenbauer2025complexity, {Equation 6}] |
+| LLM summary | A summary of the older turns, written by a summariser model [@lindenbauer2025complexity, {Equations 5 and 6}] |
 | OpenHands Software Agent SDK | Summaries in place of the events its condenser drops [@wang2025openhandssdk, sec. 4.6] |
 | Codex | A smaller list of items, with an opaque, encrypted compaction item [@bolin2026codexloop, {Section} "Performance considerations"] |
 | Compaction for Claude | A summary of the context window [@martin2026managedagents, {Section} "The session is not Claude’s context window"] |
@@ -243,7 +243,8 @@ gives the default and its evidence.
 `Trajectory.from_anthropic`, `from_openai_chat` and `from_open_responses` read
 the request a scaffold sent to the agent's model. The trajectory then holds
 the agent's context as sent, condensed or whole. In the Open Responses format,
-a compaction item becomes an observation by `AGENT`, from `compaction`, with
+a compaction item [@openresponses2026openapi, {Section} "CompactionSummaryItemParam"]
+becomes an observation by `AGENT`, from `compaction`, with
 one opaque part:
 
 ```python

@@ -19,10 +19,12 @@ leaves out `CONTEXT`.
 ## OpenAI chat completions
 
 `Trajectory.from_openai_chat` reads the `messages` of a chat completions request
-[@openai2026openapi, {Section} "ChatCompletionRequestMessage"]. `Action.from_openai_chat` reads the
-response's assistant message, `choices[0].message`
-[@openai2026openapi, {Section} "ChatCompletionResponseMessage"], and raises `FormatError` on a
-message of another role. OpenAI's response message has no reasoning field. The fields `reasoning`,
+[@openai2026openapi, {Section} "CreateChatCompletionRequest"], each a message of one of the roles
+[@openai2026openapi, {Section} "ChatCompletionRequestMessage"] that the first table lists.
+`Action.from_openai_chat` reads the response's assistant message, `choices[0].message`
+[@openai2026openapi, {Section} "CreateChatCompletionResponse"], and raises `FormatError` on a
+message of another role. OpenAI's response message has no reasoning field
+[@openai2026openapi, {Section} "ChatCompletionResponseMessage"]. The fields `reasoning`,
 `reasoning_details` and `images` are OpenRouter's
 [@openrouter2026openapi, {Section} "ChatAssistantMessage"].
 
@@ -144,8 +146,9 @@ among an action's parts fails the rating closed.
 ## Open Responses
 
 `Trajectory.from_open_responses` reads a request's `instructions`, `previous_response_id` and
-`input`, a string or a list of items. `Action.from_open_responses` reads the `output` list of a
-response. Items are polymorphic, discriminated by `type` [@openresponses2026spec, {Section} "Items"].
+`input`, a string or a list of items [@openresponses2026openapi, {Section} "CreateResponseBody"].
+`Action.from_open_responses` reads the `output` list of a response
+[@openresponses2026openapi, {Section} "ResponseResource"]. Items are polymorphic, discriminated by `type` [@openresponses2026spec, {Section} "Items"].
 A request's consecutive items that the model wrote, which are reasoning, function calls and assistant
 messages, become one action, and any other item ends it. Every item of an output becomes part of one
 action.
@@ -167,8 +170,9 @@ action.
 | an `item_reference` item, whose `type` may be null or absent | an observation by `UNKNOWN` with one opaque part of kind `item_reference` | `CONTEXT`, and the opaque part with `TOOL_CALLS` |
 | an item of any other type, such as `openai:web_search_call` | an observation by `UNKNOWN` with one opaque part of that type | `CONTEXT`, and the opaque part with `TOOL_CALLS` |
 
-A message item may omit `type`. An item with a `role` and no `type` is a message, and an item with an
-`id` and no `type` is an item reference. An output item of a type the model did not write, such as a
+The reader reads a request's item with a `role` and no `type` as a message, and an item with an `id`
+and no `type` as an item reference, whose `type` is optional
+[@openresponses2026openapi, {Section} "ItemReferenceParam"]. An output item of a type the model did not write, such as a
 tool the provider ran, becomes an opaque part among the action's parts, so the rating fails closed.
 An output message that is not the assistant's, an item without a type, or output that is not a list
 raises `FormatError`. Provider-specific item types carry the provider's prefix
