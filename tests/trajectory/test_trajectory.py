@@ -362,7 +362,6 @@ def test_a_refused_rating_leaves_the_ratings_unchanged(reading: Trajectory) -> N
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_splitting_the_latest_step_returns_its_action(reading: Trajectory) -> None:
     step = reading.split_latest_step()
 
@@ -372,7 +371,6 @@ def test_splitting_the_latest_step_returns_its_action(reading: Trajectory) -> No
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_splitting_the_latest_step_returns_the_trajectory_before_it(reading: Trajectory) -> None:
     step = reading.split_latest_step()
 
@@ -399,7 +397,6 @@ def test_splitting_the_latest_step_leaves_the_trajectory_unchanged(reading: Traj
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_trajectory_before_the_latest_step_can_take_its_action(reading: Trajectory) -> None:
     step = reading.split_latest_step()
 
@@ -417,7 +414,6 @@ def test_the_trajectory_before_the_latest_step_can_take_its_action(reading: Traj
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_splitting_the_latest_step_keeps_only_the_ratings_of_earlier_actions(
     reading: Trajectory,
 ) -> None:
@@ -448,7 +444,6 @@ def test_splitting_the_latest_step_keeps_only_the_ratings_of_earlier_actions(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_splitting_the_latest_step_keeps_only_the_subagents_of_earlier_calls(
     delegating: Trajectory,
 ) -> None:
@@ -478,7 +473,6 @@ def test_splitting_the_latest_step_keeps_only_the_subagents_of_earlier_calls(
     assert list(step.trajectory.subagents) == ["call_7"]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "trajectory",
     [

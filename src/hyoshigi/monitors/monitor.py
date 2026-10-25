@@ -34,9 +34,10 @@ class Monitor(ABC):
 
         A trajectory whose latest entry is not an action raises ConfigurationError.
         """
+        step = trajectory.split_latest_step()
         return self.rate(
-            Action(),
-            trajectory=trajectory,
+            step.action,
+            trajectory=step.trajectory,
         )
 
 
@@ -67,7 +68,8 @@ class AsyncMonitor(ABC):
 
         A trajectory whose latest entry is not an action raises ConfigurationError.
         """
+        step = trajectory.split_latest_step()
         return await self.rate(
-            Action(),
-            trajectory=trajectory,
+            step.action,
+            trajectory=step.trajectory,
         )
