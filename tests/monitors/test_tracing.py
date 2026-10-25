@@ -583,7 +583,6 @@ def build_two_of_two_calls(
                 build_reply(3),
             ),
             id="a-refusal-after-an-unavailable-call",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_two_of_two_calls,
@@ -594,7 +593,6 @@ def build_two_of_two_calls(
                 Refused(),
             ),
             id="a-refusal-after-an-unavailable-call-of-a-nested-wrapper",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -628,7 +626,6 @@ def test_a_wrapper_that_failed_closed_names_the_cause_of_the_part_it_failed_clos
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_span_of_a_mean_of_the_calls_that_answered_names_no_cause(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],

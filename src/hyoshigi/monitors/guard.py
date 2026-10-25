@@ -62,15 +62,20 @@ class GuardMonitor(Monitor):
     `prompt` states the caller's policy and should ask for one label in the guard's format;
     it is built with the bounds 0 and 1, which it need not use. `labels` names the guard's
     labels and where it writes them. A reply with no readable label, an ambiguous one, one
-    cut off at the model's output limit, a refusal or an unavailable model fails the rating
-    closed, the first such sample in order giving the cause. The samples differ only when the
-    model's temperature is above zero.
+    cut off at the model's output limit or a refusal fails the rating closed, the first such
+    sample in order giving the cause. A sample the model left unanswered, Unavailable, is set
+    aside: when more than half the samples answered, the score is the share of them labelled
+    suspicious, with the unanswered ones in its evidence; otherwise the rating fails closed
+    with the first unanswered sample. The samples differ only when the model's temperature is
+    above zero.
 
     The explanation names the guard's finding with no count: the first suspicious label among
     the replies, else the first safe label.
     `samples` is a whole number from 1 to sys.maxsize, kept as an int; with 1 every score is
     0 or 1, and building the monitor warns with HardLabelWarning. An option that cannot work
     raises ConfigurationError when the monitor is built.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/failing-closed/>
     """
 
     model: GenerativeModel
@@ -200,7 +205,9 @@ def plan_guard(
     """Plan the rating: render the action, ask the guard every sample at once, score the labels.
 
     Content the model cannot perceive fails closed before it is asked; after, the first sample
-    that is unreadable, cut off, refused or unavailable fails closed with that cause.
+    that is unreadable, cut off or refused fails closed with that cause. The labels of the
+    samples that answered are scored when more than half answered; otherwise the rating fails
+    closed with the first unavailable sample.
     """
     name = monitor.model.name
     rendering = render(
@@ -221,6 +228,7 @@ def plan_guard(
     )
     outcomes = yield (request,) * monitor.samples
     labels: list[str] = []
+    unavailable: list[Unavailable] = []
     for outcome in outcomes:
         match _read_sample(
             outcome,
@@ -228,7 +236,9 @@ def plan_guard(
         ):
             case str(label):
                 labels.append(label)
-            case Unreadable() | Truncated() | Refused() | Unavailable() as failure:
+            case Unavailable() as failure:
+                unavailable.append(failure)
+            case Unreadable() | Truncated() | Refused() as failure:
                 return fail_closed(
                     failure,
                     model=name,
@@ -239,6 +249,7 @@ def plan_guard(
         Labels(
             model=name,
             labels=tuple(labels),
+            unavailable=tuple(unavailable),
             hidden_reasoning=rendering.hidden_reasoning,
         ),
         suspicious=monitor.labels.suspicious,
@@ -268,7 +279,16 @@ def _score_labels(
     *,
     suspicious: frozenset[str],
 ) -> SuspicionScore:
-    """Score the share of suspicious labels, explained by the first one, else the first label."""
+    """Score the share of suspicious labels, explained by the first one, else the first label.
+
+    When no more samples answered than got no answer, the score fails closed as the first
+    unavailable sample.
+    """
+    if len(evidence.labels) <= len(evidence.unavailable):
+        return fail_closed(
+            evidence.unavailable[0],
+            model=evidence.model,
+        )
     flagged = [label for label in evidence.labels if label in suspicious]
     explanation = _explain_label(
         (flagged or evidence.labels)[0],

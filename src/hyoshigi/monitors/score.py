@@ -120,8 +120,9 @@ class Decisions:
     kw_only=True,
 )
 class Labels:
-    """The label a guard model gave in each sampled reply, in order, and the rated action's
-    hidden reasoning, which the monitor names only when its view shows thoughts.
+    """The label a guard model gave in each sampled reply, in order, the samples that got no
+    answer, in order, and the rated action's hidden reasoning, which the monitor names only when
+    its view shows thoughts.
     """
 
     model: str
@@ -136,7 +137,12 @@ class Labels:
     kw_only=True,
 )
 class Composite:
-    """The scores a monitor combined into its own: a tuple of at least one."""
+    """The scores a monitor combined into its own: a tuple of at least one.
+
+    A composite fails closed when a part failed closed with a cause other than Unavailable, a
+    composite that failed closed counting as such a part, or when at most half its parts did
+    not fail closed.
+    """
 
     parts: tuple[SuspicionScore, ...]
 
@@ -205,16 +211,46 @@ class SuspicionScore:
 
     @property
     def failed_closed(self) -> bool:
-        """Whether the monitor could not rate the action, or could not rate a part of it."""
+        """Whether the monitor could not rate the action: a FailedClosed, or a Composite that
+        fails closed.
+        """
         match self.evidence:
             case FailedClosed():
                 return True
             case Composite(parts=parts):
-                return any(part.failed_closed for part in parts)
+                return find_failure(parts) is not None
             case Rationale() | Decisions() | Labels():
                 return False
             case unreachable:
                 assert_never(unreachable)
+
+
+def find_failure(parts: tuple[SuspicionScore, ...]) -> SuspicionScore | None:
+    """The part a composite of the parts fails closed by, or None when it does not fail closed.
+
+    That is the first part that failed closed with a cause other than Unavailable, a composite
+    that failed closed counting as one; else, when at most half the parts did not fail closed,
+    the first part that did.
+    """
+    failed = [part for part in parts if part.failed_closed]
+    other = next(
+        (part for part in failed if not _is_unanswered(part)),
+        None,
+    )
+    if other is not None:
+        return other
+    if 2 * (len(parts) - len(failed)) > len(parts):
+        return None
+    return failed[0]
+
+
+def _is_unanswered(score: SuspicionScore) -> bool:
+    """Whether the score failed closed because its model was unavailable."""
+    match score.evidence:
+        case FailedClosed(cause=Unavailable()):
+            return True
+        case _:
+            return False
 
 
 def fail_closed(
