@@ -448,10 +448,17 @@ class Trajectory:
         NESTING_LIMIT raises FormatError.
         """
         for call_id, data in subagents.items():
-            subagent_path = select_member(
-                call_id,
-                path=path,
-            )
+            match call_id:
+                case str():
+                    subagent_path = select_member(
+                        call_id,
+                        path=path,
+                    )
+                case _:
+                    raise FormatError(
+                        path=path,
+                        expected="subagents keyed by tool call id",
+                    )
             if call_id not in self._call_ids:
                 raise FormatError(
                     path=subagent_path,
