@@ -1,5 +1,7 @@
-"""The built docs site: every citation on its pages is rendered."""
+"""The built docs site: every citation on its pages is rendered, and every page a docstring
+links to is built."""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -7,6 +9,8 @@ from pathlib import Path
 import pytest
 
 REPOSITORY = Path(__file__).resolve().parents[2]
+# A docstring ends with the URL of the docs page that gives its reasons (AGENTS.md, rule 9).
+DOCSTRING_LINK = re.compile(r"<https://omamori-lab\.github\.io/hyoshigi/([^>]*)>")
 
 
 @pytest.fixture(scope="module")
@@ -49,3 +53,20 @@ def test_no_built_page_shows_citation_markup(
     showing = sorted(path for path, text in built_pages.items() if markup in text)
 
     assert showing == []
+
+
+def read_docstring_links() -> set[str]:
+    """Return the path, under the site, of every page a module in src/ links to."""
+    return {
+        path
+        for module in (REPOSITORY / "src").rglob("*.py")
+        for path in DOCSTRING_LINK.findall(module.read_text(encoding="utf-8"))
+    }
+
+
+def test_every_page_a_docstring_links_to_is_built(built_pages: dict[str, str]) -> None:
+    links = read_docstring_links()
+
+    missing = sorted(path for path in links if f"{path}index.html" not in built_pages)
+
+    assert missing == []
