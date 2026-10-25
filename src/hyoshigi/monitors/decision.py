@@ -1,20 +1,10 @@
 """Decision monitors: rate a proposed action by asking a decision model statements.
 
-The monitor asks whether statements about the trajectory and the proposed action hold,
-and aggregates the probabilities into a suspicion score. Aggregation by maximum lets any
-single criterion raise suspicion, the right shape for threat criteria, and the way
-ShieldGemma turns its harm types into one binary outcome when it evaluates them (Zeng et
-al., "ShieldGemma: Generative AI Content Moderation Based on Gemma", arXiv:2407.21772,
-section 5.1). A mean dilutes one strong hit that the maximum keeps: 0.95 with three 0.05s
-averages 0.275.
+The monitor asks whether statements about the trajectory and the proposed action hold, and
+aggregates the probabilities into a suspicion score, by their maximum unless `aggregation`
+says otherwise.
 
-Taking the maximum of raw probabilities differs from control evaluations that aggregate
-on the honest scale: LinuxArena turns each monitor's score into a percentile rank
-against its honest distribution and then takes the maximum (Tracy et al., "LinuxArena: A
-Control Setting for AI Agents in Live Production Software Environments", arXiv:2604.15384,
-appendix C), and AI Control maps each score through the empirical distribution of honest
-scores before aggregating (Greenblatt et al., "AI Control: Improving Safety Despite
-Intentional Subversion", arXiv:2312.06942, appendix K).
+<https://omamori-lab.github.io/hyoshigi/how-to/rating-with-a-decision-model/>
 """
 
 from dataclasses import dataclass, field

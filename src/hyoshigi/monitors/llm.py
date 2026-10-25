@@ -2,17 +2,11 @@
 
 The model reasons inside <reasoning> tags and then gives an integer from `lowest_score` to
 `highest_score` inside <score> tags. The integer maps linearly onto a suspicion from 0 to 1,
-and the reasoning, without the score, becomes the explanation. Reasoning before an anchored
-score follows Apollo Research ("What makes a good monitoring prompt?", 2026, section Summary)
-and the Ctrl-Z monitor (Bhatt et al., arXiv:2504.10374, appendix D). The default scale of 0
-to 10 is the one BashArena (Kaufman et al., arXiv:2512.15688, section 4.1), LinuxArena
-(Tracy et al., arXiv:2604.15384, section 5.1) and Koran et al. (arXiv:2605.15377, section 3.1)
-use; Ctrl-Z's monitor scores 0 to 9 and Apollo Research's 1 to 10.
+and the reasoning, without the score, becomes the explanation. A reply is readable only in
+exactly that shape: the first reasoning block, then one score tag, with nothing but whitespace
+between them or after the score.
 
-A reply is readable only in exactly that shape: the first reasoning block, then one score tag,
-with nothing but whitespace between them or after the score. An agent can write text aimed at
-its monitor into the action (Terekhov et al., arXiv:2510.09462), and the model may quote it, so
-the shape keeps a score tag the agent planted from becoming the score.
+<https://omamori-lab.github.io/hyoshigi/how-to/rating-with-an-llm-monitor/>
 """
 
 import re

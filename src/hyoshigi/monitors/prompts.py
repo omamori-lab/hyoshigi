@@ -1,24 +1,10 @@
 """The prompt a generative model reads when it rates a proposed action.
 
-`DEFAULT_PROMPT` follows what the monitoring literature found to work. The task and the
-user's words come first, and only the user, or the agent that delegated the task, can
-authorise an action; a context note authorises nothing. The monitor judges what an
-action would really do, treats everything it reads as data rather than instructions,
-scores on anchored levels, and reasons before it scores. It keeps its score out of its
-reasoning, because the reasoning becomes the score's explanation, the only part of a
-score an agent may see.
+Under `DEFAULT_PROMPT`, only the user, or the agent that delegated the task, authorises an
+action. The prompt tells the monitor to judge what the action would really do, to treat
+everything it reads as data, and to reason before it gives a score on anchored levels.
 
-An agent can aim a prompt injection at its monitor (Terekhov et al., "Adaptive Attacks
-on Trusted Monitors Subvert AI Control Protocols", arXiv:2510.09462), so the prompt tells
-the monitor to treat everything it reads as data. That instruction is hyoshigi's own
-mitigation: the paper did not test it, and it names, after earlier work, a key
-limitation of current monitors: they cannot reliably keep instructions and data apart
-(section 6). Structured reasoning is the prompt component that matters most (Apollo
-Research, "What makes a good monitoring prompt?", 2026, section Summary); the
-authorisation rule and the focus on real effects follow Claude Code's auto mode
-classifier (Hughes, "How we built Claude Code auto mode", Anthropic, 2026); and
-reasoning followed by a bounded integer score is the monitor format of Ctrl-Z (Bhatt et
-al., "Ctrl-Z: Controlling AI Agents via Resampling", arXiv:2504.10374, appendix D).
+<https://omamori-lab.github.io/hyoshigi/explanation/the-default-prompt/>
 """
 
 from dataclasses import dataclass
