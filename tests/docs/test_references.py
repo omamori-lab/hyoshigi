@@ -7,9 +7,10 @@ import bibtexparser
 from bibtexparser.model import Entry
 
 DOCS = Path(__file__).resolve().parents[2] / "docs"
-# A citation group is a bracket that opens with a key, as [@key, sec. 3.2] or [@first; @second].
-CITATION_GROUP = re.compile(r"\[(@[^\]\n]+)\]")
-CITATION_KEY = re.compile(r"@([A-Za-z0-9_:-]+)")
+# A citation group is a bracket on one line that holds a key, as [@key, sec. 3.2], [see @key] or
+# [@first; @second]. A key's @ never follows a letter, a digit or a dot, as an email's does.
+CITATION_GROUP = re.compile(r"\[([^\[\]\n]*@[^\]\n]+)\]")
+CITATION_KEY = re.compile(r"(?<![\w.])-?@([A-Za-z0-9_:-]+)")
 
 
 def read_entries() -> list[Entry]:
