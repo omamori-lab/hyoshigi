@@ -116,3 +116,7 @@ minor version.
   its cause's class and its models. Nothing is sent when the span is not
   sampled or no tracer provider records it; a report that fails is logged by
   its class and error type, and the score is returned either way.
+
+### Changed
+
+- The package is marked as alpha on PyPI (`Development Status :: 3 - Alpha`).
