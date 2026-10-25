@@ -1408,7 +1408,6 @@ def test_a_completed_response_without_a_message_is_an_empty_generation(
     assert outcome == Generation(text="")
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "part",
     [

@@ -20,17 +20,9 @@ from __future__ import annotations
 import functools
 from collections.abc import Generator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
-from typing import TYPE_CHECKING, assert_never
+from typing import TYPE_CHECKING
 
-from hyoshigi.monitors.score import (
-    Composite,
-    Decisions,
-    FailedClosed,
-    Labels,
-    Rationale,
-    SuspicionScore,
-    find_failure,
-)
+from hyoshigi.monitors.score import SuspicionScore, find_cause
 
 if TYPE_CHECKING:
     from opentelemetry.trace import Span, Tracer
@@ -127,13 +119,5 @@ def name_cause(score: SuspicionScore) -> str | None:
     A composite's cause is that of the part it fails closed by, searched depth first, as a
     RepeatedMonitor's explanation is that part's.
     """
-    match score.evidence:
-        case FailedClosed(cause=cause):
-            return type(cause).__name__
-        case Composite(parts=parts):
-            failure = find_failure(parts)
-            return None if failure is None else name_cause(failure)
-        case Rationale() | Decisions() | Labels():
-            return None
-        case unreachable:
-            assert_never(unreachable)
+    cause = find_cause(score)
+    return None if cause is None else type(cause).__name__

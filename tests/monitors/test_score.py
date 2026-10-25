@@ -223,7 +223,6 @@ def test_a_score_combining_one_that_failed_closed_reports_it(
                 evidence=Composite(parts=(UNANSWERED,)),
             ),
             id="a-composite-failed-by-a-part-whose-model-was-unavailable",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

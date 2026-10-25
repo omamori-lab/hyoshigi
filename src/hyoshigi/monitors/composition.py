@@ -55,9 +55,9 @@ class RepeatedMonitor(Monitor):
     calls differ only when the wrapped monitor's model samples, so it needs a temperature
     above zero.
 
-    A call that failed closed because its model was unavailable is set aside. A call that
-    failed closed with any other cause, or whose composite score failed closed, fails the
-    whole score closed: the value is 1.0 and the explanation the first such call's.
+    A call whose score failed closed with Unavailable is set aside, a composite score counting
+    by the cause it failed closed with. A call that failed closed with any other cause fails
+    the whole score closed: the value is 1.0 and the explanation the first such call's.
     Otherwise, when more than half the calls did not fail closed, the value is the mean of
     their values, rounded to `MEAN_DECIMAL_PLACES`, and the explanation the most suspicious
     one's, the first of a tie; when at most half did, the score fails closed with the first

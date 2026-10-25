@@ -789,7 +789,6 @@ def test_at_most_half_the_calls_answering_fails_the_whole_score_closed(
 
 
 # The inner monitor makes two calls, so each inner call takes two outcomes in turn.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "value", "explanation", "failed_closed"),
     [

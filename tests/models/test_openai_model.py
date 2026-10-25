@@ -1168,7 +1168,6 @@ def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
     assert exchange.outcome == Refused(explanation="final refusal text")
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "part",
     [
