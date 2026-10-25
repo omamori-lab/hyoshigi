@@ -26,6 +26,19 @@ class Monitor(ABC):
         failed closed; it never raises for a failure the domain expects.
         """
 
+    def rate_latest_step(
+        self,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
+        """Rate the trajectory's latest action against everything before it.
+
+        A trajectory whose latest entry is not an action raises ConfigurationError.
+        """
+        return self.rate(
+            Action(),
+            trajectory=trajectory,
+        )
+
 
 class AsyncMonitor(ABC):
     """A monitor that rates an action by awaiting its models.
@@ -45,3 +58,16 @@ class AsyncMonitor(ABC):
         The action is not yet in the trajectory. A rating that fails returns a score that
         failed closed; it never raises for a failure the domain expects.
         """
+
+    async def rate_latest_step(
+        self,
+        trajectory: Trajectory,
+    ) -> SuspicionScore:
+        """Rate the trajectory's latest action against everything before it.
+
+        A trajectory whose latest entry is not an action raises ConfigurationError.
+        """
+        return await self.rate(
+            Action(),
+            trajectory=trajectory,
+        )
