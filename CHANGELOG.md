@@ -122,8 +122,7 @@ minor version.
 
 - A prompt over the model's context window now fails the rating closed, as
   `Unavailable` with status 400, on the OpenRouter and Anthropic adapters, as it
-  already did on OpenAI's. Before, it raised `ConfigurationError`. Any other
-  rejected request still raises.
+  already did on OpenAI's. Before, it raised `ConfigurationError`.
 - The README's Claude Haiku 5.5 examples set `max_tokens` to 4096. The model
-  thinks before it answers, and at 1024 tokens 21 of 60 ratings were cut off
-  and failed closed.
+  thinks before it answers, and at 1024 tokens a rating could be cut off and
+  fail closed.
