@@ -92,9 +92,11 @@ live_score = live_monitor.rate(
 
 ## The score holds a value, an explanation and evidence
 
-The value is 0.7, the reply's 7 on the scale from 0 to 10 mapped linearly onto 0 to 1. BashArena's
-monitors rate on the same scale [@kaufman2025basharena, sec. 4.1]. The explanation is the reasoning
-without the score, and it is the only part of a score written to be shown to the agent.
+The value is 0.7, the reply's 7 on the scale from 0 to 10 mapped linearly onto 0 to 1. LinuxArena's
+monitor rates on the same scale [@tracy2026linuxarena, sec. 5.1]. The explanation is the reasoning
+without the score. A scaffold that tells the agent why an action was stopped shows it the
+explanation, and [the default prompt](../explanation/the-default-prompt.md) asks the model to keep
+the score out of its reasoning.
 
 The evidence records what the score rests on. An `LLMMonitor` records a `Rationale`. It names the
 model that wrote the reasoning, and its `hidden_reasoning` lists the kinds of reasoning the rated

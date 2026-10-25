@@ -19,6 +19,16 @@ minor version.
   against everything before it, so a transcript that ends in the agent's
   reply needs no split by hand. `Trajectory.split_latest_step` returns that
   action and the trajectory before it as a `Step`.
+- Docs pages on choosing a monitor, rating with an LLM monitor, rating with a
+  decision model, and what the default prompt asks, with the reasons and
+  sources the `llm.py`, `decision.py` and `prompts.py` docstrings held.
+
+### Fixed
+
+- The first-rating tutorial named BashArena for the 0 to 10 scale, though the
+  monitor prompt BashArena prints asks for 0 to 9, and it called the
+  explanation the only part of a score shown to the agent. hyoshigi shows the
+  agent nothing; the scaffold decides.
 
 ## [0.1.0] - 2026-10-25
 
