@@ -23,14 +23,14 @@ Three kinds of monitor rate an action:
 an asynchronous twin. A tool-calling agent's own request and reply are read in the OpenAI chat
 completions, Anthropic Messages and Open Responses formats.
 
-hyoshigi is in development before its first release, and its public API can change before 1.0.0.
+hyoshigi is in alpha, and its public API can change before 1.0.0.
 
 ## Installation
 
-hyoshigi installs from GitHub, with an extra for each provider SDK it calls:
+hyoshigi installs from PyPI, with an extra for each provider SDK it calls:
 
 ```console
-pip install "hyoshigi[anthropic] @ git+https://github.com/omamori-lab/hyoshigi"
+pip install "hyoshigi[anthropic]"
 ```
 
 The core needs only the standard library of Python 3.12 or newer. Each extra brings one package:

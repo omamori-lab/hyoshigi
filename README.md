@@ -6,10 +6,10 @@ and returns a suspicion score; a control protocol decides what runs.
 
 ## Installation
 
-hyoshigi installs from GitHub, with an extra for each provider SDK it calls:
+hyoshigi installs from PyPI, with an extra for each provider SDK it calls:
 
 ```console
-pip install "hyoshigi[anthropic] @ git+https://github.com/omamori-lab/hyoshigi"
+pip install "hyoshigi[anthropic]"
 ```
 
 | Extra | Adapters |
@@ -284,9 +284,9 @@ monitor's statements. `attach` keeps a score with the action it rated, and
 
 ## Status
 
-In development, before its first release: the public API can change before
-1.0.0. hyoshigi holds trajectories, models and monitors; the control protocol
-that acts on a score is the caller's own.
+In alpha: the public API can change before 1.0.0. hyoshigi holds trajectories,
+models and monitors; the control protocol that acts on a score is the caller's
+own.
 
 ## The name
 
