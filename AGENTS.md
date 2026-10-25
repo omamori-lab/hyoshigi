@@ -43,7 +43,8 @@ langchain-sync-monitors will be rebuilt on it.
    - Data checked at a boundary (provider payloads in the format builders, a
      stored trajectory, a model's HTTP response) is validated with `match`
      mapping and class patterns, which ignore extra keys and coerce nothing,
-     and raise `FormatError` naming the path, never the input's values.
+     and raise `FormatError` naming the path, never the input's values; the
+     path may hold the input's member names, such as a subagent's call id.
    - Frozen dataclasses for values the program builds: actions, observations,
      parts, scores.
    - A TypedDict only for an exact foreign JSON shape.

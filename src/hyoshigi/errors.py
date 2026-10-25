@@ -9,8 +9,9 @@ class FormatError(ValueError):
     """A payload is not in the format its reader expects.
 
     The message names where in the payload the problem is, as a JSONPath query,
-    and what was expected there; it never quotes the payload, which can hold an
-    agent's private content.
+    and what was expected there. It quotes no value from the payload, which can
+    hold an agent's private content; the path can hold a member name, such as a
+    subagent's tool call id.
     """
 
     def __init__(

@@ -34,6 +34,16 @@ _SCORE = "a score with a value from 0 to 1, an explanation and evidence"
 _EVIDENCE = "rationale, decisions, labels, composite or failed-closed evidence"
 _DECISION = "a decision with a probability from 0 to 1 and a confidence from 0 to 1, or null"
 _CAUSE = "a cause: unreadable, unperceivable, truncated, refused or unavailable"
+_NAME_ESCAPES = {
+    **{code: f"\\u{code:04x}" for code in range(0x20)},
+    ord("\b"): "\\b",
+    ord("\t"): "\\t",
+    ord("\n"): "\\n",
+    ord("\f"): "\\f",
+    ord("\r"): "\\r",
+    ord("'"): "\\'",
+    ord("\\"): "\\\\",
+}
 
 
 def dump_event(event: Event) -> JSON:
@@ -777,3 +787,16 @@ def load_text(
                 path=path,
                 expected="text",
             )
+
+
+def select_member(
+    name: str,
+    *,
+    path: str,
+) -> str:
+    """Return the path to the member `name` of the object at `path`.
+
+    The member is named in single quotes and escaped as in a Normalized Path (RFC 9535,
+    sec. 2.7).
+    """
+    return f"{path}['{name.translate(_NAME_ESCAPES)}']"

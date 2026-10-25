@@ -50,6 +50,12 @@ minor version.
 
 ### Fixed
 
+- A `FormatError` from `Trajectory.load` inside a subagent named the subagent
+  by its position, as in `$.subagents[1]`, which is not a JSONPath query:
+  `subagents` is an object keyed by tool call id. The path now names the call
+  id, as in `$.subagents['call_8']`, escaped as RFC 9535 escapes a member name
+  in a Normalized Path. A `FormatError` quotes no value from the payload, but
+  its path can hold a member name.
 - The first-rating tutorial named BashArena for the 0 to 10 scale, though the
   monitor prompt BashArena prints asks for 0 to 9, and it called the
   explanation the only part of a score shown to the agent. hyoshigi shows the

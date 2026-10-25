@@ -735,7 +735,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 },
             },
             "$.subagents['call_7'].history[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -764,7 +763,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 },
             },
             "$.subagents['call_8'].history[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -809,7 +807,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 },
             },
             "$.subagents['call_8'].subagents['call_9'].history[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -823,7 +820,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 },
             },
             "$.subagents['call_7']",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -861,7 +857,6 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
 
 # Each expected path writes the call id as RFC 9535, sec. 2.7, writes a member name in a
 # Normalized Path.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("call_id", "path"),
     [
@@ -1176,7 +1171,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             },
             "$.subagents['call_7']",
             id="subagent-ratings-missing",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_rating_payload("a1"),
@@ -1761,7 +1755,6 @@ def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> 
             ".subagents['call_7']",
             33,
             ".subagents['call_7']",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             nest_subagents(600),
@@ -1769,7 +1762,6 @@ def test_nesting_of_32_levels_loads_back_unchanged(payload: dict[str, JSON]) -> 
             ".subagents['call_7']",
             33,
             ".subagents['call_7']",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=["composite-scores-33", "composite-scores-400", "subagents-33", "subagents-600"],
