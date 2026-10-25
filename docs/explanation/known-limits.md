@@ -129,9 +129,11 @@ nothing about the action.
 
 ## Failures and reports
 
-A refusal, a cut-off reply, an unreadable reply, a 429 still returned after
-the client's retries and a prompt over the context window each score 1.0. One
-such sample fails a guard monitor's whole score, as
+A refusal, a cut-off reply and an unreadable reply each score 1.0, and one
+such sample fails a guard monitor's whole score. A sample that gets no answer,
+such as a 429 still returned after the client's retries, is set aside while
+more than half the samples answered. A prompt over the context window gets no
+answer on any sample, so it fails the score closed, as
 [A rating that cannot be made scores 1.0](failing-closed.md) sets out.
 
 A rating's span carries its score under OpenTelemetry's evaluation attribute

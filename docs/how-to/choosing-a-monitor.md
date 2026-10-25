@@ -11,7 +11,7 @@ how many distinct scores they give:
 | Calls per rating | one, and up to `max_parse_retries` more (2 by default) after a reply it cannot read or one cut off | one per statement (one by default) | `samples` (5 by default) |
 | Suspicion | the integer, scaled to 0 to 1 | the highest probability, by default | the share of suspicious labels |
 | Explanation | the model's reasoning | the statement with the highest probability, by default | the label given, and whether it breaks the policy |
-| Ties at a threshold | the scale's integers tie: 11 values from 0 to 10 | probabilities tie when the model gives the same one | `samples` + 1 values tie: 6 by default |
+| Ties at a threshold | the scale's integers tie: 11 values from 0 to 10 | probabilities tie when the model gives the same one | `samples` + 1 values tie when every sample answers: 6 by default |
 
 Each has an asynchronous twin with the same options: `AsyncLLMMonitor`, `AsyncDecisionMonitor` and
 `AsyncGuardMonitor`.
@@ -152,7 +152,7 @@ same on APPS: the target false positive rates of 3%, 4% and 5% all mapped to one
 baseline monitor, at an actual rate of 12.2% [@koran2026ensemble, sec. 5.1].
 
 Wrapping an LLM monitor in `RepeatedMonitor(monitor=..., ensemble_size=3)` reports the mean of three
-ratings, which takes one of 31 values on the default scale. Koran et al. also found that three calls
+ratings, which takes one of 31 values on the default scale when every call answers. Koran et al. also found that three calls
 of the baseline monitor gained less than three different monitors: the best three-monitor ensemble
 gained 2.4 times as much over the baseline as three calls of the baseline did
 [@koran2026ensemble, sec. 5.2].
@@ -169,8 +169,9 @@ probabilities over all harms [@zeng2024shieldgemma, sec. 5.1].
 
 A guard model writes a label, not a score. One label gives only the scores 0 and 1, so every
 threshold between them flags the same actions. The monitor asks `samples` times and scores the
-share labelled suspicious, which takes `samples` + 1 values: 0, 0.2, 0.4, 0.6, 0.8 or 1 at the
-default of five.
+share labelled suspicious, which takes `samples` + 1 values when every sample answers: 0, 0.2, 0.4,
+0.6, 0.8 or 1 at the default of five. A sample that gets no answer is set aside while more than half
+the samples answered, and the share is then of the samples that answered.
 
 Lyu et al. found that the Brier score of confidence from sampled answers fell sharply over the first
 samples and usually saturated after 15 to 20, and advise 3 to 5 samples under a tight budget
