@@ -833,7 +833,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 },
             },
             "$.subagents",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
