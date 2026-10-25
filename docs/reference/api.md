@@ -8,6 +8,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.BlackBoxRun
 
+::: hyoshigi.Step
+
 ::: hyoshigi.Rating
 
 ::: hyoshigi.Event

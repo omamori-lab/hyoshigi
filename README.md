@@ -127,6 +127,21 @@ score = monitor.rate(
 `from_anthropic` and `from_open_responses` read Anthropic's Messages format
 and the Open Responses format, on `Trajectory` and on `Action` alike.
 
+A transcript that already ends in the reply is rated in one call:
+`rate_latest_step` rates the trajectory's latest action against everything
+before it.
+
+```python
+transcript = {
+    **request,
+    "messages": [
+        *request["messages"],
+        reply,
+    ],
+}
+score = monitor.rate_latest_step(Trajectory.from_openai_chat(transcript))
+```
+
 ## Three kinds of monitor
 
 | Monitor | Asks its model | Suspicion |
