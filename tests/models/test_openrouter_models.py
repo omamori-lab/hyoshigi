@@ -275,12 +275,15 @@ CONTEXT_OVERFLOW_ERROR: JSON = {
         "metadata": {"provider_name": None},
     },
 }
-UNKNOWN_MODEL_ERROR: JSON = {
-    "error": {
-        "message": "openai/no-such-model-xyz is not a valid model ID",
-        "code": 400,
-    },
-}
+
+
+def build_unknown_model_error(model: str) -> JSON:
+    return {
+        "error": {
+            "message": f"{model} is not a valid model ID",
+            "code": 400,
+        },
+    }
 
 
 class Wire:
@@ -1884,11 +1887,25 @@ def test_any_other_rejection_raises_naming_only_the_status(
     ) == (True, False, None, None)
 
 
-def test_an_unknown_model_id_raises_naming_only_the_status(ask: Ask) -> None:
+# The second id holds the overflow wording, which counts only at the start of a message.
+@pytest.mark.parametrize(
+    "model",
+    [
+        "openai/no-such-model-xyz",
+        pytest.param(
+            "openai/maximum context length",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_an_unknown_model_id_raises_naming_only_the_status(
+    ask: Ask,
+    model: str,
+) -> None:
     client = Wire(
         build_reply(
             400,
-            UNKNOWN_MODEL_ERROR,
+            build_unknown_model_error(model),
         ),
     ).build_client()
 
