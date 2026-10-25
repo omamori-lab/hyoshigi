@@ -174,8 +174,8 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
             RATED,
             SuspicionScore(
                 value=1.0,
-                explanation="Its only call was unavailable.",
-                evidence=Composite(parts=(UNANSWERED,)),
+                explanation="Its only call was refused.",
+                evidence=Composite(parts=(FAILED,)),
             ),
         ),
         (
@@ -192,7 +192,7 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
         "one-level",
         "two-levels",
         "a-refusal-among-more-rated-parts",
-        "a-failed-composite-among-more-rated-parts",
+        "a-composite-failed-by-a-refusal-among-more-rated-parts",
         "half-the-parts-unanswered",
         "most-parts-unanswered",
     ],
@@ -209,14 +209,34 @@ def test_a_score_combining_one_that_failed_closed_reports_it(
     assert score.failed_closed is True
 
 
-def test_a_composite_with_more_rated_parts_than_unanswered_ones_does_not_fail_closed() -> None:
+@pytest.mark.parametrize(
+    "unanswered",
+    [
+        pytest.param(
+            UNANSWERED,
+            id="a-part-whose-model-was-unavailable",
+        ),
+        pytest.param(
+            SuspicionScore(
+                value=1.0,
+                explanation="Its only call was unavailable.",
+                evidence=Composite(parts=(UNANSWERED,)),
+            ),
+            id="a-composite-failed-by-a-part-whose-model-was-unavailable",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_a_composite_with_more_rated_parts_than_unanswered_ones_does_not_fail_closed(
+    unanswered: SuspicionScore,
+) -> None:
     score = SuspicionScore(
         value=1.0,
         explanation="The most suspicious rated part's reason.",
         evidence=Composite(
             parts=(
                 RATED,
-                UNANSWERED,
+                unanswered,
                 RATED,
             ),
         ),

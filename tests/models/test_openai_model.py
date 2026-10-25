@@ -1168,6 +1168,41 @@ def test_a_completed_reply_with_a_refusal_part_is_a_refusal_with_its_text(
     assert exchange.outcome == Refused(explanation="final refusal text")
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "part",
+    [
+        {"type": "refusal"},
+        replace(
+            REFUSAL,
+            refusal=None,
+        ),
+        replace(
+            REFUSAL,
+            refusal=5,
+        ),
+    ],
+    ids=["no-text", "null-text", "text-not-a-string"],
+)
+def test_a_refusal_part_without_its_text_is_a_refusal_without_an_explanation(
+    ask: Ask,
+    part: dict[str, object],
+) -> None:
+    body = replace(
+        IMAGE_INPUT_RESPONSE,
+        output=[
+            replace(
+                MESSAGE,
+                content=[part],
+            ),
+        ],
+    )
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Refused()
+
+
 # openapi.yaml, schemas OutputMessage and ReasoningTextContent: output items and content parts
 # are told apart by their type field.
 REASONING_TEXT = {
@@ -1474,20 +1509,6 @@ def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_expla
         ),
         replace(
             IMAGE_INPUT_RESPONSE,
-            output=[
-                replace(
-                    MESSAGE,
-                    content=[
-                        replace(
-                            REFUSAL,
-                            refusal=5,
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        replace(
-            IMAGE_INPUT_RESPONSE,
             output=["nope"],
         ),
         replace(
@@ -1544,7 +1565,6 @@ def test_a_failed_reply_whose_code_names_a_refusal_is_a_refusal_without_an_expla
         "output-is-not-a-list",
         "content-is-not-a-list",
         "text-is-not-a-string",
-        "refusal-is-not-a-string",
         "output-element-is-a-string",
         "output-element-is-a-number",
         "output-element-is-null",

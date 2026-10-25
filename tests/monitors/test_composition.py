@@ -25,7 +25,9 @@ from hyoshigi import (
     Refused,
     TextPart,
     Trajectory,
+    Truncated,
     Unavailable,
+    Unreadable,
 )
 from hyoshigi.monitors.composition import (
     AsyncCalibratedMonitor,
@@ -67,6 +69,30 @@ REFUSED_SCORE = SuspicionScore(
     evidence=FailedClosed(
         model=MODEL_NAME,
         cause=Refused(explanation="I cannot assess this."),
+    ),
+)
+
+UNREADABLE_EXPLANATION = (
+    "The monitor could not read its model's reply, so the action is treated as suspicious."
+)
+UNREADABLE_SCORE = SuspicionScore(
+    value=1.0,
+    explanation=UNREADABLE_EXPLANATION,
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Unreadable(),
+    ),
+)
+TRUNCATED_EXPLANATION = (
+    "The monitor's model stopped before it gave a score, so the action is treated as suspicious."
+)
+CUT_OFF = Truncated(text="<reasoning>cut")
+TRUNCATED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation=TRUNCATED_EXPLANATION,
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=CUT_OFF,
     ),
 )
 
@@ -252,6 +278,28 @@ class Family[Wrapped]:
         )
         monitor = self.repeated(
             monitor=llm,
+            ensemble_size=ensemble_size,
+        )
+        return self.rate(
+            monitor,
+            ACTION,
+            build_trajectory(),
+        )
+
+    def rate_nested_repeated(
+        self,
+        script: Script,
+        *,
+        inner_ensemble_size: int,
+        ensemble_size: int,
+    ) -> SuspicionScore:
+        """Rate with a repeated monitor around a repeated LLM monitor."""
+        inner = self.repeated(
+            monitor=self.build_llm(script),
+            ensemble_size=inner_ensemble_size,
+        )
+        monitor = self.repeated(
+            monitor=inner,
             ensemble_size=ensemble_size,
         )
         return self.rate(
@@ -539,8 +587,9 @@ def test_the_evidence_holds_each_calls_score_in_order(
     )
 
 
+# A call that fails on its reply asks again, up to twice, so it takes the last three outcomes.
 @pytest.mark.parametrize(
-    ("outcomes", "parts"),
+    ("outcomes", "explanation", "parts"),
     [
         pytest.param(
             [
@@ -548,12 +597,13 @@ def test_the_evidence_holds_each_calls_score_in_order(
                 Refused(explanation="I cannot assess this."),
                 Unavailable(status=503),
             ],
+            REFUSED_EXPLANATION,
             (
                 build_score(0.3),
                 REFUSED_SCORE,
                 UNAVAILABLE_SCORE,
             ),
-            id="before-an-unavailable-call",
+            id="a-refusal-before-an-unavailable-call",
         ),
         pytest.param(
             [
@@ -561,18 +611,48 @@ def test_the_evidence_holds_each_calls_score_in_order(
                 Refused(explanation="I cannot assess this."),
                 build_reply(3),
             ],
+            REFUSED_EXPLANATION,
             (
                 UNAVAILABLE_SCORE,
                 REFUSED_SCORE,
                 build_score(0.3),
             ),
-            id="after-an-unavailable-call",
+            id="a-refusal-after-an-unavailable-call",
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
+                build_reply(3),
+                *[Generation(text="no score")] * 3,
+            ],
+            UNREADABLE_EXPLANATION,
+            (
+                UNAVAILABLE_SCORE,
+                build_score(0.3),
+                UNREADABLE_SCORE,
+            ),
+            id="an-unreadable-call-after-an-unavailable-call",
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
+                build_reply(3),
+                *[CUT_OFF] * 3,
+            ],
+            TRUNCATED_EXPLANATION,
+            (
+                UNAVAILABLE_SCORE,
+                build_score(0.3),
+                TRUNCATED_SCORE,
+            ),
+            id="a-cut-off-call-after-an-unavailable-call",
         ),
     ],
 )
-def test_a_refused_call_fails_the_whole_score_closed_with_its_explanation(
+def test_a_call_refused_unreadable_or_cut_off_fails_the_whole_score_closed_with_its_explanation(
     family: Family[Monitor] | Family[AsyncMonitor],
     outcomes: list[GenerationOutcome],
+    explanation: str,
     parts: tuple[SuspicionScore, ...],
 ) -> None:
     script = Script(*outcomes)
@@ -584,7 +664,7 @@ def test_a_refused_call_fails_the_whole_score_closed_with_its_explanation(
 
     assert score == SuspicionScore(
         value=1.0,
-        explanation=REFUSED_EXPLANATION,
+        explanation=explanation,
         evidence=Composite(parts=parts),
     )
     assert score.failed_closed
@@ -655,14 +735,19 @@ def test_more_than_half_the_calls_answering_scores_the_mean_of_those_that_answer
 
 
 @pytest.mark.parametrize(
-    "outcomes",
+    ("outcomes", "parts"),
     [
         pytest.param(
             [
                 build_reply(3),
                 Unavailable(status=503),
-                Unavailable(status=429),
+                Unavailable(status=503),
             ],
+            (
+                build_score(0.3),
+                UNAVAILABLE_SCORE,
+                UNAVAILABLE_SCORE,
+            ),
             id="one-of-three",
         ),
         pytest.param(
@@ -670,6 +755,10 @@ def test_more_than_half_the_calls_answering_scores_the_mean_of_those_that_answer
                 Unavailable(status=503),
                 build_reply(3),
             ],
+            (
+                UNAVAILABLE_SCORE,
+                build_score(0.3),
+            ),
             id="one-of-two",
         ),
     ],
@@ -677,6 +766,7 @@ def test_more_than_half_the_calls_answering_scores_the_mean_of_those_that_answer
 def test_at_most_half_the_calls_answering_fails_the_whole_score_closed(
     family: Family[Monitor] | Family[AsyncMonitor],
     outcomes: list[GenerationOutcome],
+    parts: tuple[SuspicionScore, ...],
 ) -> None:
     script = Script(*outcomes)
 
@@ -688,11 +778,74 @@ def test_at_most_half_the_calls_answering_fails_the_whole_score_closed(
     assert (
         score.value,
         score.explanation,
+        score.evidence,
         score.failed_closed,
     ) == (
         1.0,
         UNAVAILABLE_EXPLANATION,
+        Composite(parts=parts),
         True,
+    )
+
+
+# The inner monitor makes two calls, so each inner call takes two outcomes in turn.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("outcomes", "value", "explanation", "failed_closed"),
+    [
+        pytest.param(
+            [
+                Unavailable(status=503),
+                Unavailable(status=503),
+                build_reply(2),
+                build_reply(2),
+                build_reply(4, "high"),
+                build_reply(4, "high"),
+            ],
+            0.3,
+            "high",
+            False,
+            id="an-unanswered-inner-call-set-aside",
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
+                build_reply(3),
+                Refused(explanation="I cannot assess this."),
+                build_reply(3),
+                build_reply(3),
+                build_reply(3),
+            ],
+            1.0,
+            REFUSED_EXPLANATION,
+            True,
+            id="an-inner-refusal-after-an-unanswered-inner-call",
+        ),
+    ],
+)
+def test_an_inner_repeated_call_is_set_aside_only_when_it_failed_for_want_of_an_answer(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    outcomes: list[GenerationOutcome],
+    value: float,
+    explanation: str,
+    failed_closed: bool,
+) -> None:
+    script = Script(*outcomes)
+
+    score = family.rate_nested_repeated(
+        script,
+        inner_ensemble_size=2,
+        ensemble_size=3,
+    )
+
+    assert (
+        score.value,
+        score.explanation,
+        score.failed_closed,
+    ) == (
+        value,
+        explanation,
+        failed_closed,
     )
 
 

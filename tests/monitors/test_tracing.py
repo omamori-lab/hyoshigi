@@ -587,12 +587,13 @@ def build_two_of_two_calls(
         pytest.param(
             build_two_of_two_calls,
             (
-                build_reply(3),
-                build_reply(3),
                 Unavailable(status=503),
+                build_reply(3),
+                build_reply(3),
                 Refused(),
             ),
             id="a-refusal-after-an-unavailable-call-of-a-nested-wrapper",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
