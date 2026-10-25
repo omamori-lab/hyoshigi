@@ -1353,8 +1353,6 @@ CRACKED_MESSAGE: JSON = {
             ],
         ),
         build_response(output=[build_message({"type": "refusal"})]),
-        build_response(output=[]),
-        build_response(output=[REASONING]),
         build_response(
             status="incomplete",
             incomplete_details={"reason": "max_output_tokens"},
@@ -1366,8 +1364,6 @@ CRACKED_MESSAGE: JSON = {
         "part-without-a-type",
         "text-of-the-wrong-type",
         "refusal-without-its-text",
-        "no-output",
-        "no-message",
         "incomplete-with-a-cracked-message",
     ],
 )
@@ -1385,6 +1381,34 @@ def test_a_response_with_an_item_or_part_the_sdk_could_not_read_is_unavailable(
     outcome = generate(client)
 
     assert outcome == Unavailable()
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        build_response(output=[]),
+        build_response(output=[REASONING]),
+    ],
+    ids=[
+        "no-output",
+        "no-message",
+    ],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_completed_response_without_a_message_is_an_empty_generation(
+    generate: Callable[..., GenerationOutcome],
+    response: JSON,
+) -> None:
+    client = Wire(
+        build_reply(
+            200,
+            response,
+        ),
+    ).build_client()
+
+    outcome = generate(client)
+
+    assert outcome == Generation(text="")
 
 
 # content_filter is the other reason of the schema IncompleteDetails; the error codes are those

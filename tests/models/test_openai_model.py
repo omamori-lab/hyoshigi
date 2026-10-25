@@ -1257,7 +1257,8 @@ def test_an_output_item_that_is_not_a_message_is_not_read(ask: Ask) -> None:
     ],
     ids=["no-output", "no-message"],
 )
-def test_a_completed_reply_without_a_message_is_unavailable_without_a_status(
+@pytest.mark.xfail(strict=True)
+def test_a_completed_reply_without_a_message_is_an_empty_generation(
     ask: Ask,
     output: list[dict[str, object]],
 ) -> None:
@@ -1268,7 +1269,7 @@ def test_a_completed_reply_without_a_message_is_unavailable_without_a_status(
 
     exchange = ask(respond(body))
 
-    assert exchange.outcome == Unavailable(status=None)
+    assert exchange.outcome == Generation(text="")
 
 
 # openapi.yaml, schema OutputMessage: a message's status is in_progress, completed or
