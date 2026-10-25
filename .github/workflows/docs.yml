@@ -14,6 +14,12 @@ on:
 permissions:
   contents: read
 
+# One run at a time: a queued run gives way to a newer one, and a running one is never cancelled,
+# so an older build cannot deploy after a newer one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -50,10 +56,6 @@ jobs:
     permissions:
       pages: write
       id-token: write
-    # One deployment at a time, and a running one is never cancelled.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
