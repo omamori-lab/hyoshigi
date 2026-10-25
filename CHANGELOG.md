@@ -32,6 +32,8 @@ minor version.
   monitor prompt BashArena prints asks for 0 to 9, and it called the
   explanation the only part of a score shown to the agent. hyoshigi shows the
   agent nothing; the scaffold decides.
+- The first-rating tutorial cited Sutton and Barto's section 3.1 for a
+  history of actions and observations, which section 17.3 defines.
 
 ## [0.1.0] - 2026-10-25
 

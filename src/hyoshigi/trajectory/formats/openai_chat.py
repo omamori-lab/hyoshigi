@@ -2,7 +2,7 @@
 
 The format is OpenAI's OpenAPI specification, https://github.com/openai/openai-openapi,
 and OpenRouter's reasoning tokens guide,
-https://openrouter.ai/docs/use-cases/reasoning-tokens.
+https://openrouter.ai/docs/guides/best-practices/reasoning-tokens.
 """
 
 from dataclasses import replace
