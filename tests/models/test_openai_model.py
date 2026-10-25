@@ -1257,7 +1257,6 @@ def test_an_output_item_that_is_not_a_message_is_not_read(ask: Ask) -> None:
     ],
     ids=["no-output", "no-message"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_reply_without_a_message_is_an_empty_generation(
     ask: Ask,
     output: list[dict[str, object]],

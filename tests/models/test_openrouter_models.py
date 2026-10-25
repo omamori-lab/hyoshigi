@@ -1394,7 +1394,6 @@ def test_a_response_with_an_item_or_part_the_sdk_could_not_read_is_unavailable(
         "no-message",
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_completed_response_without_a_message_is_an_empty_generation(
     generate: Callable[..., GenerationOutcome],
     response: JSON,
