@@ -79,8 +79,9 @@ REJECTED_INPUT = frozenset(
 )
 
 # On 2026-10-19 (issue #30), the 400 for a prompt over the endpoint's context window had the
-# number 400 as its code and no error type. Only its message says what went wrong.
-CONTEXT_LENGTH_PHRASE = "maximum context length"
+# number 400 as its code and no error type. Only its message says what went wrong, and it starts
+# with these words.
+CONTEXT_LENGTH_PREFIX = "This endpoint's maximum context length is"
 
 # Every failure the SDK raises: the HTTP library's request errors (connection, timeout, decoding),
 # the SDK's errors for a status or an unreadable reply, and its error for no response.
@@ -156,12 +157,12 @@ def build_state_item(part: PromptPart) -> str | ImageObject | None:
 
 
 def read_overflow(payload: JSON) -> tuple[str, ...]:
-    """The code context_length_exceeded if the error's message holds the provider's wording for
-    a prompt over the context window, else no code. The message is never kept, because it can
+    """The code context_length_exceeded if the error's message starts with the provider's wording
+    for a prompt over the context window, else no code. The message is never kept, because it can
     echo the prompt.
     """
     match payload:
-        case {"error": {"message": str(message)}} if CONTEXT_LENGTH_PHRASE in message:
+        case {"error": {"message": str(message)}} if message.startswith(CONTEXT_LENGTH_PREFIX):
             return ("context_length_exceeded",)
         case _:
             return ()
@@ -174,7 +175,7 @@ def read_codes(body: str) -> tuple[str, ...]:
     The error type is where https://openrouter.ai/docs/api_reference/errors-and-debugging puts
     it: in the error's metadata, in the error itself (the Anthropic skin) and at the top level
     (a failed Responses reply). The code context_length_exceeded is added when the error's
-    message holds the provider's wording for a prompt over the context window.
+    message starts with the provider's wording for a prompt over the context window.
     """
     try:
         payload = json.loads(body)

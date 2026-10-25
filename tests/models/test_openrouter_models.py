@@ -1892,10 +1892,7 @@ def test_any_other_rejection_raises_naming_only_the_status(
     "model",
     [
         "openai/no-such-model-xyz",
-        pytest.param(
-            "openai/maximum context length",
-            marks=pytest.mark.xfail(strict=True),
-        ),
+        "openai/maximum context length",
     ],
 )
 def test_an_unknown_model_id_raises_naming_only_the_status(
