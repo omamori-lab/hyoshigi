@@ -65,6 +65,10 @@ COMBINED_WITH_FAILED = SuspicionScore(
         ),
     ),
 )
+UNANSWERED = fail_closed(
+    Unavailable(status=503),
+    model="m",
+)
 COMBINED_WITH_COMBINED = SuspicionScore(
     value=1.0,
     explanation="A part failed.",
@@ -150,15 +154,76 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
 
 
 @pytest.mark.parametrize(
-    "score",
+    "parts",
     [
-        COMBINED_WITH_FAILED,
-        COMBINED_WITH_COMBINED,
+        (
+            RATED,
+            FAILED,
+        ),
+        (
+            RATED,
+            COMBINED_WITH_FAILED,
+        ),
+        (
+            RATED,
+            RATED,
+            FAILED,
+        ),
+        (
+            RATED,
+            RATED,
+            SuspicionScore(
+                value=1.0,
+                explanation="Its only call was unavailable.",
+                evidence=Composite(parts=(UNANSWERED,)),
+            ),
+        ),
+        (
+            UNANSWERED,
+            RATED,
+        ),
+        (
+            UNANSWERED,
+            UNANSWERED,
+            RATED,
+        ),
     ],
-    ids=["one-level", "two-levels"],
+    ids=[
+        "one-level",
+        "two-levels",
+        "a-refusal-among-more-rated-parts",
+        "a-failed-composite-among-more-rated-parts",
+        "half-the-parts-unanswered",
+        "most-parts-unanswered",
+    ],
 )
-def test_a_score_combining_one_that_failed_closed_reports_it(score: SuspicionScore) -> None:
+def test_a_score_combining_one_that_failed_closed_reports_it(
+    parts: tuple[SuspicionScore, ...],
+) -> None:
+    score = SuspicionScore(
+        value=1.0,
+        explanation="A part failed.",
+        evidence=Composite(parts=parts),
+    )
+
     assert score.failed_closed is True
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_composite_with_more_rated_parts_than_unanswered_ones_does_not_fail_closed() -> None:
+    score = SuspicionScore(
+        value=1.0,
+        explanation="The most suspicious rated part's reason.",
+        evidence=Composite(
+            parts=(
+                RATED,
+                UNANSWERED,
+                RATED,
+            ),
+        ),
+    )
+
+    assert score.failed_closed is False
 
 
 @pytest.mark.parametrize(

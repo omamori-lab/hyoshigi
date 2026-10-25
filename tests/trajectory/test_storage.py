@@ -134,25 +134,32 @@ STORED_DECIDED: dict[str, JSON] = {
         "hidden_reasoning": ["Compared the two statements."],
     },
 }
-# Two of five replies are labelled unsafe.
+# Two of the four replies that answered are labelled unsafe; one sample got no answer.
 LABELLED = SuspicionScore(
-    value=0.4,
+    value=0.5,
     explanation="The guard model labelled the action 'unsafe', finding that it breaks the policy.",
     evidence=Labels(
         model="gpt-oss-safeguard-20b",
-        labels=("unsafe", "unsafe", "safe", "safe", "safe"),
+        labels=("unsafe", "unsafe", "safe", "safe"),
+        unavailable=(Unavailable(status=429),),
         hidden_reasoning=("reasoning.encrypted",),
     ),
 )
 STORED_LABELLED: dict[str, JSON] = {
-    "value": 0.4,
+    "value": 0.5,
     "explanation": (
         "The guard model labelled the action 'unsafe', finding that it breaks the policy."
     ),
     "evidence": {
         "kind": "labels",
         "model": "gpt-oss-safeguard-20b",
-        "labels": ["unsafe", "unsafe", "safe", "safe", "safe"],
+        "labels": ["unsafe", "unsafe", "safe", "safe"],
+        "unavailable": [
+            {
+                "kind": "unavailable",
+                "status": 429,
+            },
+        ],
         "hidden_reasoning": ["reasoning.encrypted"],
     },
 }
@@ -840,6 +847,7 @@ SCORE_CASES = [
     pytest.param(
         LABELLED,
         STORED_LABELLED,
+        marks=pytest.mark.xfail(strict=True),
     ),
     (
         COMBINED,
@@ -914,6 +922,25 @@ def test_loading_a_stored_rating_restores_the_score(
             action_id="a1",
             score=score,
         ),
+    )
+
+
+def test_labels_stored_without_samples_that_got_no_answer_load_with_none() -> None:
+    payload = build_evidence_payload(
+        {
+            "kind": "labels",
+            "model": "gpt-oss-safeguard-20b",
+            "labels": ["safe"],
+            "hidden_reasoning": [],
+        },
+    )
+
+    loaded = Trajectory.load(payload)
+
+    assert loaded.ratings[0].score.evidence == Labels(
+        model="gpt-oss-safeguard-20b",
+        labels=("safe",),
+        unavailable=(),
     )
 
 
@@ -1280,6 +1307,61 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.hidden_reasoning[0]",
             id="labels-hidden-reasoning-not-text",
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["safe"],
+                    "unavailable": {
+                        "kind": "unavailable",
+                        "status": 429,
+                    },
+                    "hidden_reasoning": [],
+                },
+            ),
+            "$.ratings[0].score.evidence.unavailable",
+            id="labels-unavailable-not-a-list",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["safe"],
+                    "unavailable": [
+                        {
+                            "kind": "refused",
+                            "explanation": None,
+                        },
+                    ],
+                    "hidden_reasoning": [],
+                },
+            ),
+            "$.ratings[0].score.evidence.unavailable[0]",
+            id="labels-unavailable-another-cause",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["safe"],
+                    "unavailable": [
+                        {
+                            "kind": "unavailable",
+                            "status": "429",
+                        },
+                    ],
+                    "hidden_reasoning": [],
+                },
+            ),
+            "$.ratings[0].score.evidence.unavailable[0]",
+            id="labels-unavailable-status-text",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(

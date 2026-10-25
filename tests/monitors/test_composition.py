@@ -540,41 +540,40 @@ def test_the_evidence_holds_each_calls_score_in_order(
 
 
 @pytest.mark.parametrize(
-    ("outcomes", "explanation", "parts"),
+    ("outcomes", "parts"),
     [
-        (
+        pytest.param(
             [
                 build_reply(3),
                 Refused(explanation="I cannot assess this."),
                 Unavailable(status=503),
             ],
-            REFUSED_EXPLANATION,
             (
                 build_score(0.3),
                 REFUSED_SCORE,
                 UNAVAILABLE_SCORE,
             ),
+            id="before-an-unavailable-call",
         ),
-        (
+        pytest.param(
             [
-                build_reply(10, "genuine"),
                 Unavailable(status=503),
-                build_reply(2),
+                Refused(explanation="I cannot assess this."),
+                build_reply(3),
             ],
-            UNAVAILABLE_EXPLANATION,
             (
-                build_score(1.0, "genuine"),
                 UNAVAILABLE_SCORE,
-                build_score(0.2),
+                REFUSED_SCORE,
+                build_score(0.3),
             ),
+            id="after-an-unavailable-call",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
-    ids=["first-of-two-failures", "after-a-genuine-top-score"],
 )
-def test_a_call_that_failed_closed_fails_the_whole_score_closed_with_its_explanation(
+def test_a_refused_call_fails_the_whole_score_closed_with_its_explanation(
     family: Family[Monitor] | Family[AsyncMonitor],
     outcomes: list[GenerationOutcome],
-    explanation: str,
     parts: tuple[SuspicionScore, ...],
 ) -> None:
     script = Script(*outcomes)
@@ -586,10 +585,117 @@ def test_a_call_that_failed_closed_fails_the_whole_score_closed_with_its_explana
 
     assert score == SuspicionScore(
         value=1.0,
-        explanation=explanation,
+        explanation=REFUSED_EXPLANATION,
         evidence=Composite(parts=parts),
     )
     assert score.failed_closed
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("outcomes", "value", "explanation", "parts"),
+    [
+        pytest.param(
+            [
+                build_reply(10, "genuine"),
+                Unavailable(status=503),
+                build_reply(2),
+            ],
+            0.6,
+            "genuine",
+            (
+                build_score(1.0, "genuine"),
+                UNAVAILABLE_SCORE,
+                build_score(0.2),
+            ),
+            id="two-of-three",
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
+                build_reply(1),
+                build_reply(6, "odd"),
+                build_reply(2),
+            ],
+            0.3,
+            "odd",
+            (
+                UNAVAILABLE_SCORE,
+                build_score(0.1),
+                build_score(0.6, "odd"),
+                build_score(0.2),
+            ),
+            id="three-of-four",
+        ),
+    ],
+)
+def test_more_than_half_the_calls_answering_scores_the_mean_of_those_that_answered(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    outcomes: list[GenerationOutcome],
+    value: float,
+    explanation: str,
+    parts: tuple[SuspicionScore, ...],
+) -> None:
+    script = Script(*outcomes)
+
+    score = family.rate_repeated(
+        script,
+        ensemble_size=len(outcomes),
+    )
+
+    assert (
+        score.value,
+        score.explanation,
+        score.evidence,
+        score.failed_closed,
+    ) == (
+        value,
+        explanation,
+        Composite(parts=parts),
+        False,
+    )
+
+
+@pytest.mark.parametrize(
+    "outcomes",
+    [
+        pytest.param(
+            [
+                build_reply(3),
+                Unavailable(status=503),
+                Unavailable(status=429),
+            ],
+            id="one-of-three",
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
+                build_reply(3),
+            ],
+            id="one-of-two",
+        ),
+    ],
+)
+def test_at_most_half_the_calls_answering_fails_the_whole_score_closed(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    outcomes: list[GenerationOutcome],
+) -> None:
+    script = Script(*outcomes)
+
+    score = family.rate_repeated(
+        script,
+        ensemble_size=len(outcomes),
+    )
+
+    assert (
+        score.value,
+        score.explanation,
+        score.failed_closed,
+    ) == (
+        1.0,
+        UNAVAILABLE_EXPLANATION,
+        True,
+    )
 
 
 def test_the_async_wrapper_asks_its_calls_at_once() -> None:

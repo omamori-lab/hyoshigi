@@ -564,19 +564,28 @@ def build_two_of_two_calls(
 
 
 @pytest.mark.parametrize(
-    ("build", "outcomes", "explanation", "cause"),
+    ("build", "outcomes"),
     [
-        (
+        pytest.param(
             build_three_calls,
             (
                 build_reply(3),
                 Refused(),
                 Unavailable(status=503),
             ),
-            REFUSED_EXPLANATION,
-            "Refused",
+            id="a-refusal-before-an-unavailable-call",
         ),
-        (
+        pytest.param(
+            build_three_calls,
+            (
+                Unavailable(status=503),
+                Refused(),
+                build_reply(3),
+            ),
+            id="a-refusal-after-an-unavailable-call",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
             build_two_of_two_calls,
             (
                 build_reply(3),
@@ -584,13 +593,12 @@ def build_two_of_two_calls(
                 Unavailable(status=503),
                 Refused(),
             ),
-            UNAVAILABLE_EXPLANATION,
-            "Unavailable",
+            id="a-refusal-after-an-unavailable-call-of-a-nested-wrapper",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
-    ids=["first-failed-call", "first-failed-call-of-a-nested-wrapper"],
 )
-def test_a_wrapper_that_failed_closed_names_the_cause_of_its_first_failed_part(
+def test_a_wrapper_that_failed_closed_names_the_cause_of_the_part_it_failed_closed_by(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
     build: Callable[
@@ -601,8 +609,6 @@ def test_a_wrapper_that_failed_closed_names_the_cause_of_its_first_failed_part(
         Monitor | AsyncMonitor,
     ],
     outcomes: tuple[GenerationOutcome, ...],
-    explanation: str,
-    cause: str,
 ) -> None:
     monitor = build(
         family,
@@ -615,9 +621,35 @@ def test_a_wrapper_that_failed_closed_names_the_cause_of_its_first_failed_part(
         {
             "gen_ai.evaluation.name": "suspicion",
             "gen_ai.evaluation.score.value": 1.0,
-            "gen_ai.evaluation.explanation": explanation,
+            "gen_ai.evaluation.explanation": REFUSED_EXPLANATION,
             "hyoshigi.failed_closed": True,
-            "hyoshigi.cause": cause,
+            "hyoshigi.cause": "Refused",
+        },
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_span_of_a_mean_of_the_calls_that_answered_names_no_cause(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+) -> None:
+    monitor = build_three_calls(
+        family,
+        Script(
+            build_reply(3),
+            Unavailable(status=503),
+            build_reply(5),
+        ),
+    )
+
+    rate(monitor)
+
+    assert read_last_attributes(spans) == [
+        {
+            "gen_ai.evaluation.name": "suspicion",
+            "gen_ai.evaluation.score.value": 0.4,
+            "gen_ai.evaluation.explanation": "calm",
+            "hyoshigi.failed_closed": False,
         },
     ]
 

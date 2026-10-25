@@ -72,15 +72,16 @@ SCORED_REPLIES = SCORES.map(build_scored_reply)
 LABELLED_REPLIES = st.sampled_from(["valid", "invalid", "maybe"]).map(
     lambda label: Generation(text=label),
 )
+UNAVAILABLE = st.builds(
+    Unavailable,
+    status=st.none() | st.integers(),
+)
 FAILURES = st.one_of(
     st.builds(
         Refused,
         explanation=st.none() | st.text(),
     ),
-    st.builds(
-        Unavailable,
-        status=st.none() | st.integers(),
-    ),
+    UNAVAILABLE,
 )
 # Outcomes after which one ask settles a rating.
 SETTLED = st.one_of(
@@ -361,6 +362,21 @@ def test_every_monitor_and_wrapper_gives_a_value_from_0_to_1(
     assert 0.0 <= score.value <= 1.0
 
 
+def rate_three_calls(
+    family: Family,
+    calls: list[GenerationOutcome],
+) -> SuspicionScore:
+    """Rate with a repeated monitor of three calls, whose model gives the outcomes in turn."""
+    repeated = family.repeated(
+        monitor=build_scripted_llm(
+            family,
+            tuple(calls),
+        ),
+        ensemble_size=3,
+    )
+    return family.rate(repeated)
+
+
 @FAMILIES
 @given(
     calls=st.lists(
@@ -371,30 +387,69 @@ def test_every_monitor_and_wrapper_gives_a_value_from_0_to_1(
         lambda calls: any(
             isinstance(
                 call,
-                Refused | Unavailable,
+                Refused,
             )
             for call in calls
         ),
     ),
 )
-def test_repeated_ratings_fail_closed_when_any_call_does(
+def test_repeated_ratings_fail_closed_when_any_call_is_refused(
     family: Family,
     calls: list[GenerationOutcome],
 ) -> None:
-    repeated = family.repeated(
-        monitor=build_scripted_llm(
-            family,
-            tuple(calls),
-        ),
-        ensemble_size=3,
+    score = rate_three_calls(
+        family,
+        calls,
     )
-
-    score = family.rate(repeated)
 
     assert (
         score.value,
         score.failed_closed,
     ) == (1.0, True)
+
+
+@FAMILIES
+@given(
+    calls=st.tuples(
+        UNAVAILABLE,
+        UNAVAILABLE,
+        SCORED_REPLIES | UNAVAILABLE,
+    ).flatmap(st.permutations),
+)
+def test_repeated_ratings_fail_closed_when_at_most_one_of_three_calls_answers(
+    family: Family,
+    calls: list[GenerationOutcome],
+) -> None:
+    score = rate_three_calls(
+        family,
+        calls,
+    )
+
+    assert (
+        score.value,
+        score.failed_closed,
+    ) == (1.0, True)
+
+
+@pytest.mark.xfail(strict=True)
+@FAMILIES
+@given(
+    calls=st.tuples(
+        UNAVAILABLE,
+        SCORED_REPLIES,
+        SCORED_REPLIES,
+    ).flatmap(st.permutations),
+)
+def test_repeated_ratings_do_not_fail_closed_when_two_of_three_calls_answer(
+    family: Family,
+    calls: list[GenerationOutcome],
+) -> None:
+    score = rate_three_calls(
+        family,
+        calls,
+    )
+
+    assert score.failed_closed is False
 
 
 @FAMILIES
