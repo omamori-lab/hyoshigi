@@ -13,6 +13,13 @@ minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `rate_latest_step`, on every monitor, rates a trajectory's latest action
+  against everything before it, so a transcript that ends in the agent's
+  reply needs no split by hand. `Trajectory.split_latest_step` returns that
+  action and the trajectory before it as a `Step`.
+
 ## [0.1.0] - 2026-10-25
 
 ### Added
