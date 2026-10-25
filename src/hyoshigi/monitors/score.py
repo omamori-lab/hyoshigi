@@ -126,6 +126,7 @@ class Labels:
 
     model: str
     labels: tuple[str, ...]
+    unavailable: tuple[Unavailable, ...] = ()
     hidden_reasoning: tuple[str, ...] = ()
 
 

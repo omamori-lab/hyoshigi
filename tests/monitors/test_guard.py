@@ -535,13 +535,15 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
         ),
         pytest.param(
             (
-                SAFE,
                 Unavailable(status=503),
                 REFUSAL,
                 SAFE,
+                SAFE,
+                SAFE,
             ),
-            UNAVAILABLE_SCORE,
-            id="unavailable-before-a-refusal",
+            REFUSED_SCORE,
+            id="a-refusal-after-an-unavailable-sample",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (
@@ -575,7 +577,7 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
         ),
     ],
 )
-def test_the_first_sample_that_fails_closes_the_whole_score_with_its_cause(
+def test_the_first_sample_unreadable_cut_off_or_refused_fails_the_score_closed_with_its_cause(
     rate: Rate,
     outcomes: tuple[GenerationOutcome, ...],
     expected: SuspicionScore,
@@ -584,10 +586,123 @@ def test_the_first_sample_that_fails_closes_the_whole_score_with_its_cause(
 
     score = rate(
         script,
-        samples=4,
+        samples=len(outcomes),
     )
 
     assert score == expected
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("outcomes", "value"),
+    [
+        pytest.param(
+            (
+                UNSAFE,
+                Unavailable(status=503),
+                SAFE,
+                Unavailable(status=429),
+                SAFE,
+            ),
+            1 / 3,
+            id="three-of-five",
+        ),
+        pytest.param(
+            (
+                Unavailable(status=503),
+                UNSAFE,
+                UNSAFE,
+                SAFE,
+            ),
+            2 / 3,
+            id="three-of-four",
+        ),
+    ],
+)
+def test_more_than_half_the_samples_answering_scores_the_share_of_them_labelled_suspicious(
+    rate: Rate,
+    outcomes: tuple[GenerationOutcome, ...],
+    value: float,
+) -> None:
+    script = Script(*outcomes)
+
+    score = rate(
+        script,
+        samples=len(outcomes),
+    )
+
+    assert (
+        score.value,
+        score.failed_closed,
+    ) == (
+        value,
+        False,
+    )
+
+
+@IGNORE_HARD_LABELS
+@pytest.mark.parametrize(
+    "outcomes",
+    [
+        pytest.param(
+            (
+                SAFE,
+                Unavailable(status=503),
+                UNSAFE,
+                Unavailable(status=429),
+                Unavailable(status=500),
+            ),
+            id="two-of-five",
+        ),
+        pytest.param(
+            (
+                Unavailable(status=503),
+                SAFE,
+                Unavailable(status=429),
+                UNSAFE,
+            ),
+            id="two-of-four",
+        ),
+        pytest.param(
+            (Unavailable(status=503),),
+            id="none-of-one",
+        ),
+    ],
+)
+def test_at_most_half_the_samples_answering_fails_closed_with_the_first_unavailable_one(
+    rate: Rate,
+    outcomes: tuple[GenerationOutcome, ...],
+) -> None:
+    script = Script(*outcomes)
+
+    score = rate(
+        script,
+        samples=len(outcomes),
+    )
+
+    assert score == UNAVAILABLE_SCORE
+
+
+@pytest.mark.xfail(strict=True)
+def test_the_evidence_holds_the_samples_that_got_no_answer_in_order(rate: Rate) -> None:
+    script = Script(
+        UNSAFE,
+        Unavailable(status=503),
+        SAFE,
+        Unavailable(),
+        SAFE,
+    )
+
+    score = rate(script)
+
+    assert score.evidence == Labels(
+        model=MODEL_NAME,
+        labels=("unsafe", "safe", "safe"),
+        unavailable=(
+            Unavailable(status=503),
+            Unavailable(),
+        ),
+    )
 
 
 def test_an_action_with_content_the_guard_cannot_perceive_fails_closed_without_asking(
