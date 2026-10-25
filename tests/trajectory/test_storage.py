@@ -847,7 +847,6 @@ SCORE_CASES = [
     pytest.param(
         LABELLED,
         STORED_LABELLED,
-        marks=pytest.mark.xfail(strict=True),
     ),
     (
         COMBINED,
@@ -1323,7 +1322,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.unavailable",
             id="labels-unavailable-not-a-list",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -1342,7 +1340,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.unavailable[0]",
             id="labels-unavailable-another-cause",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -1361,7 +1358,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             "$.ratings[0].score.evidence.unavailable[0]",
             id="labels-unavailable-status-text",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(

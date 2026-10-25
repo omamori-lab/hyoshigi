@@ -209,7 +209,6 @@ def test_a_score_combining_one_that_failed_closed_reports_it(
     assert score.failed_closed is True
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_composite_with_more_rated_parts_than_unanswered_ones_does_not_fail_closed() -> None:
     score = SuspicionScore(
         value=1.0,

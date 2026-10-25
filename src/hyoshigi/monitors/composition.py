@@ -1,9 +1,11 @@
 """Monitors that wrap monitors: the mean of repeated ratings, a calibrated rank and a cascade.
 
 A wrapper is a monitor of the family of the monitors it holds, and a monitor of the other
-family raises ConfigurationError when the wrapper is built. A failed-closed score stays 1.0
-through RepeatedMonitor and CalibratedMonitor. CascadeMonitor sends a failed fast score to its
-careful monitor, whose score then decides. A wrapper passes on a wrapped explanation word for word.
+family raises ConfigurationError when the wrapper is built. RepeatedMonitor sets aside a call
+whose model was unavailable while more than half the calls answered, and fails closed for any
+other failure. A failed-closed score stays 1.0 through CalibratedMonitor. CascadeMonitor
+sends a failed fast score to its careful monitor, whose score then decides. A wrapper passes on
+a wrapped explanation word for word.
 
 <https://omamori-lab.github.io/hyoshigi/explanation/failing-closed/>
 """
@@ -18,7 +20,7 @@ from typing import assert_never
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
-from hyoshigi.monitors.score import Composite, SuspicionScore, average_values
+from hyoshigi.monitors.score import Composite, SuspicionScore, average_values, find_failure
 from hyoshigi.monitors.tracing import record_rating, trace_rating
 from hyoshigi.options import (
     check_instance,
@@ -53,12 +55,15 @@ class RepeatedMonitor(Monitor):
     calls differ only when the wrapped monitor's model samples, so it needs a temperature
     above zero.
 
-    The value is the mean of the calls' values, rounded to `MEAN_DECIMAL_PLACES`, and the
-    explanation the most suspicious call's, the first of a tie. When any call failed closed,
-    the whole score fails closed: the value is 1.0 and the explanation the first failed
-    call's. Either way the evidence is the calls' scores, in order. `ensemble_size` is a
-    whole number from 1 to sys.maxsize, and `monitor` a Monitor; otherwise
-    ConfigurationError is raised when the wrapper is built.
+    A call that failed closed because its model was unavailable is set aside. A call that
+    failed closed with any other cause, or whose composite score failed closed, fails the
+    whole score closed: the value is 1.0 and the explanation the first such call's.
+    Otherwise, when more than half the calls did not fail closed, the value is the mean of
+    their values, rounded to `MEAN_DECIMAL_PLACES`, and the explanation the most suspicious
+    one's, the first of a tie; when at most half did, the score fails closed with the first
+    unavailable call's explanation. Either way the evidence is the calls' scores, in order.
+    `ensemble_size` is a whole number from 1 to sys.maxsize, and `monitor` a Monitor;
+    otherwise ConfigurationError is raised when the wrapper is built.
     """
 
     monitor: Monitor
@@ -196,24 +201,24 @@ def plan_repetition[Rater](
 
 
 def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
-    """Combine the scores of repeated calls into their mean, or fail closed if any did."""
+    """Combine the scores of repeated calls into the mean of those that did not fail closed,
+    or fail closed as their Composite does, with the explanation of the part it fails by.
+    """
     evidence = Composite(parts=parts)
-    failed = next(
-        (part for part in parts if part.failed_closed),
-        None,
-    )
-    if failed is not None:
+    failure = find_failure(parts)
+    if failure is not None:
         return SuspicionScore(
             value=1.0,
-            explanation=failed.explanation,
+            explanation=failure.explanation,
             evidence=evidence,
         )
+    answered = [part for part in parts if not part.failed_closed]
     most_suspicious = max(
-        parts,
+        answered,
         key=lambda part: part.value,
     )
     return SuspicionScore(
-        value=average_values(part.value for part in parts),
+        value=average_values(part.value for part in answered),
         explanation=most_suspicious.explanation,
         evidence=evidence,
     )

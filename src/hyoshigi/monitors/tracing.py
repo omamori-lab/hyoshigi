@@ -29,6 +29,7 @@ from hyoshigi.monitors.score import (
     Labels,
     Rationale,
     SuspicionScore,
+    find_failure,
 )
 
 if TYPE_CHECKING:
@@ -123,18 +124,15 @@ def describe_rating(score: SuspicionScore) -> dict[str, str | float | bool]:
 def name_cause(score: SuspicionScore) -> str | None:
     """The class of the cause a score failed closed with, or None when it did not.
 
-    A composite's cause is that of its first part to fail closed, searched depth first, as
-    a RepeatedMonitor's explanation is its first failed call's.
+    A composite's cause is that of the part it fails closed by, searched depth first, as a
+    RepeatedMonitor's explanation is that part's.
     """
     match score.evidence:
         case FailedClosed(cause=cause):
             return type(cause).__name__
         case Composite(parts=parts):
-            causes = (name_cause(part) for part in parts)
-            return next(
-                (cause for cause in causes if cause is not None),
-                None,
-            )
+            failure = find_failure(parts)
+            return None if failure is None else name_cause(failure)
         case Rationale() | Decisions() | Labels():
             return None
         case unreachable:

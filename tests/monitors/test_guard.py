@@ -543,7 +543,6 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             ),
             REFUSED_SCORE,
             id="a-refusal-after-an-unavailable-sample",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (
@@ -592,7 +591,6 @@ def test_the_first_sample_unreadable_cut_off_or_refused_fails_the_score_closed_w
     assert score == expected
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "value"),
     [
@@ -683,7 +681,6 @@ def test_at_most_half_the_samples_answering_fails_closed_with_the_first_unavaila
     assert score == UNAVAILABLE_SCORE
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_evidence_holds_the_samples_that_got_no_answer_in_order(rate: Rate) -> None:
     script = Script(
         UNSAFE,

@@ -431,7 +431,6 @@ def test_repeated_ratings_fail_closed_when_at_most_one_of_three_calls_answers(
     ) == (1.0, True)
 
 
-@pytest.mark.xfail(strict=True)
 @FAMILIES
 @given(
     calls=st.tuples(

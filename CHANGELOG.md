@@ -26,6 +26,18 @@ minor version.
   format, and choosing what a monitor reads, and a reference page on what
   each provider format's roles, items and blocks become.
 
+### Changed
+
+- A `GuardMonitor` sample or a `RepeatedMonitor` call that got no answer,
+  `Unavailable`, is set aside: when more than half the samples or calls
+  answered, the rating scores those that answered, and otherwise it fails
+  closed as `Unavailable`. A refusal, an unreadable reply or a cut-off one
+  still fails the rating closed, with its cause even after an unanswered
+  sample or call. `Labels.unavailable` keeps the unanswered samples, which
+  `Trajectory.dump` writes and `load` reads; a dump written without them
+  loads with none. A `Composite` fails closed by the same rule, which
+  `failed_closed` and the cause on a span or a report follow.
+
 ### Fixed
 
 - The first-rating tutorial named BashArena for the 0 to 10 scale, though the

@@ -367,6 +367,7 @@ def dump_evidence(evidence: Evidence) -> JSON:
                 "kind": "labels",
                 "model": evidence.model,
                 "labels": [*evidence.labels],
+                "unavailable": [dump_cause(sample) for sample in evidence.unavailable],
                 "hidden_reasoning": [*evidence.hidden_reasoning],
             }
         case Composite():
@@ -512,6 +513,10 @@ def load_evidence(
                     labels,
                     path=f"{path}.labels",
                 ),
+                unavailable=load_unavailable(
+                    data,
+                    path=path,
+                ),
                 hidden_reasoning=load_texts(
                     reasoning,
                     path=f"{path}.hidden_reasoning",
@@ -574,6 +579,51 @@ def load_composite(
             path=path,
             expected="a composite of at least one score",
         ) from None
+
+
+def load_unavailable(
+    labels: JSON,
+    *,
+    path: str,
+) -> tuple[Unavailable, ...]:
+    """Read the samples that got no answer from labels that dump_evidence wrote, as unavailable
+    causes; labels stored without them have none.
+    """
+    match labels:
+        case {"unavailable": list(samples)}:
+            return tuple(
+                load_unavailable_sample(
+                    sample,
+                    path=f"{path}.unavailable[{index}]",
+                )
+                for index, sample in enumerate(samples)
+            )
+        case {"unavailable": _}:
+            raise FormatError(
+                path=f"{path}.unavailable",
+                expected="a list of unavailable causes",
+            )
+        case _:
+            return ()
+
+
+def load_unavailable_sample(
+    data: JSON,
+    *,
+    path: str,
+) -> Unavailable:
+    """Read one sample that got no answer, which dump_cause wrote as an unavailable cause."""
+    match load_cause(
+        data,
+        path=path,
+    ):
+        case Unavailable() as cause:
+            return cause
+        case _:
+            raise FormatError(
+                path=path,
+                expected="an unavailable cause",
+            )
 
 
 def load_statement_decision(

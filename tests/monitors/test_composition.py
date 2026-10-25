@@ -567,7 +567,6 @@ def test_the_evidence_holds_each_calls_score_in_order(
                 build_score(0.3),
             ),
             id="after-an-unavailable-call",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -591,7 +590,6 @@ def test_a_refused_call_fails_the_whole_score_closed_with_its_explanation(
     assert score.failed_closed
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("outcomes", "value", "explanation", "parts"),
     [
