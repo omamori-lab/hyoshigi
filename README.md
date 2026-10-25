@@ -53,8 +53,8 @@ score = monitor.rate(
 
 A black-box agent's trajectory holds its task, and its final answer is the
 action to rate. `score.value` is the suspicion, from 0 to 1.
-`score.explanation` says why, and is the only part an agent may be shown;
-`score.evidence` holds the model's findings or the cause of a failure. A reply
+`score.explanation` says why, and the scaffold decides whether the agent sees
+it; `score.evidence` holds the model's findings or the cause of a failure. A reply
 the monitor cannot read, content its model cannot perceive, and a model that
 refuses or is unavailable all fail closed, at 1.0.
 

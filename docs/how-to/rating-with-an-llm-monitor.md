@@ -114,7 +114,7 @@ A scale whose ends are not integers, or whose lowest end is not less than its hi
 
 A reply is readable when it holds the first reasoning block and then one score tag, with nothing but
 whitespace between them or after the score. The reasoning holds some text, and the score is an
-integer in ASCII digits within the scale. Tags match in any case, and text before the first
+integer in ASCII digits within the scale, with an optional sign, as in `+10` or `-3`. Tags match in any case, and text before the first
 `<reasoning>` is ignored. Any other reply is unreadable:
 
 - no reasoning block, or a blank one;
@@ -359,11 +359,11 @@ openrouter_model = GenerativeModel.from_openrouter(
 The values a model accepts depend on the model. Anthropic's table for Claude Haiku 5.5 gives
 thinking on by default, `{"type": "disabled"}` at effort `high` or lower, and a 400 error for
 `{"type": "enabled", "budget_tokens": ...}`
-([Anthropic, Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)). The adapter
+[@anthropic2026thinking, {Section} "Configuring thinking"]. The adapter
 sends `thinking` alone, so Anthropic's default effort applies, which is `medium` for Claude Haiku
-5.5 ([Anthropic, Effort](https://platform.claude.com/docs/en/build-with-claude/effort)). OpenAI
+5.5 [@anthropic2026effort, {Section} "Recommended effort levels for Claude Haiku 5.5"]. OpenAI
 lists `none` to `max` for `reasoning.effort` and says that the supported values depend on the model
-([OpenAI, Reasoning models](https://developers.openai.com/api/docs/guides/reasoning)). A request the
+[@openai2026reasoning, {Section} "Reasoning effort"]. A request the
 API rejects as invalid raises `ConfigurationError` at the first rating, which names the status only;
 [Handling a failed rating](handling-a-failed-rating.md#a-rejected-request-raises) lists which client
 errors raise.
@@ -374,15 +374,15 @@ reasoning in its output: a prompt without the reasoning structure improved as na
 effort rose, and the prompt with it stayed roughly flat
 [@apollo2026monitoringprompt, {Section} "Model-side: can native reasoning replace the prompt scaffold?"].
 `DEFAULT_PROMPT` asks for the reasoning in the reply, and thinking tokens are billed as output
-tokens ([Anthropic, Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)).
+tokens [@anthropic2026thinking].
 
 ## A model that thinks needs room under its output limit
 
 A model that thinks before it answers spends its output limit on thinking first. Thinking tokens
 count toward `max_tokens` on Anthropic, and Claude Haiku 5.5 thinks by default
-([Anthropic, Effort](https://platform.claude.com/docs/en/build-with-claude/effort)); reasoning
+[@anthropic2026effort, {Section} "Recommended effort levels for Claude Haiku 5.5"]; reasoning
 tokens count toward `max_output_tokens` on OpenAI
-([OpenAI, Reasoning models](https://developers.openai.com/api/docs/guides/reasoning)). The examples
+[@openai2026reasoning, {Section} "Controlling costs"]. The examples
 give Claude Haiku 5.5 `max_tokens=4096`.
 
 When the limit ends the reply, the adapter returns `Truncated`: Anthropic's `max_tokens` stop reason,
@@ -412,7 +412,7 @@ FailedClosed(model='scripted', cause=Truncated(text=''))
 The remedy is a larger limit: `max_tokens` on Anthropic, and `max_output_tokens` on OpenAI and
 OpenRouter, where none is sent unless given. OpenAI recommends reserving at least 25,000 tokens for
 reasoning and output when starting with its reasoning models
-([OpenAI, Reasoning models](https://developers.openai.com/api/docs/guides/reasoning)). Anthropic's
+[@openai2026reasoning, {Section} "Allocating space for reasoning"]. Anthropic's
 SDK requires streaming for a `max_tokens` of more than 21,333
-([Anthropic, Thinking](https://platform.claude.com/docs/en/build-with-claude/thinking)), and the
+[@anthropic2026thinking, {Section} "Long requests"], and the
 adapter does not stream, so a larger `max_tokens` raises `ConfigurationError` at the first rating.
