@@ -110,15 +110,20 @@ nav:
   - Tutorials:
       - Rating a first action: tutorials/first-rating.md
   - How-to:
+      - Keeping a trajectory: how-to/keeping-a-trajectory.md
+      - Reading an agent's own format: how-to/reading-an-agents-own-format.md
       - Choosing a monitor: how-to/choosing-a-monitor.md
+      - Choosing what a monitor reads: how-to/choosing-what-a-monitor-reads.md
       - Rating with an LLM monitor: how-to/rating-with-an-llm-monitor.md
       - Rating with a decision model: how-to/rating-with-a-decision-model.md
       - Handling a failed rating: how-to/handling-a-failed-rating.md
   - Explanation:
+      - Trajectories: explanation/trajectories.md
       - The default view: explanation/the-default-view.md
       - The default prompt: explanation/the-default-prompt.md
       - Failing closed: explanation/failing-closed.md
       - Where the monitors miss: explanation/known-limits.md
   - Reference:
       - API: reference/api.md
+      - Provider formats: reference/formats.md
   - The name: name.md
