@@ -28,7 +28,8 @@ Each has an asynchronous twin with the same options: `AsyncLLMMonitor`, `AsyncDe
   [Rating with a decision model](rating-with-a-decision-model.md) covers the statements and how
   their probabilities combine.
 - **A guard monitor** fits when the caller has a policy in words and a guard model, such as
-  gpt-oss-safeguard or Qwen3Guard, labels the action against it. `GPT_OSS_SAFEGUARD` and
+  gpt-oss-safeguard [@openai2025gptosssafeguard] or Qwen3Guard [@qwen2025qwen3guard], labels the
+  action against it. `GPT_OSS_SAFEGUARD` and
   `QWEN3GUARD` name the labels each of those guards writes.
 
 All three return a `SuspicionScore`, so `RepeatedMonitor`, `CascadeMonitor` and `CalibratedMonitor`
@@ -173,11 +174,11 @@ default of five.
 
 Lyu et al. found that the Brier score of confidence from sampled answers fell sharply over the first
 samples and usually saturated after 15 to 20, and advise 3 to 5 samples under a tight budget
-[@lyu2025sampleconsistency, sec. 6.3]. The default of five follows that advice. Their questions were
-reasoning problems, and neither study covers gpt-oss-safeguard or Qwen3Guard.
+[@lyu2025sampleconsistency, sec. 6.3]. The default of five follows that advice. Their study used nine
+datasets of reasoning tasks, not guard labels [@lyu2025sampleconsistency, sec. 4].
 
 Guard models make overconfident predictions. Of the guards Liu et al. measured, Llama-Guard,
 Llama-Guard3 and WildGuard gave most predictions a confidence of 90 to 100%
 [@liu2025guardcalibration, sec. 4.2.1]. A guard that is that sure of its label gives the same
 label in nearly every sample of an honest action, which suggests that honest actions tend to share
-the score 0.
+the score 0. Neither study covers gpt-oss-safeguard or Qwen3Guard.

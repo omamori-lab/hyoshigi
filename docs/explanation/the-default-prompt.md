@@ -222,9 +222,9 @@ structure and a worked example
 the calibration of their grader's scores and left its ranking within noise
 [@apollo2026monitoringprompt, {Section} "Single Category ablations"]. A
 threshold reads a score's absolute level, the property the rubric moved. Their
-grader scored whole
-trajectories from 1 to 10, so the transfer to rating one action is an
-inference. One of Storf et al.'s reference prompts anchors three bands of a 1
+grader scored whole trajectories from 1 to 10
+[@apollo2026monitoringprompt, {Section} "Summary"], so the transfer to rating
+one action is an inference. One of Storf et al.'s reference prompts anchors three bands of a 1
 to 10 scale [@storf2026constitutional, {Appendix G.1.1}]. Their integer score
 from 1 to 10 outperformed a single binary answer at low false positive rates
 [@storf2026constitutional, {Appendix E.1.3}].
