@@ -122,6 +122,8 @@ minor version.
 ### Changed
 
 - The package is marked as alpha on PyPI (`Development Status :: 3 - Alpha`).
+- hyoshigi installs from PyPI, as `pip install "hyoshigi[anthropic]"`, instead of
+  from GitHub.
 
 ### Fixed
 
