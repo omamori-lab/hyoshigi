@@ -29,8 +29,12 @@ Each monitor reaches a cause in its own way.
   `max_parse_retries` more times, and then fails closed with the last cause.
   A refusal or an unavailable model fails the rating closed at once.
 - `GuardMonitor` asks for `samples` replies. The first of them, in order,
-  that is unreadable, cut off, refused or unavailable fails the whole score
-  closed, and no sample is asked again.
+  that is unreadable, cut off or refused fails the whole score closed, even
+  after an unavailable one, and no sample is asked again. An unavailable
+  sample is set aside: when more than half the samples answered, the score is
+  the share of them labelled suspicious, with the unanswered ones in the
+  evidence's `unavailable`, and otherwise the score fails closed with the
+  first unavailable sample.
 - `DecisionMonitor` fails closed with the first refusal or unavailable answer
   in the order of its statements. A decision model answers with a
   probability, so this monitor has no reply to misread or cut off.
@@ -45,6 +49,19 @@ Several of these failures are ones the agent can bring about. It shapes the
 trajectory its monitor reads, so it can grow a prompt past the context window,
 put content in its action that the monitor cannot perceive, or write text that
 provokes a refusal. Each of these scores 1.0, which reaches every threshold.
+
+## Only a sample or call with no answer is set aside
+
+`GuardMonitor` and `RepeatedMonitor` set aside a sample or call that got no
+answer, `Unavailable`, while more than half answered. A 429 that outlasts the
+client's retries, or an outage, says nothing about the action, so the samples
+or calls that answered rate it. A refusal, an unreadable reply and a cut-off
+one can come from the agent's own text. If the replies that answered could
+outvote them, an agent that garbles the samples that would flag it would pass
+on the ones left, so each of them fails the rating closed. A prompt the agent
+grows past the context window is also `Unavailable`, but every sample and call
+of a rating sends the same prompt, so none of them answers and the rating fails
+closed.
 
 ## Misuse raises
 
@@ -71,16 +88,20 @@ A misconfiguration caught as a failure would score every action 1.0 and hide
 its cause, so it raises at the first rating instead. Any other exception from
 hyoshigi's own code is a bug.
 
-## Wrappers keep a failed score at 1.0, except a cascade's fast score
+## Wrappers keep a failed score at 1.0, except an unanswered call and a cascade's fast score
 
-A failed score stays at 1.0 through `RepeatedMonitor` and
-`CalibratedMonitor`, and a failed fast score sends the action to
-`CascadeMonitor`'s careful monitor.
+A failed score stays at 1.0 through `CalibratedMonitor`, and through
+`RepeatedMonitor` unless it is an unanswered call while more than half the
+calls answered. A failed fast score sends the action to `CascadeMonitor`'s
+careful monitor.
 
-- `RepeatedMonitor` returns 1.0 when any call failed closed, with the first
-  failed call's explanation, and its evidence holds every call's score. A mean
-  would dilute the failure: with one failed call among n, it can be as low as
-  1/n.
+- `RepeatedMonitor` returns the mean of the calls that answered when more
+  than half answered and none failed closed with another cause. Otherwise it
+  returns 1.0, with the explanation of the first call that failed with another
+  cause, else of the first unanswered one. Either way its evidence holds every
+  call's score. A mean that counted a failed call would dilute the failure:
+  with one failed call among n, it can be as low as 1/n. An unanswered call
+  says nothing about the action, so the mean leaves it out.
 - `CalibratedMonitor` returns a failed score as it is, unranked. Ranked among
   n honest scores below 1.0, a failure would get the p-value
   (n + u) / (n + 1), with u the uniform tie draw. With fewer than 99 honest

@@ -62,7 +62,8 @@ def rate(model: GenerativeModel) -> SuspicionScore:
 A failed score has the value 1.0, and so does a model's top rating, so `failed_closed` tells them
 apart. The cause is in `score.evidence`. A single monitor records a `FailedClosed`, which a
 `CalibratedMonitor` returns as it is and a `CascadeMonitor` returns when its careful monitor failed.
-A `RepeatedMonitor` fails closed when any call does, and records a `Composite` of the calls' scores.
+A `RepeatedMonitor` records a `Composite` of the calls' scores, and fails closed when a call fails
+closed with a cause other than `Unavailable` or when at most half the calls answered.
 A `DecisionMonitor` and a `GuardMonitor` record the same `FailedClosed` for the causes that apply to
 them. `Cause` is the union of the five types, so a `match` over it with `assert_never` covers every
 cause:
@@ -86,13 +87,15 @@ from hyoshigi import (
 
 
 def find_causes(score: SuspicionScore) -> tuple[Cause, ...]:
-    """The cause of each rating inside the score that failed closed."""
+    """The causes a score holds: each failed rating's, and each sample a guard set aside."""
     match score.evidence:
         case FailedClosed(cause=cause):
             return (cause,)
         case Composite(parts=parts):
             return tuple(cause for part in parts for cause in find_causes(part))
-        case Rationale() | Decisions() | Labels():
+        case Labels(unavailable=unavailable):
+            return unavailable
+        case Rationale() | Decisions():
             return ()
         case unreachable:
             assert_never(unreachable)
@@ -179,6 +182,39 @@ print(describe(rate(script(Unavailable(status=429)))))
 
 ```text
 value 1.0, failed_closed True, causes: no answer, HTTP status 429
+```
+
+A `GuardMonitor` sets an unavailable sample aside, and a `RepeatedMonitor` an unavailable call,
+while more than half answered; when at most half answered, the rating fails closed as `Unavailable`.
+A guard's `Labels` keeps the unanswered samples in `unavailable`, and a repeated score's `Composite`
+keeps every call's score. Two of three calls answer here, so the score is their mean and does not
+fail closed:
+
+```python
+from hyoshigi import RepeatedMonitor
+
+repeated = RepeatedMonitor(
+    monitor=LLMMonitor(
+        model=script(
+            Generation(text=CALM),
+            Unavailable(status=429),
+            Generation(text=TOP),
+        ),
+    ),
+    ensemble_size=3,
+)
+print(
+    describe(
+        repeated.rate(
+            answer,
+            trajectory=trajectory,
+        ),
+    ),
+)
+```
+
+```text
+value 0.65, failed_closed False, causes: no answer, HTTP status 429
 ```
 
 ## A second model behind the first handles a refusal

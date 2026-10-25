@@ -247,8 +247,9 @@ monitor = CalibratedMonitor(
 )
 ```
 
-`RepeatedMonitor` reports the mean of several ratings by one monitor, and
-fails closed when any of them does. `CascadeMonitor` asks the careful monitor
+`RepeatedMonitor` reports the mean of several ratings by one monitor. It sets
+aside a rating whose model was unavailable while more than half answered, and
+fails closed when any other rating does. `CascadeMonitor` asks the careful monitor
 when the fast score reaches the threshold, so a failed fast score escalates.
 `CalibratedMonitor` reports a score as its smoothed conformal p-value among
 `honest_scores`, so a threshold of 0.99 flags 1% of honest actions on
