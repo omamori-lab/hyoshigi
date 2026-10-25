@@ -246,11 +246,13 @@ def find_failure(parts: tuple[SuspicionScore, ...]) -> SuspicionScore | None:
 
 def _is_unanswered(score: SuspicionScore) -> bool:
     """Whether the score failed closed because its model was unavailable."""
-    match score.evidence:
-        case FailedClosed(cause=Unavailable()):
-            return True
-        case _:
-            return False
+    return isinstance(
+        score.evidence,
+        FailedClosed,
+    ) and isinstance(
+        score.evidence.cause,
+        Unavailable,
+    )
 
 
 def fail_closed(

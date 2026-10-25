@@ -1494,6 +1494,32 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
             id="label-not-text",
         ),
         pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["safe"],
+                    "unavailable": None,
+                    "hidden_reasoning": [],
+                },
+            ),
+            "$.ratings[0].score.evidence.unavailable: expected a list of unavailable causes",
+            id="unavailable-not-a-list",
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "m",
+                    "labels": ["safe"],
+                    "unavailable": [{"kind": "unreadable"}],
+                    "hidden_reasoning": [],
+                },
+            ),
+            "$.ratings[0].score.evidence.unavailable[0]: expected an unavailable cause",
+            id="unavailable-another-cause",
+        ),
+        pytest.param(
             build_evidence_payload({"kind": "audit"}),
             "$.ratings[0].score.evidence: expected rationale, decisions, labels, composite or "
             "failed-closed evidence",
