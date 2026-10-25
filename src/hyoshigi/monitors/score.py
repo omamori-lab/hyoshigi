@@ -139,9 +139,10 @@ class Labels:
 class Composite:
     """The scores a monitor combined into its own: a tuple of at least one.
 
-    A composite fails closed when a part failed closed with a cause other than Unavailable, a
-    composite that failed closed counting as such a part, or when at most half its parts did
-    not fail closed.
+    A composite fails closed with the cause of its first part that failed closed with a cause
+    other than Unavailable; else, when at most half its parts did not fail closed, with the
+    cause of its first part that did. A part that is a composite counts by the cause it failed
+    closed with.
     """
 
     parts: tuple[SuspicionScore, ...]
@@ -214,45 +215,55 @@ class SuspicionScore:
         """Whether the monitor could not rate the action: a FailedClosed, or a Composite that
         fails closed.
         """
-        match self.evidence:
-            case FailedClosed():
-                return True
-            case Composite(parts=parts):
-                return find_failure(parts) is not None
-            case Rationale() | Decisions() | Labels():
-                return False
-            case unreachable:
-                assert_never(unreachable)
+        return find_cause(self) is not None
+
+
+def find_cause(score: SuspicionScore) -> Cause | None:
+    """The cause a score failed closed with, or None when it did not: a FailedClosed's cause,
+    or the cause of the part a composite fails closed by.
+    """
+    match score.evidence:
+        case FailedClosed(cause=cause):
+            return cause
+        case Composite(parts=parts):
+            causes = [find_cause(part) for part in parts]
+            position = _find_failing_position(causes)
+            return None if position is None else causes[position]
+        case Rationale() | Decisions() | Labels():
+            return None
+        case unreachable:
+            assert_never(unreachable)
 
 
 def find_failure(parts: tuple[SuspicionScore, ...]) -> SuspicionScore | None:
-    """The part a composite of the parts fails closed by, or None when it does not fail closed.
+    """The part a composite of the parts fails closed by, or None when it does not fail closed."""
+    position = _find_failing_position([find_cause(part) for part in parts])
+    return None if position is None else parts[position]
 
-    That is the first part that failed closed with a cause other than Unavailable, a composite
-    that failed closed counting as one; else, when at most half the parts did not fail closed,
-    the first part that did.
+
+def _find_failing_position(causes: list[Cause | None]) -> int | None:
+    """The position of the part a composite fails closed by, from its parts' causes, or None.
+
+    That is the first part with a cause other than Unavailable; else, when at most half the
+    parts have no cause, the first part with one.
     """
-    failed = [part for part in parts if part.failed_closed]
+    failed = [position for position, cause in enumerate(causes) if cause is not None]
     other = next(
-        (part for part in failed if not _is_unanswered(part)),
+        (
+            position
+            for position in failed
+            if not isinstance(
+                causes[position],
+                Unavailable,
+            )
+        ),
         None,
     )
     if other is not None:
         return other
-    if 2 * (len(parts) - len(failed)) > len(parts):
+    if 2 * (len(causes) - len(failed)) > len(causes):
         return None
     return failed[0]
-
-
-def _is_unanswered(score: SuspicionScore) -> bool:
-    """Whether the score failed closed because its model was unavailable."""
-    return isinstance(
-        score.evidence,
-        FailedClosed,
-    ) and isinstance(
-        score.evidence.cause,
-        Unavailable,
-    )
 
 
 def fail_closed(

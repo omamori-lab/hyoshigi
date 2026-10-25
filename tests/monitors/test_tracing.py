@@ -593,7 +593,6 @@ def build_two_of_two_calls(
                 Refused(),
             ),
             id="a-refusal-after-an-unavailable-call-of-a-nested-wrapper",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

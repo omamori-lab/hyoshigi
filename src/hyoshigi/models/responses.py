@@ -278,8 +278,9 @@ def read_message(
 
 
 def read_part(part: JSON) -> Piece | None:
-    """A message's part: output text, a refusal, or a part of another type as opaque; None if
-    it has no type, or is output text or a refusal without its text.
+    """A message's part: output text, a refusal, with its text as the explanation when that is
+    a string, or a part of another type as opaque; None if it has no type, or is output text
+    without its text.
     """
     match part:
         case {
@@ -292,7 +293,9 @@ def read_part(part: JSON) -> Piece | None:
             "refusal": str(refusal),
         }:
             return Refused(explanation=refusal)
-        case {"type": str(kind)} if kind not in ("output_text", "refusal"):
+        case {"type": "refusal"}:
+            return Refused()
+        case {"type": str(kind)} if kind != "output_text":
             return OpaquePart(kind=kind)
         case _:
             return None
