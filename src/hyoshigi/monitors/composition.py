@@ -237,8 +237,8 @@ class CalibratedMonitor(Monitor):
     et al. 2016, sec. 2, eq. 2).
 
     `honest_scores` are the wrapped monitor's scores on honest actions: any iterable but a
-    string or bytes, read once, of at least one score, each read as a float from 0 to 1. They
-    are kept sorted in `sorted_honest_scores`.
+    string or bytes, read once, of at least one score, each read as a threshold is and kept as
+    a float. They are kept sorted in `sorted_honest_scores`.
 
     Without a `random_seed` the draw is `random.random()`. With one, it is the first number
     of a `random.Random` seeded with the seed, a line break and the key: the JSON of the
@@ -459,8 +459,9 @@ def draw_tie_share(
 ) -> float:
     """Draw the tie share u, uniform on [0, 1): from the seed and the content when seeded.
 
-    A string seed goes through SHA-512 in Python's `random`, so the draw is the same in
-    every process.
+    A seeded draw is the same in every process.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/calibration/>
     """
     if random_seed is None:
         return random.random()
@@ -476,10 +477,9 @@ def render_tie_break_key(
     *,
     trajectory: Trajectory,
 ) -> str:
-    """Render the history and the action as JSON, without the ids and ratings.
+    """Render the history and the action as JSON, with action ids blanked and no ratings.
 
-    Action ids are blanked because they are generated at random: the same action has a
-    different id in every run.
+    <https://omamori-lab.github.io/hyoshigi/explanation/calibration/>
     """
     events = (
         *trajectory.history,

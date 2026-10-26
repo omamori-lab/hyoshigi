@@ -375,17 +375,19 @@ stand-in holds the score by the time an example reads it.
 `LangSmithFeedback` posts the feedback at once and returns after LangSmith answers, so an error from
 the client is raised. LangSmith's client sends feedback in the background only when it is given a
 trace id [@langsmith2026feedback, {Section} "Use create_feedback() / createFeedback"], and the
-report gives it the run's id alone. The report also passes `extend_trace_retention=False`. The
-client's default, true, may upgrade the trace to the extended retention tier, which raises its cost
+report gives it the run's id alone. The report also passes `extend_trace_retention=False`, where the
+client's default is true (langsmith 0.14.11). Feedback that passes true upgrades the trace to the
+extended retention tier, which raises its cost
 [@langsmith2026retention, {Section} "Data retention auto-upgrades"], and the report leaves the tier
 as it is. The client rounds the score to 4 decimal places, so 0.123456 is sent as 0.1235.
 
-The client tries again before it raises. After a connection error, a 404, a 408 or a 500 answer it
-makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them (langsmith 0.14.11),
-so a rating can wait about 8.5 minutes. The client retries a 404 because the run may not be ingested
-yet ([why a score may arrive before its span](../explanation/observability.md)). The synchronous
+The client tries again before it raises, and the rating waits (langsmith 0.14.11). After a 404 it
+makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about 8.5 minutes in
+all. It retries a 404 because the run may not be ingested yet ([why a score may arrive before its
+span](../explanation/observability.md)). It retries a connection error, a 408 and a 5xx answer too,
+and the synchronous client's HTTP session retries some of them within each attempt. The synchronous
 client also retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it
-has none, and double. A 401 is raised at once.
+has none, and double, which can hold a rating for over 4 hours. A 401 is raised at once.
 
 `project_id` is the id of the run's project, which LangSmith asks of feedback on a run
 [@langsmith2026feedbackformat]. The client sends it as `session_id`.
@@ -519,8 +521,9 @@ a missing provider is a misconfiguration. A sampled parent from another process 
 that: the span's context is valid and sampled, and nothing holds the span.
 
 A client can discard a score without a record from hyoshigi. A `Langfuse` client built with
-`tracing_enabled=False` sends nothing, and a LangSmith `Client` with a `tracing_sampling_rate` of less
-than 1 does not post the feedback of the runs it samples out.
+`tracing_enabled=False` sends nothing (langfuse 5.0.2), and a LangSmith `Client` with a
+`tracing_sampling_rate` of less than 1 does not post the feedback of the runs it samples out
+(langsmith 0.14.11).
 
 ## A failed report is logged and the score is returned
 

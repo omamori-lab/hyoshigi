@@ -201,9 +201,10 @@ def read_sendable_context(
 ) -> SpanContext | None:
     """The span's context when a backend can hold the span; otherwise log that nothing was sent.
 
-    An unsampled span is a sampler's decision. Any other span that was not recorded means no
-    tracer provider is set up, which is a misconfiguration, even when the span carries the
-    sampled context of a parent from another process.
+    An unsampled span is logged at debug level. Any other span that was not recorded is logged
+    as a warning, even when it carries the sampled context of a parent from another process.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/observability/>
     """
     context = _read_valid_context(span)
     if context is not None and not context.trace_flags.sampled:
@@ -322,8 +323,9 @@ def log_failure(
     *,
     error: Exception,
 ) -> None:
-    """Log that a report did not send the score, by the report's class and the error's type
-    alone: an error's message can quote the score's explanation or the request.
+    """Log that a report did not send the score, by the report's class and the error's type.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/observability/>
     """
     logger.warning(
         "%s did not send the score: %s.",
