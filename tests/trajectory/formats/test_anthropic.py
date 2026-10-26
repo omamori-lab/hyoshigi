@@ -11,6 +11,7 @@ from hyoshigi import (
     MediaPart,
     Observation,
     OpaquePart,
+    Part,
     TextPart,
     ToolCall,
     ToolObservation,
@@ -201,6 +202,41 @@ CONVERSATION: JSON = {
             "content": "Can you explain LLMs in plain English?",
         },
     ],
+}
+
+# https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages: the
+# request of "How it works", and the tool_removal block of "Mid-conversation tool changes", in beta.
+MID_CONVERSATION_REQUEST: JSON = {
+    "model": "claude-opus-5-5",
+    "max_tokens": 1024,
+    "cache_control": {"type": "ephemeral"},
+    "system": "You are a code review assistant. Be concise.",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Review process() in utils.py for performance issues.",
+        },
+        {
+            "role": "assistant",
+            "content": "The list comprehension is fine for small inputs. For large inputs, "
+            "consider a generator to avoid materializing the full list.",
+        },
+        {
+            "role": "user",
+            "content": "Now review the calling code that invokes process().",
+        },
+        {
+            "role": "system",
+            "content": "From now on, every suggestion must include explicit type annotations.",
+        },
+    ],
+}
+TOOL_REMOVAL: JSON = {
+    "type": "tool_removal",
+    "tool": {
+        "type": "tool_reference",
+        "name": "get_weather",
+    },
 }
 
 # https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls: "Example of
@@ -703,6 +739,95 @@ def test_a_system_prompt_given_as_text_or_null(
     assert trajectory.history == expected
 
 
+@pytest.mark.xfail(
+    strict=True,
+    raises=FormatError,
+)
+def test_a_system_message_becomes_the_scaffold_s_observation_in_its_place() -> None:
+    trajectory = Trajectory.from_anthropic(MID_CONVERSATION_REQUEST)
+
+    assert trajectory.history == (
+        Observation(
+            author=Author.SCAFFOLD,
+            source="system",
+            parts=(TextPart(text="You are a code review assistant. Be concise."),),
+        ),
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text="Review process() in utils.py for performance issues."),),
+        ),
+        Action(
+            id="$.messages[1].content",
+            parts=(
+                TextPart(
+                    text="The list comprehension is fine for small inputs. For large inputs, "
+                    "consider a generator to avoid materializing the full list.",
+                ),
+            ),
+        ),
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text="Now review the calling code that invokes process()."),),
+        ),
+        Observation(
+            author=Author.SCAFFOLD,
+            source="system",
+            parts=(
+                TextPart(
+                    text="From now on, every suggestion must include explicit type annotations.",
+                ),
+            ),
+        ),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=FormatError,
+)
+@pytest.mark.parametrize(
+    ("block", "part"),
+    [
+        (
+            {
+                "type": "text",
+                "text": "Say OK.",
+            },
+            TextPart(text="Say OK."),
+        ),
+        (
+            TOOL_REMOVAL,
+            OpaquePart(kind="tool_removal"),
+        ),
+    ],
+    ids=["text", "tool-removal"],
+)
+def test_a_system_message_s_block_becomes_text_or_an_opaque_part(
+    block: JSON,
+    part: Part,
+) -> None:
+    request: JSON = {
+        "messages": [
+            {
+                "role": "user",
+                "content": "Say OK.",
+            },
+            {
+                "role": "system",
+                "content": [block],
+            },
+        ],
+    }
+
+    trajectory = Trajectory.from_anthropic(request)
+
+    assert trajectory.history[-1] == Observation(
+        author=Author.SCAFFOLD,
+        source="system",
+        parts=(part,),
+    )
+
+
 # https://platform.claude.com/docs/en/build-with-claude/pdf-support: a PDF by URL, and one in
 # base64, whose published data is a shell variable, here the bytes "%PDF-1.7" and a newline.
 # Files referred to by id are opaque.
@@ -974,12 +1099,24 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             {
                 "messages": [
                     {
-                        "role": "system",
+                        "role": "developer",
                         "content": "Hi",
                     },
                 ],
             },
             "$.messages[0]",
+        ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": 42,
+                    },
+                ],
+            },
+            "$.messages[0].content",
+            marks=pytest.mark.xfail(strict=True),
         ),
         (
             {
@@ -1310,6 +1447,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "messages-not-a-list",
         "system-not-text",
         "unknown-role",
+        "system-content-not-text-or-blocks",
         "content-not-text-or-blocks",
         "text-block-without-text",
         "block-without-type",
