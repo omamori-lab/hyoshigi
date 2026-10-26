@@ -52,6 +52,11 @@ minor version.
 - A refusal part from OpenAI or OpenRouter whose text is missing, null or not
   a string is a refusal without an explanation, so it is no longer set aside
   as unavailable.
+- `GenerativeModel.from_anthropic` and `AsyncGenerativeModel.from_anthropic`
+  take only the `Anthropic` and `AsyncAnthropic` clients their signatures
+  declare, and their subclasses. `AnthropicBedrock`, `AnthropicVertex` and
+  `AnthropicBedrockMantle`, which subclass neither, now raise
+  `ConfigurationError` when the model is built.
 
 ### Fixed
 
@@ -79,6 +84,22 @@ minor version.
   observation by `SCAFFOLD` whose `source` is `system`, in its place, as it
   reads the top-level `system`. An image or a document block in one raises
   `FormatError`, as Anthropic allows neither there.
+- A model built with a client of the other family, such as
+  `GenerativeModel.from_anthropic(AsyncAnthropic())`, built, and then every
+  rating was `Unavailable`, or the first rating raised `AttributeError` or
+  `TypeError`. Each Anthropic, OpenAI and TypeSafe constructor now raises
+  `ConfigurationError` when the model is built, naming the constructor that
+  takes that client.
+- A model's function that returned a value outside its outcome union raised
+  `AssertionError`, whose message quoted the value, which can hold a model's
+  reply. It raises `ConfigurationError` naming the value's type only.
+- A model built with a function that is not callable, a `perceives` that is
+  not a `MediaTypes` or a name that is not a string failed only at the first
+  rating, if at all. Each model class raises `ConfigurationError` when built.
+- A monitor given a model of the other kind named its own twin in the hint,
+  as `LLMMonitor` given a `DecisionModel` said to use `AsyncLLMMonitor`. It
+  names the monitors that take that model: `DecisionMonitor` for a decision
+  model, `LLMMonitor` or `GuardMonitor` for a generative one.
 
 ## [0.1.0] - 2026-10-25
 
