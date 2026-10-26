@@ -83,16 +83,18 @@ monitor cannot perceive, and an action to rate that holds one fails closed.
 
 `Trajectory.from_anthropic` reads a Messages request's top-level `system` and its `messages`, which
 the reference lists as `user`, `assistant` and `system` messages
-[@anthropic2026messages, {Section} "MessageParam"]. The reader raises `FormatError` at a message of
-role `system`, and reads the top-level `system` as the system prompt. `Action.from_anthropic` reads
-the response, a message with role `assistant` and a list of content blocks
-[@anthropic2026messages, {Section} "Message"].
+[@anthropic2026messages, {Section} "MessageParam"]. It reads the top-level `system` as the system
+prompt, and a `system` message, whose content is a string or text blocks
+[@anthropic2026messages, {Section} "System Message Param"], as a system prompt in its place among
+the messages. `Action.from_anthropic` reads the response, a message with role `assistant` and a list
+of content blocks [@anthropic2026messages, {Section} "Message"].
 
 ### Messages and blocks of a request
 
 | Request | Becomes | Channel |
 |---|---|---|
 | `system`, a string or text blocks | an observation by `SCAFFOLD`, whose `source` is `system` | `CONTEXT` |
+| a `system` message | an observation by `SCAFFOLD`, whose `source` is `system` | `CONTEXT` |
 | a user message | an observation by the author the `authorship` returns, for each run of blocks between tool results | `TASK` for `USER`, `CONTEXT` for `UNKNOWN` |
 | a `tool_result` block | a tool observation answering `tool_use_id`, with `is_error` as given and false when absent | `TOOL_OBSERVATIONS`, or `TOOL_CALLS` when it is an error |
 | an assistant message | actions, which a server tool's result separates | thought on `THOUGHTS`, parts on `AGENT_PARTS`, tool calls on `TOOL_CALLS` |
@@ -102,7 +104,7 @@ A user message that holds tool results splits around them, in order: the author 
 blocks before and after a result, and the result is the tool's. A tool result's `content` is absent,
 a string or a list of blocks.
 
-### Blocks of a user message and of a tool result
+### Blocks of a user message, a system message and a tool result
 
 | Block | Becomes |
 |---|---|

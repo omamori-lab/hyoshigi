@@ -739,10 +739,6 @@ def test_a_system_prompt_given_as_text_or_null(
     assert trajectory.history == expected
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FormatError,
-)
 def test_a_system_message_becomes_the_scaffold_s_observation_in_its_place() -> None:
     trajectory = Trajectory.from_anthropic(MID_CONVERSATION_REQUEST)
 
@@ -781,10 +777,6 @@ def test_a_system_message_becomes_the_scaffold_s_observation_in_its_place() -> N
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=FormatError,
-)
 @pytest.mark.parametrize(
     ("block", "part"),
     [
@@ -1106,7 +1098,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0]",
         ),
-        pytest.param(
+        (
             {
                 "messages": [
                     {
@@ -1116,7 +1108,6 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 ],
             },
             "$.messages[0].content",
-            marks=pytest.mark.xfail(strict=True),
         ),
         (
             {

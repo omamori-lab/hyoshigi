@@ -141,7 +141,7 @@ def read_message(
     index: int,
     authorship: Authorship,
 ) -> list[tuple[str, Event]]:
-    """Read a user or assistant message into its events."""
+    """Read a user, assistant or system message into its events."""
     path = f"$.messages[{index}]"
     match message:
         case {
@@ -165,7 +165,24 @@ def read_message(
                 content,
                 path=f"{path}.content",
             )
-        case {"role": "user" | "assistant"}:
+        case {
+            "role": "system",
+            "content": str() | list(),
+        }:
+            return [
+                (
+                    f"{path}.content",
+                    Observation(
+                        author=Author.SCAFFOLD,
+                        source="system",
+                        parts=read_content(
+                            message,
+                            path=f"{path}.content",
+                        ),
+                    ),
+                ),
+            ]
+        case {"role": "user" | "assistant" | "system"}:
             raise FormatError(
                 path=f"{path}.content",
                 expected=_CONTENT,
@@ -173,7 +190,7 @@ def read_message(
         case _:
             raise FormatError(
                 path=path,
-                expected="a user or assistant message with content",
+                expected="a user, assistant or system message with content",
             )
 
 
@@ -273,7 +290,7 @@ def read_tool_result(
                 path=path,
                 expected="a tool_result with a tool_use_id, and is_error a boolean",
             )
-    parts = read_result_content(
+    parts = read_content(
         block,
         path=f"{path}.content",
     )
@@ -284,12 +301,12 @@ def read_tool_result(
     )
 
 
-def read_result_content(
+def read_content(
     block: JSON,
     *,
     path: str,
 ) -> tuple[Part, ...]:
-    """Read a tool result's content: absent, a string, or content blocks."""
+    """Read a tool result's or a system message's content: absent, a string, or content blocks."""
     match block:
         case {"content": str(text)}:
             return (TextPart(text=text),)
