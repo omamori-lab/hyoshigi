@@ -154,7 +154,7 @@ class LangSmithFeedback:
 class AsyncLangSmithFeedback:
     """Sends a score to LangSmith as LangSmithFeedback does, through an awaited client.
 
-    The fields and the errors are those of LangSmithFeedback.
+    Its fields other than `client`, and their errors, are those of LangSmithFeedback.
     """
 
     client: AsyncClient
