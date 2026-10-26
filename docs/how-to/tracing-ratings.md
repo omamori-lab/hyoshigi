@@ -146,8 +146,8 @@ status ERROR: ConfigurationError
 attributes {}, events []
 ```
 
-A cancelled async rating, such as one a timeout stops, ends its span with the status unset and no
-score.
+An async rating cancelled before it has its score, such as one a timeout stops, ends its span with
+the status unset and no score.
 
 ## Wrapped ratings and model calls nest in the span
 

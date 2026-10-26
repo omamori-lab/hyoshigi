@@ -384,8 +384,8 @@ as it is. The client rounds the score to 4 decimal places, so 0.123456 is sent a
 The client tries again before it raises, and the rating waits (langsmith 0.14.11). After a 404 it
 makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about 8.5 minutes in
 all. It retries a 404 because the run may not be ingested yet ([why a score may arrive before its
-span](../explanation/observability.md)). It retries a connection error, a 408 and a 5xx answer too,
-and the synchronous client's HTTP session retries some of them within each attempt. The synchronous
+span](../explanation/observability.md)). It retries a connection error and a 408, 500, 502, 503 or
+504 answer too, and the synchronous client's HTTP session retries some of them within each attempt. The synchronous
 client also retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it
 has none, and double, which can hold a rating for over 4 hours. A 401 is raised at once.
 
