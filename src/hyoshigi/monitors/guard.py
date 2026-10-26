@@ -24,6 +24,7 @@ from hyoshigi.models.model import (
     GenerativeModel,
     Prompt,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
     check_outcomes,
@@ -282,6 +283,8 @@ def _read_sample(
             )
         case Truncated() | Refused() | Unavailable():
             return outcome
+        case Rejected(status=status):
+            return Unavailable(status=status)
         case unreachable:
             assert_never(unreachable)
 

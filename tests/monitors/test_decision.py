@@ -21,6 +21,7 @@ from hyoshigi.models.model import (
     Prompt,
     Question,
     Refused,
+    Rejected,
     Unavailable,
 )
 from hyoshigi.monitors.decision import (
@@ -671,52 +672,48 @@ def test_an_action_with_unperceivable_content_fails_closed_without_asking(
 
 
 @MONITOR_FAMILIES
-def test_a_refused_decision_fails_closed(rate_action: SyncRate | AsyncRate) -> None:
-    action = Action()
-    refusal = Refused(explanation="Policy refusal")
-
+@pytest.mark.parametrize(
+    ("outcome", "explanation"),
+    [
+        (
+            Refused(explanation="Policy refusal"),
+            "The monitor's model refused to rate the action, so it is treated as suspicious.",
+        ),
+        (
+            Unavailable(status=503),
+            "The monitor's model was unavailable, so the action is treated as suspicious.",
+        ),
+        pytest.param(
+            Rejected(status=400),
+            "The monitor's model rejected what it was given, so the action is treated as "
+            "suspicious.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+    ids=["refused", "unavailable", "rejected"],
+)
+def test_a_refusal_a_rejection_or_an_unavailable_model_fails_closed(
+    rate_action: SyncRate | AsyncRate,
+    outcome: Refused | Rejected | Unavailable,
+    explanation: str,
+) -> None:
     score = rate_action(
-        lambda _q: refusal,
-        action,
+        lambda _q: outcome,
+        Action(),
         trajectory=Trajectory(),
     )
 
     assert (
         score.value,
-        score.failed_closed,
-    ) == (1.0, True)
-    assert score.evidence == FailedClosed(
-        model="model-1",
-        cause=refusal,
-    )
-    assert (
-        score.explanation
-        == "The monitor's model refused to rate the action, so it is treated as suspicious."
-    )
-
-
-@MONITOR_FAMILIES
-def test_an_unavailable_model_fails_closed(rate_action: SyncRate | AsyncRate) -> None:
-    action = Action()
-    unavailable = Unavailable(status=503)
-
-    score = rate_action(
-        lambda _q: unavailable,
-        action,
-        trajectory=Trajectory(),
-    )
-
-    assert (
-        score.value,
-        score.failed_closed,
-    ) == (1.0, True)
-    assert score.evidence == FailedClosed(
-        model="model-1",
-        cause=unavailable,
-    )
-    assert (
-        score.explanation
-        == "The monitor's model was unavailable, so the action is treated as suspicious."
+        score.explanation,
+        score.evidence,
+    ) == (
+        1.0,
+        explanation,
+        FailedClosed(
+            model="model-1",
+            cause=outcome,
+        ),
     )
 
 
@@ -861,11 +858,12 @@ def test_an_exception_from_the_model_propagates(rate_action: SyncRate | AsyncRat
     [
         (
             0.4,
-            "decide must return a Decision, Refused or Unavailable, got an instance of float",
+            "decide must return a Decision, Refused, Rejected or Unavailable, got an instance "
+            "of float",
         ),
         (
             None,
-            "decide must return a Decision, Refused or Unavailable, got None",
+            "decide must return a Decision, Refused, Rejected or Unavailable, got None",
         ),
     ],
     ids=["probability", "none"],

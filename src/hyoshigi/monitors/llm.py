@@ -22,6 +22,7 @@ from hyoshigi.models.model import (
     GenerativeModel,
     Prompt,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
     check_outcomes,
@@ -285,7 +286,7 @@ def _settle(
             )
         case Truncated():
             return outcome
-        case Refused() | Unavailable():
+        case Refused() | Rejected() | Unavailable():
             return fail_closed(
                 outcome,
                 model=monitor.model.name,

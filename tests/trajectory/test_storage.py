@@ -18,7 +18,7 @@ from hyoshigi import (
     ToolObservation,
     Trajectory,
 )
-from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
+from hyoshigi.models.model import Decision, Refused, Rejected, Truncated, Unavailable
 from hyoshigi.monitors.score import (
     Cause,
     Composite,
@@ -1008,6 +1008,26 @@ SCORE_CASES = [
         )
         for cause, stored in CAUSES_STORED
     ],
+    pytest.param(
+        *build_failed_closed_case(
+            Rejected(status=400),
+            {
+                "kind": "rejected",
+                "status": 400,
+            },
+        ),
+        marks=pytest.mark.xfail(strict=True),
+    ),
+    pytest.param(
+        *build_failed_closed_case(
+            Rejected(),
+            {
+                "kind": "rejected",
+                "status": None,
+            },
+        ),
+        marks=pytest.mark.xfail(strict=True),
+    ),
 ]
 SCORE_IDS = [
     "rationale",
@@ -1015,6 +1035,8 @@ SCORE_IDS = [
     "labels",
     "composite",
     *CAUSE_IDS,
+    "rejected-with-a-status",
+    "rejected-without-one",
 ]
 
 
@@ -1614,6 +1636,26 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             CAUSE_PATH,
             id="unavailable-status-a-bool",
+        ),
+        pytest.param(
+            build_cause_payload(
+                {
+                    "kind": "rejected",
+                    "status": "400",
+                },
+            ),
+            CAUSE_PATH,
+            id="rejected-status-text",
+        ),
+        pytest.param(
+            build_cause_payload(
+                {
+                    "kind": "rejected",
+                    "status": True,
+                },
+            ),
+            CAUSE_PATH,
+            id="rejected-status-a-bool",
         ),
     ],
 )

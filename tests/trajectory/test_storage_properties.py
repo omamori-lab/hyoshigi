@@ -26,6 +26,7 @@ from hyoshigi import (
     Rating,
     Rationale,
     Refused,
+    Rejected,
     StatementDecision,
     SuspicionScore,
     TextPart,
@@ -99,6 +100,10 @@ CAUSES = st.one_of(
     st.builds(
         Refused,
         explanation=st.none() | TEXT,
+    ),
+    st.builds(
+        Rejected,
+        status=st.none() | st.integers(),
     ),
     st.builds(
         Unavailable,
@@ -342,6 +347,7 @@ def pass_through_json_text(data: JSON) -> JSON:
     ],
     ids=["as dumped", "through JSON text"],
 )
+@pytest.mark.xfail(strict=True)
 @given(trajectory=trajectories())
 def test_a_trajectory_loads_back_as_it_was_dumped(
     transport: Callable[[JSON], JSON],

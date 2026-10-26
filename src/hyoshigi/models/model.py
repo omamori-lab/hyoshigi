@@ -153,6 +153,19 @@ class Refused:
     slots=True,
     kw_only=True,
 )
+class Rejected:
+    """The provider rejected the prompt as one it cannot use, with the HTTP status if there was
+    one.
+    """
+
+    status: int | None = None
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Unavailable:
     """No answer after the caller's retries, with the HTTP status if there was one."""
 
@@ -196,8 +209,8 @@ class Decision:
             )
 
 
-type GenerationOutcome = Generation | Truncated | Refused | Unavailable
-type DecisionOutcome = Decision | Refused | Unavailable
+type GenerationOutcome = Generation | Truncated | Refused | Rejected | Unavailable
+type DecisionOutcome = Decision | Refused | Rejected | Unavailable
 
 
 def check_outcomes(
