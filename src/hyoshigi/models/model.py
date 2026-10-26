@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.options import check_instance, name_class, read_threshold
+from hyoshigi.options import check_instance, describe_type, name_class, read_threshold
 from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
@@ -206,6 +206,31 @@ def check_name(name: str) -> None:
         raise ConfigurationError("a model needs a name, such as the provider's model id")
 
 
+def check_model(
+    name: str,
+    *,
+    function: Callable[..., object],
+    function_name: str,
+    perceives: MediaTypes,
+) -> None:
+    """Raise ConfigurationError unless a model's name is a non-empty str, its function is
+    callable and perceives is a MediaTypes; the message names the field and the type given.
+    """
+    check_instance(
+        name,
+        expected=str,
+        name="name",
+    )
+    check_name(name)
+    if not callable(function):
+        raise ConfigurationError(f"{function_name} must be callable, got {describe_type(function)}")
+    check_instance(
+        perceives,
+        expected=MediaTypes,
+        name="perceives",
+    )
+
+
 def check_client(
     client: object,
     *,
@@ -261,7 +286,12 @@ class GenerativeModel:
     perceives: MediaTypes = TEXT_ONLY
 
     def __post_init__(self) -> None:
-        check_name(self.name)
+        check_model(
+            self.name,
+            function=self.generate,
+            function_name="generate",
+            perceives=self.perceives,
+        )
 
     @classmethod
     def from_openai(
@@ -359,7 +389,12 @@ class AsyncGenerativeModel:
     perceives: MediaTypes = TEXT_ONLY
 
     def __post_init__(self) -> None:
-        check_name(self.name)
+        check_model(
+            self.name,
+            function=self.generate,
+            function_name="generate",
+            perceives=self.perceives,
+        )
 
     @classmethod
     def from_openai(
@@ -457,7 +492,12 @@ class DecisionModel:
     perceives: MediaTypes = TEXT_ONLY
 
     def __post_init__(self) -> None:
-        check_name(self.name)
+        check_model(
+            self.name,
+            function=self.decide,
+            function_name="decide",
+            perceives=self.perceives,
+        )
 
     @classmethod
     def from_openai(
@@ -534,7 +574,12 @@ class AsyncDecisionModel:
     perceives: MediaTypes = TEXT_ONLY
 
     def __post_init__(self) -> None:
-        check_name(self.name)
+        check_model(
+            self.name,
+            function=self.decide,
+            function_name="decide",
+            perceives=self.perceives,
+        )
 
     @classmethod
     def from_openai(

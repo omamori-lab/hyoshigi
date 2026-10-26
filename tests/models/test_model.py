@@ -295,7 +295,6 @@ def test_a_model_without_a_name_raises(
     assert str(raised.value) == "a model needs a name, such as the provider's model id"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "fields", "message"),
     [
