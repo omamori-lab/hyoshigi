@@ -613,6 +613,19 @@ def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when
         )
 
 
+@pytest.mark.xfail(strict=True)
+def test_a_perceives_that_is_not_media_types_raises_when_the_model_is_built(
+    build_driver: BuildDriver,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        build_driver(
+            Wire(REFERENCE_RESPONSE).respond,
+            perceives="image/png",  # ty: ignore[invalid-argument-type]
+        )
+
+    assert str(raised.value) == "perceives must be a MediaTypes, got an instance of str"
+
+
 @pytest.mark.parametrize(
     ("build", "client", "message"),
     [
