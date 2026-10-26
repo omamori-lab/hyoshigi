@@ -1,7 +1,7 @@
 # Provider adapters
 
-Six adapters connect a monitor to a provider. Each sends one request per call through the caller's
-SDK client and returns an outcome. A generative model returns `Generation`, `Truncated`, `Refused`
+Six adapters connect a monitor to a provider. Each makes at most one call to the caller's SDK client
+per prompt, which the client may retry, and returns an outcome. A generative model returns `Generation`, `Truncated`, `Refused`
 or `Unavailable`, and a decision model `Decision`, `Refused` or `Unavailable`. The client holds
 the key, the timeout and the retries, so an outcome is what remains after the client's retries.
 [Connecting a model](../how-to/connecting-a-model.md) builds the clients.
@@ -19,7 +19,7 @@ Each constructor has an async twin, such as `AsyncGenerativeModel.from_anthropic
 async client, or the one `OpenRouter` client, and awaits the async form of the call. A model's name
 is the provider and the model id, such as `anthropic:claude-haiku-5-5`. Building a model raises
 `ConfigurationError` for an empty model id and for a `perceives` that names media the API cannot
-carry. Each section gives the media its adapter carries.
+carry.
 
 ## An outcome says whether the provider answered
 
@@ -37,14 +37,15 @@ answer came, which includes a prompt the provider rejected and one the adapter c
 | `Unavailable` with 408, 409, 429, a 5xx, or a 1xx or 3xx status | The provider gave no answer now |
 | `Unavailable` with no status | No answer arrived: a connection error, a timeout, or a body nothing can read. Or no request was sent: the prompt holds nothing to send, media in a form the API cannot take, or text the client cannot encode |
 | `Unavailable` with 400, 404 or 413 | The provider rejected what the prompt holds: a prompt over the context window, an image it cannot use, a body too large |
-| `ConfigurationError`, raised | The provider rejected a request that cannot work |
+| `ConfigurationError`, raised | The provider, or the SDK before sending, rejected a request that cannot work |
 
 A rejected or unsent prompt is the same for every sample and call of a rating, so none of them
 answers, and the rating fails closed.
 
 ## A client error raises unless it blames the prompt
 
-The four providers' adapters read an HTTP error status the same way:
+On OpenAI and OpenRouter, an error whose code is a refusal or names a policy is `Refused` at any
+status. Otherwise the four providers' adapters read an HTTP error status the same way:
 
 - 408 (request timeout), 409 (conflict), 413 (payload too large) and 429 (too many requests) are
   `Unavailable` with the status. A retry can clear a timeout, a conflict or a rate limit, and the
@@ -53,8 +54,7 @@ The four providers' adapters read an HTTP error status the same way:
   ([Handling a failed rating](../how-to/handling-a-failed-rating.md#a-429-that-outlasts-the-clients-retries-is-unavailable)).
 - A 5xx is `Unavailable` with the status.
 - Any other 4xx raises `ConfigurationError`, unless the error names a refusal, which is `Refused`,
-  or blames what the prompt holds, which is `Unavailable` with the status. Each section lists the
-  errors it reads that way.
+  or blames what the prompt holds, which is `Unavailable` with the status.
 - A connection error or a timeout is `Unavailable` with no status.
 
 Each provider documents 401 as a missing or invalid key, 429 as a rate limit, and a 5xx as a
@@ -151,8 +151,9 @@ which can hold prompts and responses, are kept for up to 30 days by default what
 [@openai2026yourdata, {Section} "Data retention controls for abuse monitoring"].
 
 `perceives` may name `image/*`, `application/*`, `text/*` and the types under them. Before any
-request, `image/*` bytes and text with no UTF-8 form return `Unavailable()`, and media of another
-top-level type raises `ConfigurationError` naming it.
+request, bytes typed with one of those ranges, such as `image/*`, which no data URL can name, and
+text with no UTF-8 form return `Unavailable()`, and media of another top-level type raises
+`ConfigurationError` naming it.
 
 ### Replies
 
