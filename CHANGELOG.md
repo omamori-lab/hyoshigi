@@ -56,6 +56,11 @@ minor version.
   agent nothing; the scaffold decides.
 - The first-rating tutorial cited Sutton and Barto's section 3.1 for a
   history of actions and observations, which section 17.3 defines.
+- `Trajectory.from_anthropic` raised `FormatError` at a message of role
+  `system`, which Anthropic's Messages API accepts among a request's
+  messages, so a request that held one could not be rated. It reads one as an
+  observation by `SCAFFOLD` whose `source` is `system`, in its place, as it
+  reads the top-level `system`.
 
 ## [0.1.0] - 2026-10-25
 
