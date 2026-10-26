@@ -4,7 +4,7 @@ from base64 import b64decode, b64encode
 from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
-from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
+from hyoshigi.models.model import Decision, Refused, Rejected, Truncated, Unavailable
 from hyoshigi.monitors.score import (
     Cause,
     Composite,
@@ -427,7 +427,7 @@ def dump_cause(cause: Cause) -> JSON:
                 "kind": "refused",
                 "explanation": cause.explanation,
             }
-        case Unavailable():
+        case Unavailable() | Rejected():
             return {
                 "kind": "unavailable",
                 "status": cause.status,
@@ -745,7 +745,7 @@ def load_model_outcome(
         }:
             return Refused(explanation=explanation)
         case {
-            "kind": "unavailable",
+            "kind": "unavailable" | "rejected",
             "status": int() | None as status,
         } if not isinstance(
             status,

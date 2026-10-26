@@ -5,7 +5,7 @@ import math
 import pytest
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
+from hyoshigi.models.model import Decision, Refused, Rejected, Truncated, Unavailable
 from hyoshigi.monitors.score import (
     Cause,
     Composite,
@@ -69,6 +69,10 @@ UNANSWERED = fail_closed(
     Unavailable(status=503),
     model="m",
 )
+REJECTED = fail_closed(
+    Rejected(status=400),
+    model="m",
+)
 COMBINED_WITH_COMBINED = SuspicionScore(
     value=1.0,
     explanation="A part failed.",
@@ -87,8 +91,19 @@ STATEMENT = StatementDecision(
 
 @pytest.mark.parametrize(
     ("cause", "explanation"),
-    CAUSES_AND_EXPLANATIONS,
-    ids=CAUSE_IDS,
+    [
+        *CAUSES_AND_EXPLANATIONS,
+        pytest.param(
+            Rejected(status=400),
+            "The monitor's model rejected what it was given, so the action is treated as "
+            "suspicious.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+    ids=[
+        *CAUSE_IDS,
+        "rejected",
+    ],
 )
 def test_failing_closed_scores_one_with_the_causes_explanation_and_the_failure_as_evidence(
     cause: Cause,
@@ -187,6 +202,14 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
             UNANSWERED,
             RATED,
         ),
+        pytest.param(
+            (
+                RATED,
+                RATED,
+                REJECTED,
+            ),
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "one-level",
@@ -195,6 +218,7 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
         "a-composite-failed-by-a-refusal-among-more-rated-parts",
         "half-the-parts-unanswered",
         "most-parts-unanswered",
+        "a-rejection-among-more-rated-parts",
     ],
 )
 def test_a_score_combining_one_that_failed_closed_reports_it(

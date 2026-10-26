@@ -26,6 +26,7 @@ from hyoshigi import (
     Prompt,
     Question,
     Refused,
+    Rejected,
     TextPart,
     ToolCall,
     Trajectory,
@@ -95,6 +96,15 @@ UNAVAILABLE_SCORE = SuspicionScore(
     evidence=FailedClosed(
         model=MODEL_NAME,
         cause=Unavailable(status=503),
+    ),
+)
+REJECTED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model rejected what it was given, so the action is treated as "
+    "suspicious.",
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Rejected(status=400),
     ),
 )
 UNPERCEIVABLE_SCORE = SuspicionScore(
@@ -741,10 +751,15 @@ def test_a_failed_closed_score_records_the_cause_of_the_last_attempt(
             Unavailable(status=503),
             UNAVAILABLE_SCORE,
         ),
+        pytest.param(
+            Rejected(status=400),
+            REJECTED_SCORE,
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
-    ids=["refused", "unavailable"],
+    ids=["refused", "unavailable", "rejected"],
 )
-def test_a_refusal_or_an_unavailable_model_fails_closed_after_one_call(
+def test_a_refusal_a_rejection_or_an_unavailable_model_fails_closed_after_one_call(
     rate: Rate,
     outcome: GenerationOutcome,
     expected: SuspicionScore,
@@ -832,12 +847,13 @@ def test_an_exception_from_the_model_propagates(rate: Rate) -> None:
     [
         (
             CALM_REPLY,
-            "generate must return a Generation, Truncated, Refused or Unavailable, "
+            "generate must return a Generation, Truncated, Refused, Rejected or Unavailable, "
             "got an instance of str",
         ),
         (
             None,
-            "generate must return a Generation, Truncated, Refused or Unavailable, got None",
+            "generate must return a Generation, Truncated, Refused, Rejected or Unavailable, "
+            "got None",
         ),
     ],
     ids=["reply-text", "none"],

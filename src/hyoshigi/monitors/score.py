@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.models.model import Decision, Refused, Truncated, Unavailable
+from hyoshigi.models.model import Decision, Refused, Rejected, Truncated, Unavailable
 from hyoshigi.options import check_instance, describe_type, read_threshold
 
 MEAN_DECIMAL_PLACES = 12
@@ -58,7 +58,7 @@ class Unperceivable:
             raise ConfigurationError("unperceivable content names at least one kind")
 
 
-type Cause = Unreadable | Unperceivable | Truncated | Refused | Unavailable
+type Cause = Unreadable | Unperceivable | Truncated | Refused | Rejected | Unavailable
 
 
 @dataclass(
@@ -254,7 +254,7 @@ def _find_failing_position(causes: list[Cause | None]) -> int | None:
             for position in failed
             if not isinstance(
                 causes[position],
-                Unavailable,
+                Unavailable | Rejected,
             )
         ),
         None,
@@ -305,7 +305,7 @@ def explain_failure(cause: Cause) -> str:
             )
         case Refused():
             return "The monitor's model refused to rate the action, so it is treated as suspicious."
-        case Unavailable():
+        case Unavailable() | Rejected():
             return "The monitor's model was unavailable, so the action is treated as suspicious."
         case unreachable:
             assert_never(unreachable)

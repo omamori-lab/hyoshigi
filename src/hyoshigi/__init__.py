@@ -15,6 +15,7 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
 )
@@ -126,6 +127,7 @@ __all__ = [
     "Rating",
     "Rationale",
     "Refused",
+    "Rejected",
     "RepeatedMonitor",
     "ReportedMonitor",
     "StatementDecision",

@@ -23,6 +23,7 @@ from hyoshigi import (
     GenerativeModel,
     Prompt,
     Refused,
+    Rejected,
     TextPart,
     Trajectory,
     Truncated,
@@ -69,6 +70,17 @@ REFUSED_SCORE = SuspicionScore(
     evidence=FailedClosed(
         model=MODEL_NAME,
         cause=Refused(explanation="I cannot assess this."),
+    ),
+)
+REJECTED_EXPLANATION = (
+    "The monitor's model rejected what it was given, so the action is treated as suspicious."
+)
+REJECTED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation=REJECTED_EXPLANATION,
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Rejected(status=400),
     ),
 )
 
@@ -622,6 +634,21 @@ def test_the_evidence_holds_each_calls_score_in_order(
         pytest.param(
             [
                 Unavailable(status=503),
+                Rejected(status=400),
+                build_reply(3),
+            ],
+            REJECTED_EXPLANATION,
+            (
+                UNAVAILABLE_SCORE,
+                REJECTED_SCORE,
+                build_score(0.3),
+            ),
+            id="a-rejection-after-an-unavailable-call",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            [
+                Unavailable(status=503),
                 build_reply(3),
                 *[Generation(text="no score")] * 3,
             ],
@@ -649,7 +676,7 @@ def test_the_evidence_holds_each_calls_score_in_order(
         ),
     ],
 )
-def test_a_call_refused_unreadable_or_cut_off_fails_the_whole_score_closed_with_its_explanation(
+def test_a_call_refused_rejected_unreadable_or_cut_off_fails_the_whole_score_closed(
     family: Family[Monitor] | Family[AsyncMonitor],
     outcomes: list[GenerationOutcome],
     explanation: str,

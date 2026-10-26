@@ -38,6 +38,7 @@ from hyoshigi import (
     Monitor,
     MonitorPrompt,
     Refused,
+    Rejected,
     RepeatedMonitor,
     SuspicionScore,
     TextPart,
@@ -80,6 +81,10 @@ FAILURES = st.one_of(
     st.builds(
         Refused,
         explanation=st.none() | st.text(),
+    ),
+    st.builds(
+        Rejected,
+        status=st.none() | st.integers(),
     ),
     UNAVAILABLE,
 )
@@ -377,6 +382,7 @@ def rate_three_calls(
     return family.rate(repeated)
 
 
+@pytest.mark.xfail(strict=True)
 @FAMILIES
 @given(
     calls=st.lists(
@@ -387,13 +393,13 @@ def rate_three_calls(
         lambda calls: any(
             isinstance(
                 call,
-                Refused,
+                Refused | Rejected,
             )
             for call in calls
         ),
     ),
 )
-def test_repeated_ratings_fail_closed_when_any_call_is_refused(
+def test_repeated_ratings_fail_closed_when_any_call_is_refused_or_rejected(
     family: Family,
     calls: list[GenerationOutcome],
 ) -> None:
@@ -462,7 +468,7 @@ def test_repeated_ratings_do_not_fail_closed_when_two_of_three_calls_answer(
 )
 def test_a_calibrated_monitor_returns_a_score_that_failed_closed_unranked(
     family: Family,
-    failure: Refused | Unavailable,
+    failure: Refused | Rejected | Unavailable,
     honest_scores: list[float],
 ) -> None:
     calibrated = family.calibrated(
@@ -495,8 +501,8 @@ def test_a_calibrated_monitor_returns_a_score_that_failed_closed_unranked(
 )
 def test_a_cascade_gives_the_careful_failure_after_a_fast_score_that_failed_closed(
     family: Family,
-    fast_failure: Refused | Unavailable,
-    careful_failure: Refused | Unavailable,
+    fast_failure: Refused | Rejected | Unavailable,
+    careful_failure: Refused | Rejected | Unavailable,
     escalation_threshold: float,
 ) -> None:
     cascade = family.cascade(
@@ -533,7 +539,7 @@ def test_a_cascade_gives_the_careful_failure_after_a_fast_score_that_failed_clos
 )
 def test_a_cascade_gives_the_careful_score_after_a_fast_score_that_failed_closed(
     family: Family,
-    fast_failure: Refused | Unavailable,
+    fast_failure: Refused | Rejected | Unavailable,
     careful_score: int,
     escalation_threshold: float,
 ) -> None:

@@ -23,6 +23,7 @@ from hyoshigi.models.model import (
     Prompt,
     Question,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
 )
@@ -99,6 +100,15 @@ UNAVAILABLE_SCORE = SuspicionScore(
     evidence=FailedClosed(
         model=MODEL_NAME,
         cause=Unavailable(status=503),
+    ),
+)
+REJECTED_SCORE = SuspicionScore(
+    value=1.0,
+    explanation="The monitor's model rejected what it was given, so the action is treated as "
+    "suspicious.",
+    evidence=FailedClosed(
+        model=MODEL_NAME,
+        cause=Rejected(status=400),
     ),
 )
 IGNORE_HARD_LABELS = pytest.mark.filterwarnings("ignore::hyoshigi.monitors.guard.HardLabelWarning")
@@ -600,9 +610,21 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             REFUSED_SCORE,
             id="a-refusal-before-a-reply-with-no-label",
         ),
+        pytest.param(
+            (
+                Unavailable(status=503),
+                Rejected(status=400),
+                SAFE,
+                SAFE,
+                SAFE,
+            ),
+            REJECTED_SCORE,
+            id="a-rejection-after-an-unavailable-sample",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
 )
-def test_the_first_sample_unreadable_cut_off_or_refused_fails_the_score_closed_with_its_cause(
+def test_the_first_sample_unreadable_cut_off_refused_or_rejected_fails_the_score_closed(
     rate: Rate,
     outcomes: tuple[GenerationOutcome, ...],
     expected: SuspicionScore,
@@ -961,12 +983,13 @@ def test_more_than_one_sample_builds_without_a_warning(
     [
         (
             "unsafe\nS7",
-            "generate must return a Generation, Truncated, Refused or Unavailable, "
+            "generate must return a Generation, Truncated, Refused, Rejected or Unavailable, "
             "got an instance of str",
         ),
         (
             None,
-            "generate must return a Generation, Truncated, Refused or Unavailable, got None",
+            "generate must return a Generation, Truncated, Refused, Rejected or Unavailable, "
+            "got None",
         ),
     ],
     ids=["reply-text", "none"],

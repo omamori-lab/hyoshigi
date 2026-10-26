@@ -21,6 +21,7 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Refused,
+    Rejected,
     Unavailable,
     check_outcomes,
 )
@@ -215,12 +216,12 @@ def build_state(rendering: Rendering) -> tuple[PromptPart, ...]:
 
 def collect_decisions(
     outcomes: tuple[DecisionOutcome, ...],
-) -> tuple[Decision, ...] | Refused | Unavailable:
+) -> tuple[Decision, ...] | Refused | Rejected | Unavailable:
     """Return the decisions in order, or the first failure in statement order."""
     decisions: list[Decision] = []
     for outcome in outcomes:
         match outcome:
-            case Refused() | Unavailable():
+            case Refused() | Rejected() | Unavailable():
                 return outcome
             case Decision():
                 decisions.append(outcome)
@@ -297,7 +298,7 @@ def plan_decision(
     collected = collect_decisions(outcomes)
     if isinstance(
         collected,
-        Refused | Unavailable,
+        Refused | Rejected | Unavailable,
     ):
         return fail_closed(
             collected,
