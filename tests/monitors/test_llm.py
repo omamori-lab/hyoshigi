@@ -955,19 +955,17 @@ def build(request: pytest.FixtureRequest) -> Callable[..., LLMMonitor | AsyncLLM
             "model must be an AsyncGenerativeModel, got an instance of GenerativeModel. "
             "Use LLMMonitor for a GenerativeModel.",
         ),
-        pytest.param(
+        (
             LLMMonitor,
             SYNC_DECISION_MODEL,
             "model must be a GenerativeModel, got an instance of DecisionModel. "
             "Use DecisionMonitor for a DecisionModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             AsyncLLMMonitor,
             ASYNC_DECISION_MODEL,
             "model must be an AsyncGenerativeModel, got an instance of AsyncDecisionModel. "
             "Use AsyncDecisionMonitor for an AsyncDecisionModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

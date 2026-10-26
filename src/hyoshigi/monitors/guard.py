@@ -28,7 +28,7 @@ from hyoshigi.models.model import (
     Unavailable,
 )
 from hyoshigi.monitors.guard_labels import GuardLabels, read_label
-from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
+from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_decision_monitor
 from hyoshigi.monitors.prompts import MonitorPrompt
 from hyoshigi.monitors.rendering import render
 from hyoshigi.monitors.score import (
@@ -89,7 +89,10 @@ class GuardMonitor(Monitor):
             self.model,
             expected=GenerativeModel,
             name="model",
-            hint="Use AsyncGuardMonitor for an AsyncGenerativeModel.",
+            hint=name_decision_monitor(
+                self.model,
+                otherwise="Use AsyncGuardMonitor for an AsyncGenerativeModel.",
+            ),
         )
         _check_options(self)
 
@@ -133,7 +136,10 @@ class AsyncGuardMonitor(AsyncMonitor):
             self.model,
             expected=AsyncGenerativeModel,
             name="model",
-            hint="Use GuardMonitor for a GenerativeModel.",
+            hint=name_decision_monitor(
+                self.model,
+                otherwise="Use GuardMonitor for a GenerativeModel.",
+            ),
         )
         _check_options(self)
 

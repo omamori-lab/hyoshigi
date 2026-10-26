@@ -1006,19 +1006,17 @@ def test_a_value_outside_the_outcome_union_raises_naming_its_type(
             "model must be an AsyncGenerativeModel, got an instance of GenerativeModel. "
             "Use GuardMonitor for a GenerativeModel.",
         ),
-        pytest.param(
+        (
             GuardMonitor,
             SYNC_DECISION_MODEL,
             "model must be a GenerativeModel, got an instance of DecisionModel. "
             "Use DecisionMonitor for a DecisionModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             AsyncGuardMonitor,
             ASYNC_DECISION_MODEL,
             "model must be an AsyncGenerativeModel, got an instance of AsyncDecisionModel. "
             "Use AsyncDecisionMonitor for an AsyncDecisionModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

@@ -25,7 +25,7 @@ from hyoshigi.models.model import (
     Truncated,
     Unavailable,
 )
-from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
+from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_decision_monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
 from hyoshigi.monitors.rendering import Rendering, render
 from hyoshigi.monitors.score import (
@@ -84,7 +84,10 @@ class LLMMonitor(Monitor):
             self.model,
             expected=GenerativeModel,
             name="model",
-            hint="Use AsyncLLMMonitor for an AsyncGenerativeModel.",
+            hint=name_decision_monitor(
+                self.model,
+                otherwise="Use AsyncLLMMonitor for an AsyncGenerativeModel.",
+            ),
         )
         _check_options(self)
 
@@ -129,7 +132,10 @@ class AsyncLLMMonitor(AsyncMonitor):
             self.model,
             expected=AsyncGenerativeModel,
             name="model",
-            hint="Use LLMMonitor for a GenerativeModel.",
+            hint=name_decision_monitor(
+                self.model,
+                otherwise="Use LLMMonitor for a GenerativeModel.",
+            ),
         )
         _check_options(self)
 
