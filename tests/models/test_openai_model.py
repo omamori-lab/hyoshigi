@@ -5,7 +5,7 @@ each reply.
 import asyncio
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -2102,6 +2102,56 @@ def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming
             respond(DAMAGED_RESPONSE),
             perceives=MediaTypes(*patterns),
         )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("build", "client", "message"),
+    [
+        (
+            GenerativeModel.from_openai,
+            AsyncOpenAI(api_key=API_KEY),
+            "client must be an OpenAI, got an instance of openai.AsyncOpenAI. "
+            "Use AsyncGenerativeModel.from_openai for an AsyncOpenAI.",
+        ),
+        (
+            AsyncGenerativeModel.from_openai,
+            OpenAI(api_key=API_KEY),
+            "client must be an AsyncOpenAI, got an instance of openai.OpenAI. "
+            "Use GenerativeModel.from_openai for an OpenAI.",
+        ),
+        (
+            DecisionModel.from_openai,
+            AsyncOpenAI(api_key=API_KEY),
+            "client must be an OpenAI, got an instance of openai.AsyncOpenAI. "
+            "Use AsyncDecisionModel.from_openai for an AsyncOpenAI.",
+        ),
+        (
+            AsyncDecisionModel.from_openai,
+            OpenAI(api_key=API_KEY),
+            "client must be an AsyncOpenAI, got an instance of openai.OpenAI. "
+            "Use DecisionModel.from_openai for an OpenAI.",
+        ),
+    ],
+    ids=[
+        "async-client-for-the-sync-model",
+        "sync-client-for-the-async-model",
+        "async-client-for-the-sync-decision-model",
+        "sync-client-for-the-async-decision-model",
+    ],
+)
+def test_a_client_of_the_other_family_raises_when_the_model_is_built(
+    build: Callable[..., object],
+    client: object,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        build(
+            client,
+            model=MODEL,
+        )
+
+    assert str(raised.value) == message
 
 
 def test_text_is_sent_as_the_input_with_one_predicate_question(
