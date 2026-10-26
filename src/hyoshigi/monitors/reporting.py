@@ -1,21 +1,15 @@
 """The monitor that sends its rating's score to Langfuse and LangSmith, for the rating's span.
 
-ReportedMonitor rates with the monitor it wraps inside a span of its own (tracing.py) and,
-once the span has ended, sends the score for that span, so a backend that ingests the span
-from OpenTelemetry shows the score on it. Langfuse takes the span's trace id as 32 lower-case
-hex digits and its span id as 16, the ids its client reads from the current span
-(langfuse 5.0.2, Langfuse.get_current_trace_id and get_current_observation_id). LangSmith
-ingests a span as a run whose id is the span id's 8 bytes right-aligned in a 16-byte UUID
-(langsmith 0.14.11, langsmith.integrations.otel.langsmith_run_id_from_otel_span_id). A score
-may reach either before its span: Langfuse documents it
-(https://langfuse.com/docs/evaluation/evaluation-methods/scores-via-sdk), and LangSmith's
-client retries feedback on a run not yet ingested (Client.create_feedback).
+ReportedMonitor rates with the monitor it wraps inside a span of its own and, once the span has
+ended, sends the score for that span: to Langfuse the span's trace id as 32 lower-case hex
+digits and its span id as 16, to LangSmith the run id that holds the span id's 8 bytes
+right-aligned in a 16-byte UUID.
 
-A score is sent only when the span's context is valid and sampled; otherwise no backend holds
-the span, and a log record says nothing was sent. Reporting never changes or loses a score: a
-report that raises is logged, the other reports are sent, and the score is returned. A log
-record names the report's class and the exception's type, never the trajectory, the
-explanation or the exception's message, which can quote them.
+A score is sent only when the span's context is valid and sampled; otherwise a log record says
+nothing was sent. A report that raises is logged by the report's class and the exception's
+type, the other reports are sent, and the score is returned unchanged.
+
+<https://omamori-lab.github.io/hyoshigi/explanation/observability/>
 """
 
 # OpenTelemetry's classes are imported only to type, since it is an optional extra.

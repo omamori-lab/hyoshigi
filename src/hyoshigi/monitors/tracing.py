@@ -1,17 +1,14 @@
 """A span per rating in OpenTelemetry, when the opentelemetry-api package is installed.
 
 Every monitor's rating opens a span named "rate" and the monitor's class, of kind INTERNAL,
-as the current span, so the ratings of a wrapped monitor and the calls of an instrumented model
-client nest inside it. The span comes from the global tracer provider's tracer "hyoshigi".
-Once the rating has its score, the span carries the score in the attributes of OpenTelemetry's
-evaluation result, gen_ai.evaluation.name, gen_ai.evaluation.score.value and
-gen_ai.evaluation.explanation (the event gen_ai.evaluation.result, OpenTelemetry semantic
-conventions for generative AI, docs/gen-ai/gen-ai-events.md, in development), and whether the
-score failed closed, with its cause's class when it did. Langfuse's default export filter keeps
-a span with a gen_ai.* attribute and drops one without (langfuse 5.0.2,
-langfuse/_client/span_filter.py, is_default_export_span). An exception raised during the
-rating marks the span as an error by its type alone, since its message can quote the request,
-and is raised on. Without the package, a rating opens no span.
+as the current span, from the global tracer provider's tracer "hyoshigi". Once the rating has
+its score, the span carries gen_ai.evaluation.name, gen_ai.evaluation.score.value and
+gen_ai.evaluation.explanation, the attributes of OpenTelemetry's gen_ai.evaluation.result
+event, and hyoshigi.failed_closed, with hyoshigi.cause when the score failed closed. An
+exception raised during the rating marks the span as an error by its type alone and is raised
+on. Without the package, a rating opens no span.
+
+<https://omamori-lab.github.io/hyoshigi/explanation/observability/>
 """
 
 # Tracer and Span are imported only to type, since opentelemetry-api is an optional extra.

@@ -87,14 +87,15 @@ class LangfuseScores:
     kw_only=True,
 )
 class LangSmithFeedback:
-    """Sends a score to LangSmith as model feedback on a run, and waits until it is stored.
+    """Sends a score to LangSmith as model feedback on a run, and waits for LangSmith's answer.
 
-    The feedback is posted at once, not queued, so it needs no trace id, and it leaves the
-    trace's retention as it is. LangSmith keeps the score to 4 decimal places. `project_id` is
-    the run's project id, a UUID string, which LangSmith asks of feedback on a run
-    (Client.create_feedback, session_id). An error from the client is raised. A `client` that
-    is not a langsmith.Client, a blank `name` or a `project_id` that is not a UUID string
-    raises ConfigurationError when the report is built.
+    The feedback is posted at once, with no trace id, and leaves the trace's retention as it
+    is; the client rounds the score to 4 decimal places and retries as its create_feedback
+    does. `project_id` is the run's project id, a UUID string. An error from the client is
+    raised. A `client` that is not a langsmith.Client, a blank `name` or a `project_id` that
+    is not a UUID string raises ConfigurationError when the report is built.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/reporting-scores-to-langfuse-and-langsmith/>
     """
 
     client: Client
