@@ -28,6 +28,8 @@ minor version.
 - The docs pages, the README and the default prompt's module carry the
   training-data canary that alignment.org/canary lists, so a dataset builder
   can leave them out of training corpora.
+- Docs pages on connecting a model, and on what each provider adapter
+  sends and what each reply or error becomes.
 
 ### Changed
 

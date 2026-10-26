@@ -113,6 +113,7 @@ nav:
       - Keeping a trajectory: how-to/keeping-a-trajectory.md
       - Reading an agent's own format: how-to/reading-an-agents-own-format.md
       - Choosing a monitor: how-to/choosing-a-monitor.md
+      - Connecting a model: how-to/connecting-a-model.md
       - Choosing what a monitor reads: how-to/choosing-what-a-monitor-reads.md
       - Rating with an LLM monitor: how-to/rating-with-an-llm-monitor.md
       - Rating with a decision model: how-to/rating-with-a-decision-model.md
@@ -126,4 +127,5 @@ nav:
   - Reference:
       - API: reference/api.md
       - Provider formats: reference/formats.md
+      - Provider adapters: reference/providers.md
   - The name: name.md
