@@ -739,7 +739,7 @@ def test_a_system_prompt_given_as_text_or_null(
     assert trajectory.history == expected
 
 
-def test_a_system_message_becomes_the_scaffold_s_observation_in_its_place() -> None:
+def test_the_published_request_with_a_system_message_becomes_its_events_in_order() -> None:
     trajectory = Trajectory.from_anthropic(MID_CONVERSATION_REQUEST)
 
     assert trajectory.history == (
@@ -1113,6 +1113,17 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             {
                 "messages": [
                     {
+                        "role": "system",
+                        "content": [{"type": "text"}],
+                    },
+                ],
+            },
+            "$.messages[0].content[0]",
+        ),
+        (
+            {
+                "messages": [
+                    {
                         "role": "user",
                         "content": 42,
                     },
@@ -1439,6 +1450,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "system-not-text",
         "unknown-role",
         "system-content-not-text-or-blocks",
+        "system-block-without-text",
         "content-not-text-or-blocks",
         "text-block-without-text",
         "block-without-type",
