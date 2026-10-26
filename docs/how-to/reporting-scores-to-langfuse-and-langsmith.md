@@ -390,6 +390,25 @@ span](../explanation/observability.md)). It retries a connection error and a 408
 client also retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it
 has none, and double, which can hold a rating for over 4 hours. A 401 is raised at once.
 
+`stop_after_attempt` caps the attempts, a positive integer that is 10 by default, as in the client's
+`create_feedback`. A control loop that cannot wait sets a low value, such as 2:
+
+```python
+feedback = LangSmithFeedback(
+    client=Client(
+        api_url=langsmith_url,
+        api_key="lsv2-offline",
+        info={},
+        auto_batch_tracing=False,
+    ),
+    project_id=PROJECT_ID,
+    stop_after_attempt=2,
+)
+```
+
+A 404 is then retried once, after about a second, and the score of a run not yet ingested may be
+lost, which the report [logs](#a-failed-report-is-logged-and-the-score-is-returned).
+
 `project_id` is the id of the run's project, which LangSmith asks of feedback on a run
 [@langsmith2026feedbackformat]. The client sends it as `session_id`.
 
