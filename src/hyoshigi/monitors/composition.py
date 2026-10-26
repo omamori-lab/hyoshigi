@@ -232,37 +232,24 @@ def build_mean_score(parts: tuple[SuspicionScore, ...]) -> SuspicionScore:
 class CalibratedMonitor(Monitor):
     """Reports a monitor's score as its smoothed conformal p-value among honest scores.
 
-    Control evaluations set thresholds as percentiles of honest-run scores, so an audit
-    budget of 1% flags the top 1% of honest actions. The p-value ranks the raw score among
-    the n honest scores as a share of n + 1, with its ties broken by a uniform random draw
-    u: (below + u * (tied + 1)) / (n + 1). That is the smoothed conformal p-value of Vovk et
-    al. ("Criteria of efficiency for conformal prediction", arXiv:1603.04416, section 2,
-    equation 2) with the raw score as the conformity score, and ties are broken at random as
-    Makins et al. ("Multi-Agent AI Control: Distributed Attacks Hamper Per-Instance
-    Monitors", arXiv:2607.07368, appendix G.4.1) and LinuxArena (Tracy et al., "LinuxArena: A
-    Control Setting for AI Agents in Live Production Software Environments",
-    arXiv:2604.15384, section 5.1) break them. When the raw score is exchangeable with the
-    honest scores, the p-value is uniform on [0, 1], so a threshold of 0.99 flags 1% of
-    such actions on average.
+    The p-value is (below + u * (tied + 1)) / (n + 1), where `below` of the n honest scores
+    are lower than the raw score, `tied` equal it, and u is a uniform draw from [0, 1) (Vovk
+    et al. 2016, sec. 2, eq. 2).
 
-    `honest_scores` are the wrapped monitor's scores on actions of runs the caller trusts,
-    from the same monitor with the same settings: any iterable but a string or bytes, read
-    once, of at least one score. Each is read as a threshold is, as a float from 0 to 1, so
-    a float32 0.1 becomes 0.10000000149011612 and no longer ties with 0.1. They are kept
-    sorted in `sorted_honest_scores`. A RepeatedMonitor inside ranks the mean, the score the
-    honest scores measured; outside it would average p-values, and a mean of p-values is not
-    a p-value.
+    `honest_scores` are the wrapped monitor's scores on honest actions: any iterable but a
+    string or bytes, read once, of at least one score, each read as a float from 0 to 1. They
+    are kept sorted in `sorted_honest_scores`.
 
     Without a `random_seed` the draw is `random.random()`. With one, it is the first number
-    of a `random.Random` seeded with the seed, a line break and the key. The key is the JSON
-    of the history's events and of the action as `dump_event` writes them, with every
-    action's id blanked (ids are generated at random) and the trajectory's ratings left out,
-    so the same action against the same history always draws the same share, in every
-    process.
+    of a `random.Random` seeded with the seed, a line break and the key: the JSON of the
+    history's events and of the action as `dump_event` writes them, with every action's id
+    blanked and the trajectory's ratings left out.
 
     A score that failed closed is returned as it is, unranked. Otherwise the explanation is
     the wrapped score's and the evidence is a Composite of it. `random_seed` is an integer or
     None; anything the monitor cannot work with raises ConfigurationError when it is built.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/calibration/>
     """
 
     monitor: Monitor
