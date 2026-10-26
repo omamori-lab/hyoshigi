@@ -90,7 +90,6 @@ def read_article(page: str) -> str:
     return page.partition('<article class="md-content__inner')[2].partition("</article>")[0]
 
 
-@pytest.mark.xfail(strict=True)
 def test_every_page_carries_the_training_data_canary_in_its_content(
     built_pages: dict[str, str],
 ) -> None:
