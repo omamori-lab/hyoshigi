@@ -11,10 +11,14 @@ from hyoshigi.errors import ConfigurationError
 from hyoshigi.models.model import (
     TEXT_ONLY,
     AsyncDecisionModel,
+    AsyncGenerativeModel,
     Decision,
     DecisionModel,
     DecisionOutcome,
+    GenerationOutcome,
+    GenerativeModel,
     MediaTypes,
+    Prompt,
     Question,
     Refused,
     Unavailable,
@@ -48,6 +52,14 @@ def decide_dummy(_question: Question) -> DecisionOutcome:
 
 async def decide_dummy_async(_question: Question) -> DecisionOutcome:
     return Decision(probability=0.0)
+
+
+def generate_refusal(_prompt: Prompt) -> GenerationOutcome:
+    return Refused()
+
+
+async def generate_refusal_asynchronously(_prompt: Prompt) -> GenerationOutcome:
+    return Refused()
 
 
 def rate_sync(
@@ -124,6 +136,14 @@ SYNC_MODEL = DecisionModel(
 ASYNC_MODEL = AsyncDecisionModel(
     name="model-1",
     decide=decide_dummy_async,
+)
+SYNC_GENERATIVE_MODEL = GenerativeModel(
+    name="model-1",
+    generate=generate_refusal,
+)
+ASYNC_GENERATIVE_MODEL = AsyncGenerativeModel(
+    name="model-1",
+    generate=generate_refusal_asynchronously,
 )
 DEFAULT_VIEW = View()
 
@@ -226,10 +246,29 @@ def test_default_options_use_view_default_statement_and_maximum_aggregation(
             "model must be an AsyncDecisionModel, got an instance of DecisionModel. "
             "Use DecisionMonitor for a sync model.",
         ),
+        pytest.param(
+            DecisionMonitor,
+            SYNC_GENERATIVE_MODEL,
+            "model must be a DecisionModel, got an instance of GenerativeModel. "
+            "Use LLMMonitor or GuardMonitor for a GenerativeModel.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            AsyncDecisionMonitor,
+            ASYNC_GENERATIVE_MODEL,
+            "model must be an AsyncDecisionModel, got an instance of AsyncGenerativeModel. "
+            "Use AsyncLLMMonitor or AsyncGuardMonitor for an AsyncGenerativeModel.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
-    ids=["async-model-for-the-sync-monitor", "sync-model-for-the-async-monitor"],
+    ids=[
+        "async-model-for-the-sync-monitor",
+        "sync-model-for-the-async-monitor",
+        "generative-model-for-the-sync-monitor",
+        "async-generative-model-for-the-async-monitor",
+    ],
 )
-def test_a_model_of_the_other_family_is_refused_naming_the_monitor_it_belongs_to(
+def test_a_model_it_does_not_take_is_refused_naming_the_monitors_that_take_it(
     monitor_class: type[DecisionMonitor] | type[AsyncDecisionMonitor],
     model: object,
     message: str,
