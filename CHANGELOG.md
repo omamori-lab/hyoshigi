@@ -22,6 +22,9 @@ minor version.
 - Docs pages on choosing a monitor, rating with an LLM monitor, rating with a
   decision model, and what the default prompt asks, with the reasons and
   sources the `llm.py`, `decision.py` and `prompts.py` docstrings held.
+- Docs pages on what a trajectory is, keeping one, reading an agent's own
+  format, and choosing what a monitor reads, and a reference page on what
+  each provider format's roles, items and blocks become.
 
 ### Fixed
 
@@ -37,6 +40,8 @@ minor version.
   monitor prompt BashArena prints asks for 0 to 9, and it called the
   explanation the only part of a score shown to the agent. hyoshigi shows the
   agent nothing; the scaffold decides.
+- The first-rating tutorial cited Sutton and Barto's section 3.1 for a
+  history of actions and observations, which section 17.3 defines.
 
 ## [0.1.0] - 2026-10-25
 

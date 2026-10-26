@@ -3,7 +3,7 @@
 A task and an answer are enough to rate an action. `Trajectory.from_run` builds a trajectory that
 holds the task and returns the answer as the action to rate against it. The trajectory is the
 history of an agent's actions and the observations that reach it, as in reinforcement learning
-[@sutton2018reinforcement, sec. 3.1]. A monitor rates the action before it runs, as a reference
+[@sutton2018reinforcement, sec. 17.3]. A monitor rates the action before it runs, as a reference
 monitor validates each reference before it is granted [@anderson1972planning, sec. 4.1.1, p. 22].
 The action joins the trajectory, through `trajectory.act`, only once a decision allows it.
 
