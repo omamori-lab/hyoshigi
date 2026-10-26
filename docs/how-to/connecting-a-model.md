@@ -6,9 +6,9 @@ form:
 
 | Model | Wraps | Returns | Taken by |
 |---|---|---|---|
-| `GenerativeModel` | `generate(prompt)` | `Generation`, `Truncated`, `Refused` or `Unavailable` | `LLMMonitor`, `GuardMonitor` |
+| `GenerativeModel` | `generate(prompt)` | `Generation`, `Truncated`, `Refused`, `Rejected` or `Unavailable` | `LLMMonitor`, `GuardMonitor` |
 | `AsyncGenerativeModel` | `async generate(prompt)` | the same | `AsyncLLMMonitor`, `AsyncGuardMonitor` |
-| `DecisionModel` | `decide(question)` | `Decision`, `Refused` or `Unavailable` | `DecisionMonitor` |
+| `DecisionModel` | `decide(question)` | `Decision`, `Refused`, `Rejected` or `Unavailable` | `DecisionMonitor` |
 | `AsyncDecisionModel` | `async decide(question)` | the same | `AsyncDecisionMonitor` |
 
 ## A monitor takes a model of its own family
@@ -123,7 +123,7 @@ five samples wait five times as long. A shorter `timeout` and fewer retries shor
 model. `generate` takes a `Prompt`, which holds the monitor's instructions in `system` and the
 content to rate in `content`, and returns an outcome. `DecisionModel(name=..., decide=...,
 perceives=...)` takes a function from a `Question`, a `statement` and the `state` it is about, to a
-`Decision`, `Refused` or `Unavailable`. A `Decision` holds the probability that the statement holds,
+`Decision`, `Refused`, `Rejected` or `Unavailable`. A `Decision` holds the probability that the statement holds,
 and a confidence if the model gives one, each a number from 0 to 1; any other value raises
 `ConfigurationError`. The async classes take an `async def`. A `name` that is empty or not a
 string, a function that is not callable and a `perceives` that is not a `MediaTypes` raise
@@ -140,7 +140,8 @@ the outcome that names it:
 | wrote a reply that ended on its own | `Generation(text=...)` | The monitor reads it. A reply with no readable score or label is `Unreadable`, which fails the rating closed once an `LLMMonitor`'s retries are spent. |
 | wrote a reply cut off at the output limit | `Truncated(text=...)` | An `LLMMonitor` asks again, up to `max_parse_retries` more times, before the rating fails closed. A `GuardMonitor` sample fails it at once. |
 | declined | `Refused(explanation=...)` | The rating fails closed. |
-| gave no answer: no connection, a timeout, a 429 or 5xx status after the client's retries, a prompt over the context window | `Unavailable(status=...)` | The rating fails closed, except that a `GuardMonitor` sample or a `RepeatedMonitor` call is set aside while more than half answered. |
+| answered that it cannot use the prompt: a prompt over the context window, an image it cannot use, a request too large | `Rejected(status=...)` | The rating fails closed. |
+| gave no answer: no connection, a timeout, a 429 or 5xx status after the client's retries | `Unavailable(status=...)` | The rating fails closed, except that a `GuardMonitor` sample or a `RepeatedMonitor` call is set aside while more than half answered. |
 | cannot work because the program's setup is wrong: a bad key, an unknown model | the function raises | The error leaves `rate` as it is. |
 
 Only a provider that gave no answer is `Unavailable`. An unavailable sample or call is set aside, so a
@@ -153,7 +154,7 @@ A function that raises ends the rating, and no score comes back. A `GuardMonitor
 sample after the one that raised, and an `AsyncGuardMonitor` cancels the samples in flight and raises
 the first error as it is. Raising belongs to a mistake in the program's setup, such as a bad key,
 which a score of 1.0 for every action would hide
-([a rejected request raises](handling-a-failed-rating.md#a-rejected-request-raises)). A timeout is
+([misuse raises](handling-a-failed-rating.md#misuse-raises)). A timeout is
 the provider's failure, so the function returns it. With five samples and a second that times out,
 the function that returns `Unavailable` leaves four answers, and the one that raises leaves none:
 

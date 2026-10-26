@@ -6,8 +6,8 @@ suspicious. A mistake in a mechanism that grants permission tends to fail by ref
 the safe direction [@saltzer1975protection, sec. I.A.3, principle b]. [A rating that cannot be made
 scores 1.0](../explanation/failing-closed.md) gives the reasons.
 
-[![When a rating cannot be made, the score fails closed. Five causes, each a Cause, join in one lane into the failed score: Unreadable, no readable score or label in its replies; Unperceivable, content in the action it cannot perceive; Truncated, a reply cut off at the output limit; Refused, the model or its provider declined; Unavailable, no answer after the caller's retries. The score fails closed with suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A fork leads to three wrappers. RepeatedMonitor fails the whole score when any call failed closed, with the first failed call's explanation. CascadeMonitor escalates a failed score: a failed fast score is 1.0, so it escalates, and a failed careful one stands. CalibratedMonitor returns a failed score as it is, never ranked. A failed score is 1.0, and only CascadeMonitor can replace it, with its careful monitor's score.](../assets/diagrams/failure-causes-light.svg#only-light)](../assets/diagrams/failure-causes-light.svg "Open the diagram at full size")
-[![When a rating cannot be made, the score fails closed. Five causes, each a Cause, join in one lane into the failed score: Unreadable, no readable score or label in its replies; Unperceivable, content in the action it cannot perceive; Truncated, a reply cut off at the output limit; Refused, the model or its provider declined; Unavailable, no answer after the caller's retries. The score fails closed with suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A fork leads to three wrappers. RepeatedMonitor fails the whole score when any call failed closed, with the first failed call's explanation. CascadeMonitor escalates a failed score: a failed fast score is 1.0, so it escalates, and a failed careful one stands. CalibratedMonitor returns a failed score as it is, never ranked. A failed score is 1.0, and only CascadeMonitor can replace it, with its careful monitor's score.](../assets/diagrams/failure-causes-dark.svg#only-dark)](../assets/diagrams/failure-causes-dark.svg "Open the diagram at full size")
+[![When a rating cannot be made, the score fails closed. Six causes, each a Cause, join in one lane into the failed score: Unreadable, no readable score or label in its replies; Unperceivable, content in the action it cannot perceive; Truncated, a reply cut off at the output limit; Refused, the model or its provider declined; Rejected, the provider could not use the prompt; Unavailable, no answer after the caller's retries. The score fails closed with suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A fork leads to three wrappers. RepeatedMonitor averages the answers: it leaves out an unanswered call while most calls answered, and any other failure gives 1.0. CascadeMonitor escalates a failed score: a failed fast score is 1.0, so it escalates, and a failed careful one stands. CalibratedMonitor returns a failed score as it is, never ranked. A GuardMonitor sets an unanswered sample aside by the same rule as RepeatedMonitor. Only CascadeMonitor puts another monitor's score in place of a failed one.](../assets/diagrams/failure-causes-light.svg#only-light)](../assets/diagrams/failure-causes-light.svg "Open the diagram at full size")
+[![When a rating cannot be made, the score fails closed. Six causes, each a Cause, join in one lane into the failed score: Unreadable, no readable score or label in its replies; Unperceivable, content in the action it cannot perceive; Truncated, a reply cut off at the output limit; Refused, the model or its provider declined; Rejected, the provider could not use the prompt; Unavailable, no answer after the caller's retries. The score fails closed with suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A fork leads to three wrappers. RepeatedMonitor averages the answers: it leaves out an unanswered call while most calls answered, and any other failure gives 1.0. CascadeMonitor escalates a failed score: a failed fast score is 1.0, so it escalates, and a failed careful one stands. CalibratedMonitor returns a failed score as it is, never ranked. A GuardMonitor sets an unanswered sample aside by the same rule as RepeatedMonitor. Only CascadeMonitor puts another monitor's score in place of a failed one.](../assets/diagrams/failure-causes-dark.svg#only-dark)](../assets/diagrams/failure-causes-dark.svg "Open the diagram at full size")
 
 `script` returns each outcome in turn, so a scripted model fails in the way a section describes.
 `rate` rates one answer with an `LLMMonitor`:
@@ -65,7 +65,7 @@ apart. The cause is in `score.evidence`. A single monitor records a `FailedClose
 A `RepeatedMonitor` records a `Composite` of the calls' scores, and fails closed when a call fails
 closed with a cause other than `Unavailable` or when at most half the calls answered.
 A `DecisionMonitor` and a `GuardMonitor` record the same `FailedClosed` for the causes that apply to
-them. `Cause` is the union of the five types, so a `match` over it with `assert_never` covers every
+them. `Cause` is the union of the six types, so a `match` over it with `assert_never` covers every
 cause:
 
 ```python
@@ -79,6 +79,7 @@ from hyoshigi import (
     Labels,
     Rationale,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
     Unperceivable,
@@ -112,6 +113,8 @@ def name_cause(cause: Cause) -> str:
             return "a reply cut off at the output limit"
         case Refused():
             return "a refusal"
+        case Rejected(status=status):
+            return f"a prompt the provider cannot use, HTTP status {status or 'none'}"
         case Unavailable(status=status):
             return f"no answer, HTTP status {status or 'none'}"
         case unreachable:
@@ -173,7 +176,7 @@ retries, so the OpenRouter example lowers the one-hour limit to one minute.
 
 An `LLMMonitor` asks again only after an unreadable or a truncated reply, so an unavailable model
 fails the rating closed at once. A monitor keeps no state between calls, so the caller can rate the
-same action again later. A 408, a 409, a 413 and any 5xx status are unavailable in the same way. A
+same action again later. A 408, a 409 and any 5xx status are unavailable in the same way. A
 connection error or a timeout is unavailable with no status:
 
 ```python
@@ -219,9 +222,9 @@ value 0.65, failed_closed False, causes: no answer, HTTP status 429
 
 ## A second model behind the first handles a refusal
 
-The adapters read a provider's refusal as `Refused`: Anthropic's `refusal` stop reason, and on
-OpenAI and OpenRouter a refusal part in the reply, a reply stopped by a content filter or an error
-whose code names a refusal. An `LLMMonitor` fails closed on it at once, and a second model can rate
+The adapters read a provider's refusal as `Refused`: Anthropic's `refusal` stop reason, on OpenAI
+and OpenRouter a refusal part in the reply, a reply stopped by a content filter or an error whose
+code names a refusal, and on OpenRouter every 403. An `LLMMonitor` fails closed on it at once, and a second model can rate
 the action.
 
 A `CascadeMonitor` puts a careful monitor behind a fast one, as Claude Code's auto mode puts a
@@ -363,16 +366,17 @@ The `text_only` model has no outcome to return, so asking it would raise an `Ind
 raises `ConfigurationError` when `perceives` names a media type its API cannot carry. The Anthropic
 adapter carries JPEG, PNG, GIF, WebP, PDF and plain text.
 
-## A prompt over the context window is unavailable with status 400
+## A prompt the provider cannot use is rejected
 
-A prompt over the model's context window fails closed as `Unavailable(status=400)` on the Anthropic,
-OpenAI and OpenRouter adapters. The OpenAI adapter reads the error code `context_length_exceeded`.
-The Anthropic and OpenRouter adapters read the provider's wording for it in the message of a 400,
-and keep none of the message, which can echo the prompt. On OpenAI and OpenRouter an image the
-provider cannot use also fails closed as `Unavailable` with the provider's status, so a status of
-400 means that the provider rejected the prompt. Asking again sends the same prompt, and
-`View(most_recent=N)` shrinks it: the view keeps the N latest entries it shows, and every task entry
-as well:
+A prompt over the model's context window fails closed as `Rejected(status=400)` on every adapter.
+The OpenAI adapter reads the error code `context_length_exceeded`, and the TypeSafe adapter
+`max_tokens_exceeded`. The Anthropic and OpenRouter adapters read the provider's wording for it in
+the message of a 400, and keep none of the message, which can echo the prompt. A request too large
+(413) and an image the provider cannot use are rejected with the provider's status too. On
+Anthropic, TypeSafe and OpenRouter Decisions, so is a 400 that names no reason for a prompt that
+carries media. `Rejected` fails the rating closed at once, since every sample and call of a rating
+sends the same prompt. Asking again sends it unchanged, and `View(most_recent=N)` shrinks it: the
+view keeps the N latest entries it shows, and every task entry as well:
 
 ```python
 from hyoshigi import Action, TextPart, ToolCall, View
@@ -388,7 +392,7 @@ def generate_within_window(prompt: Prompt) -> GenerationOutcome:
         )
     )
     if size > 3_000:
-        return Unavailable(status=400)
+        return Rejected(status=400)
     return Generation(text=CALM)
 
 
@@ -423,14 +427,15 @@ print(describe(recent))
 ```
 
 ```text
-value 1.0, failed_closed True, causes: no answer, HTTP status 400
+value 1.0, failed_closed True, causes: a prompt the provider cannot use, HTTP status 400
 value 0.3, failed_closed False, causes: none
 ```
 
-## A rejected request raises
+## Misuse raises
 
-A client error other than 408, 409, 413 and 429 raises `ConfigurationError` on the Anthropic, OpenAI
-and OpenRouter adapters. It names the status only: an invalid key (401), a model that does not exist
-(404) or a request the API cannot parse. Such a mistake belongs to the program's setup and is fixed
-there. The exceptions are the 400s above and, on OpenAI and OpenRouter, an error whose code names a
-refusal, which is `Refused`. A 400 that the adapters do not read as a prompt over the window raises.
+A client error other than 408, 409 and 429 raises `ConfigurationError` on every adapter. It names the
+status only: an invalid key (401), a model that does not exist (404) or a request the API cannot
+parse. Such a mistake belongs to the program's setup and is fixed there. The exceptions are the
+rejections above, and the refusals: on OpenAI and OpenRouter an error whose code names a refusal,
+and on OpenRouter every 403, are `Refused`. A 400 for a text-only prompt that the adapters do not
+read as a rejection raises.

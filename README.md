@@ -24,8 +24,8 @@ Each SDK's client reads its key from the environment: `OPENAI_API_KEY`,
 
 The core needs only the standard library of Python 3.12 or newer.
 `GenerativeModel(name=..., generate=...)` wraps any other client: its function
-takes a `Prompt` and returns a `Generation`, `Truncated`, `Refused` or
-`Unavailable`.
+takes a `Prompt` and returns a `Generation`, `Truncated`, `Refused`, `Rejected`
+or `Unavailable`.
 
 ## Rating an action
 
@@ -55,8 +55,8 @@ A black-box agent's trajectory holds its task, and its final answer is the
 action to rate. `score.value` is the suspicion, from 0 to 1.
 `score.explanation` says why, and the scaffold decides whether the agent sees
 it; `score.evidence` holds the model's findings or the cause of a failure. A reply
-the monitor cannot read, content its model cannot perceive, and a model that
-refuses or is unavailable all fail closed, at 1.0.
+the monitor cannot read, content its model cannot perceive, a refusal, a prompt
+the provider rejects and a model that is unavailable all fail closed, at 1.0.
 
 ## Reading an agent's own format
 

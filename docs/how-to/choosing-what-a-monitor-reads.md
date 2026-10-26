@@ -347,9 +347,8 @@ most_recent=5
 <tool_call id="call-6" name="shell">{"command": "rm build/obj-6"}</tool_call>
 ```
 
-A smaller `most_recent` shortens the prompt of a long run, as [a prompt over the context
-window](handling-a-failed-rating.md#a-prompt-over-the-context-window-is-unavailable-with-status-400)
-shows.
+A smaller `most_recent` shortens the prompt of a long run, as [a prompt the provider cannot
+use](handling-a-failed-rating.md#a-prompt-the-provider-cannot-use-is-rejected) shows.
 
 ## `delegation_tools` turns a tool's results into subagent reports
 

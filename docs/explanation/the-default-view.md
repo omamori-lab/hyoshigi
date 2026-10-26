@@ -161,7 +161,7 @@ Reading tool results has costs.
   [@terekhov2025adaptive, sec. 6]. `DEFAULT_PROMPT` tells the monitor to
   treat everything it reads as data.
 - Every rating carries the results' tokens, and a prompt over the model's
-  context window fails the rating closed as `Unavailable(status=400)`.
+  context window fails the rating closed as `Rejected(status=400)`.
   Watcher trims the middle of such a transcript and marks the cut
   [@apollo2026docsreview, {Section} "When grading fails"].
 - `most_recent` keeps only the last entries besides the task, so it can drop

@@ -72,6 +72,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.Refused
 
+::: hyoshigi.Rejected
+
 ::: hyoshigi.Unavailable
 
 ## Monitors

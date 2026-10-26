@@ -36,8 +36,24 @@ minor version.
   `tracing.py`, `reporting.py` and `reports.py` docstrings held.
 - `LangSmithFeedback` and `AsyncLangSmithFeedback` take `stop_after_attempt`,
   the number of attempts the client's `create_feedback` makes, 10 by default.
+- `Rejected`, the outcome of a prompt the provider says it cannot use, with
+  the HTTP status if there was one. A monitor fails the rating closed with it
+  at once, as with a refusal, and a trajectory stores it as a `rejected`
+  cause, which 0.1.0 cannot read. A model function of one's own can return
+  it.
 
 ### Changed
+
+- A prompt over the context window, an image the provider cannot use and a
+  413 are `Rejected` with the status on every adapter, where they were
+  `Unavailable`, which says that no answer came; so is a failed Responses
+  reply whose error says the prompt cannot be used. A guard sample or a
+  repeated call that is rejected fails the rating closed, where an
+  unavailable one was set aside while most answered. This is a breaking
+  change: an exhaustive `match` over `Cause`, `GenerationOutcome` or
+  `DecisionOutcome` needs a `Rejected` case, and a `match` on
+  `Unavailable(status=400)` for a prompt over the context window now finds
+  `Rejected(status=400)`.
 
 - A `GuardMonitor` sample or a `RepeatedMonitor` call that got no answer,
   `Unavailable`, is set aside: when more than half the samples or calls
@@ -66,6 +82,21 @@ minor version.
 
 ### Fixed
 
+- Four provider rejections that the agent's content can cause raised
+  `ConfigurationError`, so the agent's content could crash a rating, and a
+  scaffold that reads an exception as allow would let the action pass. They
+  now fail closed:
+  - OpenAI's `invalid_prompt` is `Rejected`.
+  - Every OpenRouter 403 is `Refused`, a guardrail's block among them. A
+    spent budget, a missing permission or the wrong data region, which
+    OpenRouter also answers with a 403, now scores every action 1.0.
+  - OpenRouter's `invalid_prompt` with no error type is
+    `Rejected(status=400)`.
+  - A 400 that names no reason, for a prompt that carries media, is
+    `Rejected(status=400)` on Anthropic, TypeSafe and OpenRouter Decisions,
+    each of which answers an image it cannot use that way. With media in the
+    prompt, a 400 for misuse, such as Anthropic's spend limit, fails closed
+    too; for a text-only prompt it still raises.
 - The OpenAI adapter's docstring said OpenAI retains none of the monitored
   agent's content. `store: false` stops the Responses API storing the
   response; OpenAI's abuse-monitoring logs, which can hold prompts, are
