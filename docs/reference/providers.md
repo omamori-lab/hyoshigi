@@ -1,9 +1,10 @@
 # Provider adapters
 
 Six adapters connect a monitor to a provider. Each makes at most one call to the caller's SDK client
-per prompt, which the client may retry, and returns an outcome. A generative model returns `Generation`, `Truncated`, `Refused`
-or `Unavailable`, and a decision model `Decision`, `Refused` or `Unavailable`. The client holds
-the key, the timeout and the retries, so an outcome is what remains after the client's retries.
+each time it is asked, which the client may retry, and returns an outcome. A generative model
+returns `Generation`, `Truncated`, `Refused` or `Unavailable`, and a decision model `Decision`,
+`Refused` or `Unavailable`. The client holds the key, the timeout and the retries, so an outcome is
+what remains after the client's retries.
 [Connecting a model](../how-to/connecting-a-model.md) builds the clients.
 
 | Adapter | Constructor | Extra | Clients | Call | Endpoint |
@@ -53,8 +54,8 @@ status. Otherwise the four providers' adapters read an HTTP error status the sam
   and 429 by default
   ([Handling a failed rating](../how-to/handling-a-failed-rating.md#a-429-that-outlasts-the-clients-retries-is-unavailable)).
 - A 5xx is `Unavailable` with the status.
-- Any other 4xx raises `ConfigurationError`, unless the error names a refusal, which is `Refused`,
-  or blames what the prompt holds, which is `Unavailable` with the status.
+- Any other 4xx raises `ConfigurationError`, unless the error blames what the prompt holds, which
+  is `Unavailable` with the status.
 - A connection error or a timeout is `Unavailable` with no status.
 
 Each provider documents 401 as a missing or invalid key, 429 as a rate limit, and a 5xx as a
