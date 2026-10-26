@@ -138,10 +138,8 @@ def build_decision_part(part: PromptPart) -> DecisionInputPartUnionParam | None:
     """A state part as an input text or an input image; None for an image in a form the API
     cannot take. Raise ConfigurationError for media that is not an image the API reads.
 
-    The API reference, https://developers.openai.com/api/reference/resources/decisions/methods/create,
-    and the SDK say an image is a base64 data URL or a publicly accessible HTTP(S) URL. The guide,
-    https://developers.openai.com/api/docs/guides/decisions, says images must be data URLs, but a
-    hosted URL was accepted live on 2026-10-18, so a URL is sent as given.
+    Bytes are sent as a base64 data URL and a URL as given, the two forms of an image in the API
+    reference, https://developers.openai.com/api/reference/resources/decisions/methods/create.
     """
     match part:
         case TextPart(text=text):
@@ -230,12 +228,12 @@ def read_failure(error: Failure) -> Refused | Unavailable:
     """The outcome of a request that failed after the client's retries.
 
     An error code that is a refusal or names a policy is a refusal. A 4xx status other than 408,
-    409, 413 and 429, whose code does not blame the prompt's content, rejects the request: it
-    raises ConfigurationError naming only the status. This is called outside the handler of the
-    provider's error, so the provider's text, which can echo the prompt, is in neither the
-    raised error's cause nor its context. Any other failure, a connection error, a timeout, a
-    body that cannot be decoded, a prompt that cannot be encoded, or another status, is
-    unavailable.
+    409, 413 and 429, whose code does not blame the prompt's content, raises ConfigurationError
+    naming only the status. Any other status is unavailable with it, and any other failure, a
+    connection error, a timeout, a body that cannot be decoded or a prompt that cannot be
+    encoded, is unavailable.
+
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     match error:
         case APIStatusError(code=str(code)) if responses.names_refusal(code):
@@ -264,9 +262,11 @@ def build_model(
 ) -> GenerativeModel:
     """A model on the Responses API, through the caller's client.
 
-    Each request sets store to false, so OpenAI does not retain the monitored agent's content.
-    The reply is read from its raw body. Raise ConfigurationError if the model id is empty or
-    perceives names media the API cannot carry.
+    Each request sets store to false, so the Responses API stores no response for later
+    retrieval. The reply is read from its raw body. Raise ConfigurationError if the model id is
+    empty or perceives names media the API cannot carry.
+
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     check_name(model)
     check_perceives(
@@ -308,9 +308,11 @@ def build_async_model(
 ) -> AsyncGenerativeModel:
     """A model on the Responses API, through the caller's async client.
 
-    Each request sets store to false, so OpenAI does not retain the monitored agent's content.
-    The reply is read from its raw body. Raise ConfigurationError if the model id is empty or
-    perceives names media the API cannot carry.
+    Each request sets store to false, so the Responses API stores no response for later
+    retrieval. The reply is read from its raw body. Raise ConfigurationError if the model id is
+    empty or perceives names media the API cannot carry.
+
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     check_name(model)
     check_perceives(
