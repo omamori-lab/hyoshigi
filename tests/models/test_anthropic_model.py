@@ -23,6 +23,7 @@ from hyoshigi import (
     MediaTypes,
     Prompt,
     Refused,
+    Rejected,
     TextPart,
     Truncated,
     Unavailable,
@@ -1594,10 +1595,9 @@ def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
     assert outcome == Unavailable(status=None)
 
 
-# https://platform.claude.com/docs/en/api/errors, "HTTP errors": 409, 413, 429, 500, 504 and
-# 529 are documented; 408 and 503 are the statuses the SDK retries and names. 413, a request
-# too large, is a status the prompt's content can cause. 301 and 304 are statuses that are not
-# a success and not an error of the request.
+# https://platform.claude.com/docs/en/api/errors, "HTTP errors": 409, 429, 500, 504 and 529 are
+# documented; 408 and 503 are the statuses the SDK retries and names. 301 and 304 are statuses
+# that are not a success and not an error of the request.
 @pytest.mark.parametrize(
     "status",
     [
@@ -1605,7 +1605,6 @@ def test_a_reply_the_client_rejects_as_invalid_is_unavailable_without_a_status(
         304,
         408,
         409,
-        413,
         429,
         500,
         503,
@@ -1721,12 +1720,34 @@ def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
     )
 
 
-def test_a_prompt_over_the_input_limit_is_unavailable_with_status_400(
+# The same page: 413 request_too_large, "Request exceeds the maximum allowed number of bytes."
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        pytest.param(
+            400,
+            CONTEXT_OVERFLOW_ERROR,
+            id="over-the-input-limit",
+        ),
+        pytest.param(
+            413,
+            build_error(
+                "request_too_large",
+                "Request exceeds the maximum allowed number of bytes.",
+            ),
+            id="too-large",
+        ),
+    ],
+)
+def test_a_prompt_the_api_rejects_is_rejected_with_its_status(
     build_driver: BuildDriver,
+    status: int,
+    body: JSON,
 ) -> None:
     wire = Wire(
-        CONTEXT_OVERFLOW_ERROR,
-        status=400,
+        body,
+        status=status,
     )
     model = build_driver(wire.respond)
 
@@ -1736,7 +1757,7 @@ def test_a_prompt_over_the_input_limit_is_unavailable_with_status_400(
         outcome,
         len(wire.requests),
     ) == (
-        Unavailable(status=400),
+        Rejected(status=status),
         1,
     )
 

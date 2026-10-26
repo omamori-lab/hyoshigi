@@ -29,6 +29,7 @@ from hyoshigi import (
     Prompt,
     Question,
     Refused,
+    Rejected,
     TextPart,
     Truncated,
     Unavailable,
@@ -1447,6 +1448,33 @@ def test_a_failed_reply_is_unavailable_without_a_status(
     assert exchange.outcome == Unavailable(status=None)
 
 
+# openapi.yaml, schema ResponseErrorCode, and schema SessionTurnErrorCodeResource for
+# context_length_exceeded: codes that say the prompt cannot be used.
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "code",
+    [
+        "context_length_exceeded",
+        "image_too_large",
+    ],
+)
+def test_a_failed_reply_whose_code_says_the_prompt_cannot_be_used_is_rejected_without_a_status(
+    ask: Ask,
+    code: str,
+) -> None:
+    body = replace(
+        FAILED_RESPONSE,
+        error={
+            "code": code,
+            "message": "The prompt cannot be used.",
+        },
+    )
+
+    exchange = ask(respond(body))
+
+    assert exchange.outcome == Rejected(status=None)
+
+
 # openapi.yaml, schema ResponseErrorCode: the codes that name a policy; and the code "refusal".
 @pytest.mark.parametrize(
     "code",
@@ -1708,10 +1736,6 @@ def test_a_connection_that_fails_is_unavailable_without_a_status(
             SERVER_OVERLOADED,
         ),
         (
-            413,
-            SERVER_OVERLOADED,
-        ),
-        (
             500,
             SERVER_OVERLOADED,
         ),
@@ -1749,61 +1773,47 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
 
 
 # openapi.yaml, schema SessionTurnErrorCodeResource: context_length_exceeded, "The request
-# exceeds the model's context window." The Responses API's own error codes list none.
-def test_an_input_that_exceeds_the_context_window_is_unavailable_with_its_status(
-    ask_either: AskEither,
-) -> None:
-    body = reject(
-        "The request exceeds the model's context window.",
-        code="context_length_exceeded",
-    )
-
-    exchange = ask_either(
-        respond(
-            body,
-            status=400,
-        ),
-    )
-
-    assert exchange.outcome == Unavailable(status=400)
-
-
-# openapi.yaml, schema ResponseErrorCode: the codes that say an image cannot be used, other
-# than the policy one and image_file_not_found, which names a file the request never refers to.
+# exceeds the model's context window."; schema ResponseErrorCode: the codes that say an image
+# cannot be used, other than the policy one and image_file_not_found, which names a file the
+# request never refers to. A 413, a request too large, has no published body.
+@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
-    "code",
+    ("status", "code"),
     [
-        "invalid_image",
-        "invalid_image_format",
-        "invalid_base64_image",
-        "invalid_image_url",
-        "image_too_large",
-        "image_too_small",
-        "image_parse_error",
-        "invalid_image_mode",
-        "image_file_too_large",
-        "unsupported_image_media_type",
-        "empty_image_file",
-        "failed_to_download_image",
+        (400, "context_length_exceeded"),
+        (400, "invalid_image"),
+        (400, "invalid_image_format"),
+        (400, "invalid_base64_image"),
+        (400, "invalid_image_url"),
+        (400, "image_too_large"),
+        (400, "image_too_small"),
+        (400, "image_parse_error"),
+        (400, "invalid_image_mode"),
+        (400, "image_file_too_large"),
+        (400, "unsupported_image_media_type"),
+        (400, "empty_image_file"),
+        (400, "failed_to_download_image"),
+        (413, None),
     ],
 )
-def test_an_image_the_api_cannot_use_is_unavailable_with_its_status(
+def test_a_prompt_the_api_cannot_use_is_rejected_with_its_status(
     ask_either: AskEither,
-    code: str,
+    status: int,
+    code: str | None,
 ) -> None:
     body = reject(
-        "The image cannot be used.",
+        "The prompt cannot be used.",
         code=code,
     )
 
     exchange = ask_either(
         respond(
             body,
-            status=400,
+            status=status,
         ),
     )
 
-    assert exchange.outcome == Unavailable(status=400)
+    assert exchange.outcome == Rejected(status=status)
 
 
 # openapi.yaml, schema ResponseErrorCode: image_content_policy_violation; and the code "refusal".

@@ -22,6 +22,7 @@ from hyoshigi import (
     MediaPart,
     MediaTypes,
     Question,
+    Rejected,
     TextPart,
     Unavailable,
 )
@@ -597,14 +598,14 @@ def test_a_lone_surrogate_in_the_question_returns_unavailable(
     assert outcome == Unavailable(status=None)
 
 
-# https://docs.typesafe.ai/api.md, "Errors": 413 Payload Too Large, 429 Too Many Requests,
-# 529 Overloaded, plus HTTP 1xx, 3xx, 408, 409 and 5xx.
+# https://docs.typesafe.ai/api/errors.md, "Errors": 429 Too Many Requests, 529 Overloaded,
+# plus HTTP 1xx, 3xx, 408, 409 and 5xx.
 @BUILDERS
 @pytest.mark.parametrize(
     "status",
-    [103, 302, 408, 409, 413, 429, 500, 502, 503, 529],
+    [103, 302, 408, 409, 429, 500, 502, 503, 529],
 )
-def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_status(
+def test_a_transient_http_failure_returns_unavailable_with_its_status(
     build_model: ModelBuilder,
     status: int,
 ) -> None:
@@ -624,17 +625,36 @@ def test_a_transient_or_oversized_http_failure_returns_unavailable_with_its_stat
     assert outcome == Unavailable(status=status)
 
 
-# https://docs.typesafe.ai/api.md, "Errors": HTTP 400 with "max_tokens_exceeded" means the
-# request exceeds the model's context length. The body's shape was observed from the live API,
-# relayed by OpenRouter, on 2026-10-17.
+# https://docs.typesafe.ai/api/errors.md, "Errors": HTTP 400 with "max_tokens_exceeded" means
+# the request exceeds the model's context length, and 413 Payload Too Large that the body is
+# over 32 MiB. The 400 body's shape was observed from the live API, relayed by OpenRouter, on
+# 2026-10-17.
+@pytest.mark.xfail(strict=True)
 @BUILDERS
-def test_a_context_length_http_error_returns_unavailable_with_status_400(
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        pytest.param(
+            400,
+            {"detail": {"error_type": "max_tokens_exceeded"}},
+            id="over-the-context-length",
+        ),
+        pytest.param(
+            413,
+            {"error": "too large"},
+            id="too-large",
+        ),
+    ],
+)
+def test_a_request_typesafe_cannot_use_returns_rejected_with_its_status(
     build_model: ModelBuilder,
+    status: int,
+    body: JSON,
 ) -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(
-            400,
-            json={"detail": {"error_type": "max_tokens_exceeded"}},
+            status,
+            json=body,
         )
 
     model = build_model(handler)
@@ -644,7 +664,7 @@ def test_a_context_length_http_error_returns_unavailable_with_status_400(
         question=BILLING_QUESTION,
     )
 
-    assert outcome == Unavailable(status=400)
+    assert outcome == Rejected(status=status)
 
 
 # Through OpenRouter the code is inside message text, which the adapter does not read.
