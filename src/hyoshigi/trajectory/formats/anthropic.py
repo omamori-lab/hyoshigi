@@ -167,21 +167,12 @@ def read_message(
             )
         case {
             "role": "system",
-            "content": str() | list(),
+            "content": str() | list() as content,
         }:
-            return [
-                (
-                    f"{path}.content",
-                    Observation(
-                        author=Author.SCAFFOLD,
-                        source="system",
-                        parts=read_content(
-                            message,
-                            path=f"{path}.content",
-                        ),
-                    ),
-                ),
-            ]
+            return read_system_content(
+                content,
+                path=f"{path}.content",
+            )
         case {"role": "user" | "assistant" | "system"}:
             raise FormatError(
                 path=f"{path}.content",
@@ -192,6 +183,50 @@ def read_message(
                 path=path,
                 expected="a user, assistant or system message with content",
             )
+
+
+def read_system_content(
+    content: str | list[JSON],
+    *,
+    path: str,
+) -> list[tuple[str, Event]]:
+    """Read a system message's content into a scaffold's observation.
+
+    A text block is text, and a block of another type, such as tool_removal, an opaque
+    part; an image or a document block raises FormatError.
+    """
+    parts: list[Part] = []
+    if isinstance(
+        content,
+        str,
+    ):
+        parts.append(TextPart(text=content))
+    else:
+        for index, block in enumerate(content):
+            block_path = f"{path}[{index}]"
+            match block:
+                case {"type": "image" | "document"}:
+                    raise FormatError(
+                        path=block_path,
+                        expected="a text block or a tool change, which a system message holds",
+                    )
+                case _:
+                    parts.extend(
+                        read_content_block(
+                            block,
+                            path=block_path,
+                        ),
+                    )
+    return [
+        (
+            path,
+            Observation(
+                author=Author.SCAFFOLD,
+                source="system",
+                parts=tuple(parts),
+            ),
+        ),
+    ]
 
 
 def read_user_content(
@@ -290,7 +325,7 @@ def read_tool_result(
                 path=path,
                 expected="a tool_result with a tool_use_id, and is_error a boolean",
             )
-    parts = read_content(
+    parts = read_result_content(
         block,
         path=f"{path}.content",
     )
@@ -301,12 +336,12 @@ def read_tool_result(
     )
 
 
-def read_content(
+def read_result_content(
     block: JSON,
     *,
     path: str,
 ) -> tuple[Part, ...]:
-    """Read a tool result's or a system message's content: absent, a string, or content blocks."""
+    """Read a tool result's content: absent, a string, or content blocks."""
     match block:
         case {"content": str(text)}:
             return (TextPart(text=text),)

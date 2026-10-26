@@ -1120,7 +1120,7 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[0]",
         ),
-        pytest.param(
+        (
             {
                 "messages": [
                     {
@@ -1137,9 +1137,8 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 ],
             },
             "$.messages[0].content[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             {
                 "messages": [
                     {
@@ -1156,7 +1155,6 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
                 ],
             },
             "$.messages[0].content[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         (
             {

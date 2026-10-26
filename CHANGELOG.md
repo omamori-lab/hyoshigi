@@ -38,7 +38,8 @@ minor version.
   `system`, which Anthropic's Messages API accepts among a request's
   messages, so a request that held one could not be rated. It reads one as an
   observation by `SCAFFOLD` whose `source` is `system`, in its place, as it
-  reads the top-level `system`.
+  reads the top-level `system`. An image or a document block in one raises
+  `FormatError`, as Anthropic allows neither there.
 
 ## [0.1.0] - 2026-10-25
 
