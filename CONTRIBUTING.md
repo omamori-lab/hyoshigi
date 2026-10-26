@@ -84,6 +84,8 @@ line.
 5. Open a pull request against `main` with `Closes #N` in the description,
    and work through the template's checklist. CodeRabbit reviews it; its
    findings are advisory, and each is reproduced before anyone acts on it.
+6. The pull request merges by rebase only, as omamori lab's
+   [commit and merge rules](https://github.com/omamori-lab/.github/blob/main/CONTRIBUTING.md) set out for every repository.
 
 ## Licence
 
