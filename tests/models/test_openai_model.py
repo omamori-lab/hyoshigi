@@ -2104,7 +2104,6 @@ def test_a_decision_model_that_perceives_media_the_api_cannot_read_raises_naming
         )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "client", "message"),
     [

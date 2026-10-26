@@ -35,6 +35,7 @@ from hyoshigi.models.model import (
     Refused,
     Truncated,
     Unavailable,
+    check_client,
     check_name,
     check_perceives,
     collect,
@@ -80,12 +81,19 @@ def build_model(
 ) -> GenerativeModel:
     """A model on the Messages API, through the caller's client.
 
-    The thinking configuration is sent only when given. Raise ConfigurationError if the model
-    id is empty, max_tokens is below 1 or perceives names media the API cannot carry.
+    The thinking configuration is sent only when given. Raise ConfigurationError if the client
+    is not an Anthropic, the model id is empty, max_tokens is below 1 or perceives names media
+    the API cannot carry.
     Generating raises ConfigurationError if the SDK refuses the request's arguments before
     sending them, as it does for a max_tokens that may take longer than ten minutes without
     streaming.
     """
+    check_client(
+        client,
+        expected=Anthropic,
+        twin=AsyncAnthropic,
+        twin_constructor="AsyncGenerativeModel.from_anthropic",
+    )
     check_arguments(
         model=model,
         max_tokens=max_tokens,
@@ -124,12 +132,19 @@ def build_async_model(
 ) -> AsyncGenerativeModel:
     """A model on the Messages API, through the caller's async client.
 
-    The thinking configuration is sent only when given. Raise ConfigurationError if the model
-    id is empty, max_tokens is below 1 or perceives names media the API cannot carry.
+    The thinking configuration is sent only when given. Raise ConfigurationError if the client
+    is not an AsyncAnthropic, the model id is empty, max_tokens is below 1 or perceives names media
+    the API cannot carry.
     Generating raises ConfigurationError if the SDK refuses the request's arguments before
     sending them, as it does for a max_tokens that may take longer than ten minutes without
     streaming.
     """
+    check_client(
+        client,
+        expected=AsyncAnthropic,
+        twin=Anthropic,
+        twin_constructor="GenerativeModel.from_anthropic",
+    )
     check_arguments(
         model=model,
         max_tokens=max_tokens,

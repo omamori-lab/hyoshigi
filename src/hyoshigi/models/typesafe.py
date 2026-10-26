@@ -33,6 +33,7 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Unavailable,
+    check_client,
     check_name,
     check_perceives,
     collect,
@@ -150,9 +151,15 @@ def build_decision_model(
     """A decision model on TypeSafe's API, through the caller's client.
 
     A request whose state holds an image carries ``TypeSafe-Danger-Zone-Images: true``, which
-    TypeSafe requires for images. Raise ConfigurationError if the model id is empty or
-    perceives names media TypeSafe cannot carry.
+    TypeSafe requires for images. Raise ConfigurationError if the client is not a
+    TypeSafeClient, the model id is empty or perceives names media TypeSafe cannot carry.
     """
+    check_client(
+        client,
+        expected=TypeSafeClient,
+        twin=AsyncTypeSafeClient,
+        twin_constructor="AsyncDecisionModel.from_typesafe",
+    )
     name = format_model_name(model)
     check_perceives(
         perceives,
@@ -192,9 +199,15 @@ def build_async_decision_model(
     """A decision model on TypeSafe's API, through the caller's async client.
 
     A request whose state holds an image carries ``TypeSafe-Danger-Zone-Images: true``, which
-    TypeSafe requires for images. Raise ConfigurationError if the model id is empty or
-    perceives names media TypeSafe cannot carry.
+    TypeSafe requires for images. Raise ConfigurationError if the client is not an
+    AsyncTypeSafeClient, the model id is empty or perceives names media TypeSafe cannot carry.
     """
+    check_client(
+        client,
+        expected=AsyncTypeSafeClient,
+        twin=TypeSafeClient,
+        twin_constructor="DecisionModel.from_typesafe",
+    )
     name = format_model_name(model)
     check_perceives(
         perceives,

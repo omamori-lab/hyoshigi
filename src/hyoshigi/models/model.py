@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.options import read_threshold
+from hyoshigi.options import check_instance, name_class, read_threshold
 from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
@@ -204,6 +204,31 @@ def check_name(name: str) -> None:
     """Raise ConfigurationError if a model's name is empty."""
     if not name:
         raise ConfigurationError("a model needs a name, such as the provider's model id")
+
+
+def check_client(
+    client: object,
+    *,
+    expected: type,
+    twin: type,
+    twin_constructor: str,
+) -> None:
+    """Raise ConfigurationError unless the client is an instance of the expected class; a client
+    of the twin class, the SDK's other family, is pointed to the constructor that takes it.
+    """
+    check_instance(
+        client,
+        expected=expected,
+        name="client",
+        hint=(
+            f"Use {twin_constructor} for {name_class(twin)}."
+            if isinstance(
+                client,
+                twin,
+            )
+            else ""
+        ),
+    )
 
 
 def check_perceives(
