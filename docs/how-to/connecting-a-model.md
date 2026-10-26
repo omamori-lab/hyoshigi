@@ -216,7 +216,10 @@ def raise_failures(complete: Callable[[Prompt], str]) -> GenerativeModel:
     )
 
 
-for connect in (return_failures, raise_failures):
+for connect in (
+    return_failures,
+    raise_failures,
+):
     guard = GuardMonitor(
         model=connect(script("VALID", None, "VALID", "INVALID", "VALID")),
         prompt=POLICY,
@@ -270,7 +273,10 @@ confirmation = Action(
         ),
     ),
 )
-for perceives in (MediaTypes(), MediaTypes("image/*")):
+for perceives in (
+    MediaTypes(),
+    MediaTypes("image/*"),
+):
     asked.clear()
     monitor = LLMMonitor(
         model=GenerativeModel(
@@ -339,7 +345,10 @@ class Recorder:
         self.running = 0
         self.most = 0
 
-    async def generate(self, prompt: Prompt) -> Generation:
+    async def generate(
+        self,
+        prompt: Prompt,
+    ) -> Generation:
         self.calls += 1
         self.running += 1
         self.most = max(
