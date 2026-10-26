@@ -251,13 +251,17 @@ def build_skin_error(error_type: str) -> JSON:
 
 # https://openrouter.ai/docs/api_reference/responses/error-handling: an error body is
 # {"error": {"code", "message"}, "metadata"} and its code is a string.
-def build_coded_error(code: str) -> JSON:
+def build_coded_error(
+    code: str,
+    **fields: JSON,
+) -> JSON:
     return {
         "error": {
             "code": code,
             "message": "Detailed error description",
         },
         "metadata": None,
+        **fields,
     }
 
 
@@ -1890,9 +1894,9 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
     assert outcome == Unavailable(status=502)
 
 
-# The envelopes are the published error examples; invalid_request and permission_denied are error
-# types of https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes, put
-# in the envelope's error_type field, where that page puts the Responses API's error type.
+# The envelopes are the published error examples; invalid_request is an error type of
+# https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes, put in the
+# envelope's error_type field, where that page puts the Responses API's error type.
 @pytest.mark.parametrize(
     ("status", "fields"),
     [
@@ -1909,10 +1913,6 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
             {},
         ),
         (
-            403,
-            {},
-        ),
-        (
             404,
             {},
         ),
@@ -1924,12 +1924,8 @@ def test_a_gateway_page_is_judged_by_its_status(ask: Ask) -> None:
             400,
             {"error_type": "invalid_request"},
         ),
-        (
-            403,
-            {"error_type": "permission_denied"},
-        ),
     ],
-    ids=["400", "401", "402", "403", "404", "422", "invalid-request", "permission-denied"],
+    ids=["400", "401", "402", "404", "422", "invalid-request"],
 )
 def test_any_other_rejection_raises_naming_only_the_status(
     ask: Ask,
@@ -1986,14 +1982,139 @@ def test_an_unknown_model_id_raises_naming_only_the_status(
         ask(client)
 
 
-def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask) -> None:
-    client = Wire(build_page(403)).build_client()
+# https://openrouter.ai/docs/api_reference/errors-and-debugging, "Responses API": invalid_prompt
+# stands for invalid_request too, and the error type then says which.
+def test_invalid_prompt_with_an_invalid_request_type_raises_naming_only_the_status(
+    ask: Ask,
+) -> None:
+    client = Wire(
+        build_reply(
+            400,
+            build_coded_error(
+                "invalid_prompt",
+                error_type="invalid_request",
+            ),
+        ),
+    ).build_client()
 
     with pytest.raises(
         ConfigurationError,
-        match="403",
+        match="400",
     ):
         ask(client)
+
+
+# https://openrouter.ai/docs/guides/community/multimodal-decisions, "Image size on Jev": an image
+# below the minimum dimensions returns a 400, whose body the page does not give.
+@pytest.mark.xfail(strict=True)
+def test_a_decision_400_that_names_no_reason_about_an_image_is_rejected(
+    decide: Callable[..., DecisionOutcome],
+) -> None:
+    client = Wire(
+        build_reply(
+            400,
+            build_error(400),
+        ),
+    ).build_client()
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=(
+            TextPart(text=STICKER_TITLE),
+            PNG,
+        ),
+    )
+
+    outcome = decide(
+        client,
+        question,
+    )
+
+    assert outcome == Rejected(status=400)
+
+
+def test_a_decision_400_about_an_image_whose_error_type_is_misuse_raises(
+    decide: Callable[..., DecisionOutcome],
+) -> None:
+    client = Wire(
+        build_reply(
+            400,
+            build_typed_error(400, "invalid_request"),
+        ),
+    ).build_client()
+    question = Question(
+        statement=STICKER_STATEMENT,
+        state=(PNG,),
+    )
+
+    with pytest.raises(
+        ConfigurationError,
+        match="400",
+    ):
+        decide(
+            client,
+            question,
+        )
+
+
+def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask) -> None:
+    client = Wire(build_page(401)).build_client()
+
+    with pytest.raises(
+        ConfigurationError,
+        match="401",
+    ):
+        ask(client)
+
+
+# https://openrouter.ai/docs/guides/features/guardrails, "When a Request Is Blocked": a
+# prompt-injection block and a data-region refusal; and
+# https://openrouter.ai/docs/api_reference/errors-and-debugging: "Moderation errors" (the
+# metadata's fields, with the 403 that "Error codes" gives a moderation flag) and "Budget
+# errors". Every one is a 403.
+GUARDRAIL_BLOCK: JSON = {
+    "error": {
+        "code": 403,
+        "message": "Request blocked: prompt injection patterns detected",
+        "metadata": {"patterns": ["ignore all previous instructions"]},
+    },
+}
+MODERATION_FLAG: JSON = {
+    "error": {
+        "code": 403,
+        "message": "Input was flagged by moderation",
+        "metadata": {
+            "reasons": ["violence"],
+            "flagged_input": "...",
+            "provider_name": "OpenAI",
+            "model_slug": "openai/gpt-4o",
+        },
+    },
+}
+BUDGET_SPENT: JSON = {
+    "error": {
+        "code": 403,
+        "message": (
+            "Budget limit exceeded (weekly limit). Contact your org admin. $52.00 of $50.00 "
+            "used; resets 2026-10-12T00:00:00.000Z."
+        ),
+        "metadata": {
+            "limit_source": "openrouter_guardrail_budget",
+            "scope": "workspace_default_member",
+            "limit_usd": 50,
+            "spend_usd": 52,
+            "resets_at": "2026-10-12T00:00:00.000Z",
+        },
+    },
+}
+DATA_REGION: JSON = {
+    "error": {
+        "code": 403,
+        "message": (
+            "This request arrived on the global data region, but the key's workspace permits "
+            "requests only on these OpenRouter hostnames: eu.openrouter.ai."
+        ),
+    },
+}
 
 
 # image_content_policy_violation is the code of a 403 in the table of
@@ -2035,6 +2156,36 @@ def test_a_rejection_with_a_gateway_page_raises_naming_only_the_status(ask: Ask)
         pytest.param(
             build_skin_error("content_policy_violation"),
             id="skin-policy",
+        ),
+        pytest.param(
+            build_error(403),
+            id="no-error-type",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_typed_error(403, "permission_denied"),
+            id="permission-denied",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            GUARDRAIL_BLOCK,
+            id="guardrail",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            MODERATION_FLAG,
+            id="moderation",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            BUDGET_SPENT,
+            id="budget",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            DATA_REGION,
+            id="data-region",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -2133,6 +2284,20 @@ CODED_REJECTIONS = [
             413,
             build_error(413),
             id="payload-too-large-status",
+        ),
+        pytest.param(
+            400,
+            build_coded_error(
+                "invalid_prompt",
+                error_type="context_length_exceeded",
+            ),
+            id="invalid-prompt-with-an-overflow-type",
+        ),
+        pytest.param(
+            400,
+            build_coded_error("invalid_prompt"),
+            id="invalid-prompt-without-a-type",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

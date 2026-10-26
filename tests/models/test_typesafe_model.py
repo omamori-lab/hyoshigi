@@ -666,6 +666,40 @@ def test_a_request_typesafe_cannot_use_returns_rejected_with_its_status(
     assert outcome == Rejected(status=status)
 
 
+# https://docs.typesafe.ai/images.md, "Errors": a 400 when "an image or asset was rejected",
+# for example one below the minimum width; the page gives no body.
+@pytest.mark.xfail(strict=True)
+@BUILDERS
+def test_a_400_for_a_state_that_holds_an_image_returns_rejected(
+    build_model: ModelBuilder,
+) -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            400,
+            json={"detail": "An image was rejected."},
+        )
+
+    model = build_model(
+        handler,
+        perceives=IMAGES,
+    )
+
+    outcome = run_decision(
+        model,
+        question=Question(
+            statement="Is this a red rectangle?",
+            state=(
+                MediaPart(
+                    media_type="image/png",
+                    data=RED_RECTANGLE_PNG,
+                ),
+            ),
+        ),
+    )
+
+    assert outcome == Rejected(status=400)
+
+
 # Through OpenRouter the code is inside message text, which the adapter does not read.
 @BUILDERS
 def test_a_context_length_code_inside_message_text_raises_configuration_error(

@@ -1449,12 +1449,18 @@ def test_a_failed_reply_is_unavailable_without_a_status(
 
 
 # openapi.yaml, schema ResponseErrorCode, and schema SessionTurnErrorCodeResource for
-# context_length_exceeded: codes that say the prompt cannot be used.
+# context_length_exceeded: codes that say the prompt cannot be used. invalid_prompt is in
+# ResponseErrorCode with no description; OpenAI's Codex client (openai/codex@970111f,
+# codex-rs/codex-api/src/sse/responses.rs) reads it from a failed reply as a rejected prompt.
 @pytest.mark.parametrize(
     "code",
     [
         "context_length_exceeded",
         "image_too_large",
+        pytest.param(
+            "invalid_prompt",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
 )
 def test_a_failed_reply_whose_code_says_the_prompt_cannot_be_used_is_rejected_without_a_status(
@@ -1774,11 +1780,18 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
 # openapi.yaml, schema SessionTurnErrorCodeResource: context_length_exceeded, "The request
 # exceeds the model's context window."; schema ResponseErrorCode: the codes that say an image
 # cannot be used, other than the policy one and image_file_not_found, which names a file the
-# request never refers to. A 413, a request too large, has no published body.
+# request never refers to. A 413, a request too large, has no published body. invalid_prompt
+# is in ResponseErrorCode with no description; OpenAI's Codex client (openai/codex@970111f,
+# codex-rs/codex-api/src/api_bridge.rs) reads it from a 400 as a rejected prompt.
 @pytest.mark.parametrize(
     ("status", "code"),
     [
         (400, "context_length_exceeded"),
+        pytest.param(
+            400,
+            "invalid_prompt",
+            marks=pytest.mark.xfail(strict=True),
+        ),
         (400, "invalid_image"),
         (400, "invalid_image_format"),
         (400, "invalid_base64_image"),
