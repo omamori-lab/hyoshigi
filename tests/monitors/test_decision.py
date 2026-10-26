@@ -683,11 +683,10 @@ def test_an_action_with_unperceivable_content_fails_closed_without_asking(
             Unavailable(status=503),
             "The monitor's model was unavailable, so the action is treated as suspicious.",
         ),
-        pytest.param(
+        (
             Rejected(status=400),
             "The monitor's model rejected what it was given, so the action is treated as "
             "suspicious.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=["refused", "unavailable", "rejected"],

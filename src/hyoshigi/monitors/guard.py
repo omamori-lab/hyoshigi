@@ -64,12 +64,12 @@ class GuardMonitor(Monitor):
     `prompt` states the caller's policy and should ask for one label in the guard's format;
     it is built with the bounds 0 and 1, which it need not use. `labels` names the guard's
     labels and where it writes them. A reply with no readable label, an ambiguous one, one
-    cut off at the model's output limit or a refusal fails the rating closed, the first such
-    sample in order giving the cause. A sample the model left unanswered, Unavailable, is set
-    aside: when more than half the samples answered, the score is the share of them labelled
-    suspicious, with the unanswered ones in its evidence; otherwise the rating fails closed
-    with the first unanswered sample. The samples differ only when the model's temperature is
-    above zero.
+    cut off at the model's output limit, a refusal or a rejection fails the rating closed, the
+    first such sample in order giving the cause. A sample the model left unanswered,
+    Unavailable, is set aside: when more than half the samples answered, the score is the share
+    of them labelled suspicious, with the unanswered ones in its evidence; otherwise the rating
+    fails closed with the first unanswered sample. The samples differ only when the model's
+    temperature is above zero.
 
     The explanation names the guard's finding with no count: the first suspicious label among
     the replies, else the first safe label.
@@ -213,7 +213,7 @@ def plan_guard(
     """Plan the rating: render the action, ask the guard every sample at once, score the labels.
 
     Content the model cannot perceive fails closed before it is asked; after, the first sample
-    that is unreadable, cut off or refused fails closed with that cause. The labels of the
+    that is unreadable, cut off, refused or rejected fails closed with that cause. The labels of the
     samples that answered are scored when more than half answered; otherwise the rating fails
     closed with the first unavailable sample.
     """
@@ -251,7 +251,7 @@ def plan_guard(
                 labels.append(label)
             case Unavailable() as failure:
                 unavailable.append(failure)
-            case Unreadable() | Truncated() | Refused() as failure:
+            case Unreadable() | Truncated() | Refused() | Rejected() as failure:
                 return fail_closed(
                     failure,
                     model=name,
@@ -273,7 +273,7 @@ def _read_sample(
     outcome: GenerationOutcome,
     *,
     labels: GuardLabels,
-) -> str | Unreadable | Truncated | Refused | Unavailable:
+) -> str | Unreadable | Truncated | Refused | Rejected | Unavailable:
     """Return the label a sample holds, or the outcome that fails the rating closed."""
     match outcome:
         case Generation(text=text):
@@ -281,10 +281,8 @@ def _read_sample(
                 text,
                 labels=labels,
             )
-        case Truncated() | Refused() | Unavailable():
+        case Truncated() | Refused() | Rejected() | Unavailable():
             return outcome
-        case Rejected(status=status):
-            return Unavailable(status=status)
         case unreachable:
             assert_never(unreachable)
 

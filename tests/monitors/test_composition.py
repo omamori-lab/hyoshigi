@@ -644,7 +644,6 @@ def test_the_evidence_holds_each_calls_score_in_order(
                 build_score(0.3),
             ),
             id="a-rejection-after-an-unavailable-call",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             [

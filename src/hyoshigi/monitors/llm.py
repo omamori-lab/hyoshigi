@@ -225,7 +225,8 @@ def plan_rating(
     The model is asked again, with the same prompt, after a reply that holds no readable
     score and after one cut off at its output limit, until `max_parse_retries` further asks
     are spent. Without a score by then, the rating fails closed with the last cause. A
-    refusal, an unavailable model, and content the model cannot perceive fail closed at once.
+    refusal, a rejection, an unavailable model, and content the model cannot perceive fail
+    closed at once.
     """
     name = monitor.model.name
     rendering = render(

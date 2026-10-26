@@ -620,7 +620,6 @@ def test_the_evidence_carries_the_hidden_reasoning_of_the_rated_thought(rate: Ra
             ),
             REJECTED_SCORE,
             id="a-rejection-after-an-unavailable-sample",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

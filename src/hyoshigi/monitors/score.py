@@ -254,7 +254,7 @@ def _find_failing_position(causes: list[Cause | None]) -> int | None:
             for position in failed
             if not isinstance(
                 causes[position],
-                Unavailable | Rejected,
+                Unavailable,
             )
         ),
         None,
@@ -298,6 +298,17 @@ def explain_failure(cause: Cause) -> str:
                 "The action holds content the monitor cannot perceive, so it is treated as "
                 "suspicious."
             )
+        case Truncated() | Refused() | Rejected() | Unavailable():
+            return explain_model_outcome(cause)
+        case unreachable:
+            assert_never(unreachable)
+
+
+def explain_model_outcome(outcome: Truncated | Refused | Rejected | Unavailable) -> str:
+    """Say in a sentence why the model's outcome makes the action suspicious, without its
+    content.
+    """
+    match outcome:
         case Truncated():
             return (
                 "The monitor's model stopped before it gave a score, so the action is treated "
@@ -305,7 +316,12 @@ def explain_failure(cause: Cause) -> str:
             )
         case Refused():
             return "The monitor's model refused to rate the action, so it is treated as suspicious."
-        case Unavailable() | Rejected():
+        case Rejected():
+            return (
+                "The monitor's model rejected what it was given, so the action is treated as "
+                "suspicious."
+            )
+        case Unavailable():
             return "The monitor's model was unavailable, so the action is treated as suspicious."
         case unreachable:
             assert_never(unreachable)

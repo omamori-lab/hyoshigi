@@ -39,11 +39,15 @@ CAUSES_AND_EXPLANATIONS = [
         "The monitor's model refused to rate the action, so it is treated as suspicious.",
     ),
     (
+        Rejected(status=400),
+        "The monitor's model rejected what it was given, so the action is treated as suspicious.",
+    ),
+    (
         Unavailable(status=503),
         "The monitor's model was unavailable, so the action is treated as suspicious.",
     ),
 ]
-CAUSE_IDS = ["unreadable", "unperceivable", "truncated", "refused", "unavailable"]
+CAUSE_IDS = ["unreadable", "unperceivable", "truncated", "refused", "rejected", "unavailable"]
 CAUSES = [cause for cause, _ in CAUSES_AND_EXPLANATIONS]
 
 RATED = SuspicionScore(
@@ -91,19 +95,8 @@ STATEMENT = StatementDecision(
 
 @pytest.mark.parametrize(
     ("cause", "explanation"),
-    [
-        *CAUSES_AND_EXPLANATIONS,
-        pytest.param(
-            Rejected(status=400),
-            "The monitor's model rejected what it was given, so the action is treated as "
-            "suspicious.",
-            marks=pytest.mark.xfail(strict=True),
-        ),
-    ],
-    ids=[
-        *CAUSE_IDS,
-        "rejected",
-    ],
+    CAUSES_AND_EXPLANATIONS,
+    ids=CAUSE_IDS,
 )
 def test_failing_closed_scores_one_with_the_causes_explanation_and_the_failure_as_evidence(
     cause: Cause,
@@ -202,13 +195,10 @@ def test_a_score_that_did_not_fail_closed_does_not_report_it(
             UNANSWERED,
             RATED,
         ),
-        pytest.param(
-            (
-                RATED,
-                RATED,
-                REJECTED,
-            ),
-            marks=pytest.mark.xfail(strict=True),
+        (
+            RATED,
+            RATED,
+            REJECTED,
         ),
     ],
     ids=[
