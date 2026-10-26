@@ -956,7 +956,6 @@ def test_more_than_one_sample_builds_without_a_warning(
     assert caught == []
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("returned", "message"),
     [

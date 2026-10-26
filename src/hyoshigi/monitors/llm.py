@@ -24,6 +24,7 @@ from hyoshigi.models.model import (
     Refused,
     Truncated,
     Unavailable,
+    check_outcomes,
 )
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_decision_monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
@@ -244,7 +245,13 @@ def plan_rating(
     )
     cause: _Retry = Unreadable()
     for _ in range(monitor.max_parse_retries + 1):
-        (outcome,) = yield (request,)
+        outcomes = yield (request,)
+        check_outcomes(
+            outcomes,
+            union=GenerationOutcome,
+            function="generate",
+        )
+        (outcome,) = outcomes
         settled = _settle(
             outcome,
             monitor=monitor,

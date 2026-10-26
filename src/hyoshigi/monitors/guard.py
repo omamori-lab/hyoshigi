@@ -26,6 +26,7 @@ from hyoshigi.models.model import (
     Refused,
     Truncated,
     Unavailable,
+    check_outcomes,
 )
 from hyoshigi.monitors.guard_labels import GuardLabels, read_label
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_decision_monitor
@@ -233,6 +234,11 @@ def plan_guard(
         highest_score=1,
     )
     outcomes = yield (request,) * monitor.samples
+    check_outcomes(
+        outcomes,
+        union=GenerationOutcome,
+        function="generate",
+    )
     labels: list[str] = []
     unavailable: list[Unavailable] = []
     for outcome in outcomes:

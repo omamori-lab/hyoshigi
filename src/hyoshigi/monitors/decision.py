@@ -22,6 +22,7 @@ from hyoshigi.models.model import (
     Question,
     Refused,
     Unavailable,
+    check_outcomes,
 )
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_generative_monitors
 from hyoshigi.monitors.rendering import Rendering, merge_text, render
@@ -288,6 +289,11 @@ def plan_decision(
         for statement in monitor.statements
     )
     outcomes = yield questions
+    check_outcomes(
+        outcomes,
+        union=DecisionOutcome,
+        function="decide",
+    )
     collected = collect_decisions(outcomes)
     if isinstance(
         collected,

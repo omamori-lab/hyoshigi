@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAliasType, get_args
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.options import check_instance, describe_type, name_class, read_threshold
@@ -198,6 +198,29 @@ class Decision:
 
 type GenerationOutcome = Generation | Truncated | Refused | Unavailable
 type DecisionOutcome = Decision | Refused | Unavailable
+
+
+def check_outcomes(
+    outcomes: tuple[object, ...],
+    *,
+    union: TypeAliasType,
+    function: str,
+) -> None:
+    """Raise ConfigurationError if a model's function returned a value outside its outcome
+    union, naming the function, the union's classes and the first such value's type, never
+    the value, which can hold a model's reply.
+    """
+    kinds: tuple[type, ...] = get_args(union.__value__)
+    for outcome in outcomes:
+        if not isinstance(
+            outcome,
+            kinds,
+        ):
+            *others, last = (kind.__name__ for kind in kinds)
+            raise ConfigurationError(
+                f"{function} must return a {', '.join(others)} or {last}, "
+                f"got {describe_type(outcome)}",
+            )
 
 
 def check_name(name: str) -> None:

@@ -855,7 +855,6 @@ def test_an_exception_from_the_model_propagates(rate_action: SyncRate | AsyncRat
         )
 
 
-@pytest.mark.xfail(strict=True)
 @MONITOR_FAMILIES
 @pytest.mark.parametrize(
     ("returned", "message"),
