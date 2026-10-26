@@ -293,3 +293,96 @@ def test_a_model_without_a_name_raises(
         )
 
     assert str(raised.value) == "a model needs a name, such as the provider's model id"
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("kind", "fields", "message"),
+    [
+        (
+            GenerativeModel,
+            {
+                "name": "m",
+                "generate": "x",
+            },
+            "generate must be callable, got an instance of str",
+        ),
+        (
+            AsyncGenerativeModel,
+            {
+                "name": "m",
+                "generate": None,
+            },
+            "generate must be callable, got None",
+        ),
+        (
+            DecisionModel,
+            {
+                "name": "m",
+                "decide": "x",
+            },
+            "decide must be callable, got an instance of str",
+        ),
+        (
+            AsyncDecisionModel,
+            {
+                "name": "m",
+                "decide": None,
+            },
+            "decide must be callable, got None",
+        ),
+        (
+            GenerativeModel,
+            {
+                "name": "m",
+                "generate": build_refusal,
+                "perceives": "image/png",
+            },
+            "perceives must be a MediaTypes, got an instance of str",
+        ),
+        (
+            AsyncDecisionModel,
+            {
+                "name": "m",
+                "decide": build_refusal,
+                "perceives": ("image/png",),
+            },
+            "perceives must be a MediaTypes, got an instance of tuple",
+        ),
+        (
+            AsyncGenerativeModel,
+            {
+                "name": 3,
+                "generate": build_refusal,
+            },
+            "name must be a str, got an instance of int",
+        ),
+        (
+            DecisionModel,
+            {
+                "name": None,
+                "decide": build_refusal,
+            },
+            "name must be a str, got None",
+        ),
+    ],
+    ids=[
+        "generate-not-callable",
+        "async-generate-not-callable",
+        "decide-not-callable",
+        "async-decide-not-callable",
+        "perceives-a-string",
+        "async-perceives-a-tuple",
+        "async-name-a-number",
+        "name-none",
+    ],
+)
+def test_a_model_field_of_the_wrong_type_raises_naming_the_field_when_built(
+    kind: type,
+    fields: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        kind(**fields)
+
+    assert str(raised.value) == message
