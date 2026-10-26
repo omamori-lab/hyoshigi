@@ -33,6 +33,7 @@ from hyoshigi.models.model import (
     Prompt,
     PromptPart,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
     check_client,
@@ -51,9 +52,8 @@ _FAILURES = (
     ValueError,
 )
 
-# The client errors a retry or a smaller prompt can clear: the SDK retries 408, 409 and 429, and
-# the prompt's content can make a request too large (413), so these fail closed.
-_UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
+# The client errors a retry can clear, which the SDK retries.
+_UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
 
 # The start of the message of the 400 for an input over the context window: Anthropic's "Context
 # windows" guide, section "Context window overflow behavior".
@@ -352,28 +352,25 @@ def read_reply(reply: Message | Failure) -> GenerationOutcome:
             return Unavailable()
 
 
-def read_failure(failure: Failure) -> Unavailable:
+def read_failure(failure: Failure) -> Rejected | Unavailable:
     """The outcome of a failure that stood in for a reply.
 
-    A 400 whose message starts "prompt is too long" is unavailable with status 400, and the
-    message is not kept. Any other client error except 408, 409, 413 and 429 raises
-    ConfigurationError naming only the status, and so does a plain ValueError, the SDK refusing
-    the request's arguments. Any other status is unavailable with it, and any other failure,
-    a ValueError's subclasses included, is unavailable.
+    A status that says the API cannot use the prompt is rejected with it. Any other client error
+    except 408, 409 and 429 raises ConfigurationError naming only the status, and so does a
+    plain ValueError, the SDK refusing the request's arguments. Any other status is unavailable
+    with it, and any other failure, a ValueError's subclasses included, is unavailable.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     match failure:
         case APIStatusError(
-            status_code=400,
-            body={
-                "error": {
-                    "type": "invalid_request_error",
-                    "message": str(message),
-                },
-            },
-        ) if message.startswith(_PROMPT_TOO_LONG):
-            return Unavailable(status=400)
+            status_code=status,
+            body=body,
+        ) if is_rejection(
+            status,
+            body=body,
+        ):
+            return Rejected(status=status)
         case APIStatusError(status_code=status) if (
             400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
         ):
@@ -386,6 +383,28 @@ def read_failure(failure: Failure) -> Unavailable:
             )
         case _:
             return Unavailable()
+
+
+def is_rejection(
+    status: int,
+    *,
+    body: object,
+) -> bool:
+    """Whether a status and its body say the API cannot use the prompt: a 413, or a 400 whose
+    message starts "prompt is too long", which is read and never kept.
+    """
+    match status, body:
+        case 413, _:
+            return True
+        case 400, {
+            "error": {
+                "type": "invalid_request_error",
+                "message": str(message),
+            },
+        }:
+            return message.startswith(_PROMPT_TOO_LONG)
+        case _:
+            return False
 
 
 def read_message(message: Message) -> GenerationOutcome:

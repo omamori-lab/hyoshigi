@@ -31,6 +31,7 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Refused,
+    Rejected,
     Unavailable,
     check_name,
     check_perceives,
@@ -46,9 +47,9 @@ QUESTION_NAME = "statement"
 # image only as a base64 data URL of one of these types.
 DECISION_IMAGES = MediaTypes("image/png", "image/jpeg", "image/webp")
 
-# https://openrouter.ai/docs/api_reference/errors-and-debugging: a timeout, a conflict, a
-# request body too large and a rate limit mean no answer now.
-UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
+# https://openrouter.ai/docs/api_reference/errors-and-debugging: a timeout, a conflict and a
+# rate limit mean no answer now.
+UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
 
 # The codes of input the provider rejects, which an agent's own trajectory can cause: the error
 # types of https://openrouter.ai/docs/api_reference/errors-and-debugging#typed-error-codes, and
@@ -202,12 +203,12 @@ def read_failure(
     status: int,
     *,
     codes: tuple[str, ...],
-) -> Refused | Unavailable:
+) -> Refused | Rejected | Unavailable:
     """The outcome of an HTTP failure with this status and these error codes.
 
-    A refusal is refused. No answer now (a status below 400, above 499 or one to ask again
-    later), or input the provider rejects, is unavailable. Any other rejection raises
-    ConfigurationError naming only the status.
+    A refusal is refused. A 413, or input the provider rejects, is rejected with the status. No
+    answer now (a status below 400, above 499 or one to ask again later) is unavailable. Any
+    other rejection raises ConfigurationError naming only the status.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
@@ -218,21 +219,19 @@ def read_failure(
         ),
     ):
         return Refused()
-    if (
-        not 400 <= status < 500
-        or status in UNAVAILABLE_STATUSES
-        or not REJECTED_INPUT.isdisjoint(codes)
-    ):
+    if status == 413 or not REJECTED_INPUT.isdisjoint(codes):
+        return Rejected(status=status)
+    if not 400 <= status < 500 or status in UNAVAILABLE_STATUSES:
         return Unavailable(status=status)
     raise ConfigurationError(f"OpenRouter answered HTTP {status}")
 
 
-def read_error(error: Failure) -> Refused | Unavailable:
+def read_error(error: Failure) -> Refused | Rejected | Unavailable:
     """The outcome of an exception the SDK raised.
 
     A connection error, no response, or a success status with a reply the SDK could not read
     is unavailable with no status; any other status is read by read_failure, which raises
-    ConfigurationError for a rejection.
+    ConfigurationError for a request that cannot work.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
@@ -261,7 +260,10 @@ def read_reply(reply: object) -> GenerationOutcome:
     """
     match reply:
         case components.OpenResponsesResult():
-            return responses.read_reply(restore(reply.model_dump(warnings=False)))
+            return responses.read_reply(
+                restore(reply.model_dump(warnings=False)),
+                rejections=REJECTED_INPUT,
+            )
         case _:
             return Unavailable()
 

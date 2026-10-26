@@ -1721,7 +1721,6 @@ def test_the_error_for_a_status_does_not_carry_the_text_the_api_sent(
 
 
 # The same page: 413 request_too_large, "Request exceeds the maximum allowed number of bytes."
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("status", "body"),
     [

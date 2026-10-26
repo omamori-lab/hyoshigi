@@ -1450,7 +1450,6 @@ def test_a_failed_reply_is_unavailable_without_a_status(
 
 # openapi.yaml, schema ResponseErrorCode, and schema SessionTurnErrorCodeResource for
 # context_length_exceeded: codes that say the prompt cannot be used.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "code",
     [
@@ -1776,7 +1775,6 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
 # exceeds the model's context window."; schema ResponseErrorCode: the codes that say an image
 # cannot be used, other than the policy one and image_file_not_found, which names a file the
 # request never refers to. A 413, a request too large, has no published body.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("status", "code"),
     [
