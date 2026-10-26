@@ -118,11 +118,15 @@ nav:
       - Rating with an LLM monitor: how-to/rating-with-an-llm-monitor.md
       - Rating with a decision model: how-to/rating-with-a-decision-model.md
       - Handling a failed rating: how-to/handling-a-failed-rating.md
+      - Tracing ratings: how-to/tracing-ratings.md
+      - Reporting scores to Langfuse and LangSmith: how-to/reporting-scores-to-langfuse-and-langsmith.md
   - Explanation:
       - Trajectories: explanation/trajectories.md
       - The default view: explanation/the-default-view.md
       - The default prompt: explanation/the-default-prompt.md
       - Failing closed: explanation/failing-closed.md
+      - Calibration: explanation/calibration.md
+      - Observability: explanation/observability.md
       - Where the monitors miss: explanation/known-limits.md
   - Reference:
       - API: reference/api.md

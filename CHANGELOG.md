@@ -30,6 +30,10 @@ minor version.
   can leave them out of training corpora.
 - Docs pages on connecting a model, and on what each provider adapter
   sends and what each reply or error becomes.
+- Docs pages on tracing ratings, reporting scores to Langfuse and LangSmith,
+  what a calibrated score means, and why a rating is a span whose score is
+  reported for it, with the reasons and sources the `CalibratedMonitor`,
+  `tracing.py`, `reporting.py` and `reports.py` docstrings held.
 
 ### Changed
 
