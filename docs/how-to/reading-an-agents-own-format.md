@@ -294,9 +294,9 @@ provider's server, and the reader records a placeholder for them
 ([Provider formats](../reference/formats.md#previous_response_id-leaves-the-earlier-turns-on-the-providers-server)).
 
 A body that is not in the format raises `FormatError`. Its message names the JSONPath of the first
-problem and what was expected there, and it never quotes the payload, which can hold the agent's
-private content. Passing a whole response where the message or the output goes is one such mistake,
-and arguments sent as an object where the format has JSON text is another:
+problem and what was expected there, and it quotes no value from the payload, which can hold the
+agent's private content. Passing a whole response where the message or the output goes is one such
+mistake, and arguments sent as an object where the format has JSON text is another:
 
 ```python
 from hyoshigi import FormatError
