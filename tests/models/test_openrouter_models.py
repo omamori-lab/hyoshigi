@@ -26,6 +26,7 @@ from hyoshigi import (
     Prompt,
     Question,
     Refused,
+    Rejected,
     TextPart,
     Truncated,
     Unavailable,
@@ -1487,6 +1488,31 @@ def test_a_response_the_provider_blocks_is_refused(
     assert outcome == Refused()
 
 
+# The same page, "Responses API": a context overflow takes the code invalid_prompt and keeps
+# its error type at the top level of the failed reply.
+@pytest.mark.xfail(strict=True)
+def test_a_response_whose_error_type_says_the_input_cannot_be_used_is_rejected(
+    generate: Callable[..., GenerationOutcome],
+) -> None:
+    client = Wire(
+        build_reply(
+            200,
+            build_response(
+                status="failed",
+                error={
+                    "code": "invalid_prompt",
+                    "message": "Detailed error description",
+                },
+                error_type="context_length_exceeded",
+            ),
+        ),
+    ).build_client()
+
+    outcome = generate(client)
+
+    assert outcome == Rejected()
+
+
 @pytest.mark.parametrize(
     ("answer", "probability"),
     [
@@ -1839,7 +1865,7 @@ def test_an_answer_that_is_not_a_probability_is_unavailable_without_a_status(
 
 @pytest.mark.parametrize(
     "status",
-    [408, 409, 413, 429, 500, 502, 503, 524, 529],
+    [408, 409, 429, 500, 502, 503, 524, 529],
 )
 def test_a_status_that_means_try_later_is_unavailable_with_that_status(
     ask: Ask,
@@ -2104,9 +2130,15 @@ CODED_REJECTIONS = [
             CONTEXT_OVERFLOW_ERROR,
             id="context-length-message",
         ),
+        pytest.param(
+            413,
+            build_error(413),
+            id="payload-too-large-status",
+        ),
     ],
 )
-def test_input_the_provider_rejects_is_unavailable_with_the_status(
+@pytest.mark.xfail(strict=True)
+def test_input_the_provider_rejects_is_rejected_with_the_status(
     ask: Ask,
     status: int,
     body: JSON,
@@ -2120,7 +2152,7 @@ def test_input_the_provider_rejects_is_unavailable_with_the_status(
 
     outcome = ask(client)
 
-    assert outcome == Unavailable(status=status)
+    assert outcome == Rejected(status=status)
 
 
 @pytest.mark.parametrize(
