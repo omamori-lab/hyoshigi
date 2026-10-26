@@ -956,6 +956,41 @@ def test_more_than_one_sample_builds_without_a_warning(
     assert caught == []
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("returned", "message"),
+    [
+        (
+            "unsafe\nS7",
+            "generate must return a Generation, Truncated, Refused or Unavailable, "
+            "got an instance of str",
+        ),
+        (
+            None,
+            "generate must return a Generation, Truncated, Refused or Unavailable, got None",
+        ),
+    ],
+    ids=["reply-text", "none"],
+)
+def test_a_value_outside_the_outcome_union_raises_naming_its_type(
+    rate: Rate,
+    returned: object,
+    message: str,
+) -> None:
+    script = Script(
+        SAFE,
+        returned,  # ty: ignore[invalid-argument-type]
+    )
+
+    with pytest.raises(ConfigurationError) as raised:
+        rate(
+            script,
+            samples=2,
+        )
+
+    assert str(raised.value) == message
+
+
 @pytest.mark.parametrize(
     ("monitor_class", "model", "message"),
     [

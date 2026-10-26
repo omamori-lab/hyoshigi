@@ -857,6 +857,40 @@ def test_an_exception_from_the_model_propagates(rate_action: SyncRate | AsyncRat
         )
 
 
+@pytest.mark.xfail(strict=True)
+@MONITOR_FAMILIES
+@pytest.mark.parametrize(
+    ("returned", "message"),
+    [
+        (
+            0.4,
+            "decide must return a Decision, Refused or Unavailable, got an instance of float",
+        ),
+        (
+            None,
+            "decide must return a Decision, Refused or Unavailable, got None",
+        ),
+    ],
+    ids=["probability", "none"],
+)
+def test_a_value_outside_the_outcome_union_raises_naming_its_type(
+    rate_action: SyncRate | AsyncRate,
+    returned: object,
+    message: str,
+) -> None:
+    def decide(_question: Question) -> DecisionOutcome:
+        return returned  # ty: ignore[invalid-return-type]
+
+    with pytest.raises(ConfigurationError) as raised:
+        rate_action(
+            decide,
+            Action(),
+            trajectory=Trajectory(),
+        )
+
+    assert str(raised.value) == message
+
+
 def test_async_monitor_asks_questions_concurrently() -> None:
     action = Action()
     statements = ("Statement one", "Statement two")
