@@ -90,7 +90,8 @@ feedback again while the server answers 404 Not Found, since the run may not be 
 10 attempts with a wait that doubles from one second (langsmith 0.14.11, `Client.create_feedback`
 and `AsyncClient.create_feedback`). The LangSmith report waits for LangSmith's answer. For a
 run that never arrives, the waits add up to 511 seconds, so the rating returns its score about eight
-and a half minutes later, and the log record names `LangSmithNotFoundError`.
+and a half minutes later, and the log record names `LangSmithNotFoundError`. The report's
+`stop_after_attempt` caps the attempts, and with them the wait.
 
 ## The reported score is the wrapped monitor's
 

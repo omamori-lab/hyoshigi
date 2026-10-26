@@ -34,6 +34,9 @@ minor version.
   what a calibrated score means, and why a rating is a span whose score is
   reported for it, with the reasons and sources the `CalibratedMonitor`,
   `tracing.py`, `reporting.py` and `reports.py` docstrings held.
+- `LangSmithFeedback` and `AsyncLangSmithFeedback` take `stop_after_attempt`,
+  the attempts of the client's `create_feedback`, 10 by default, so a control
+  loop that cannot wait on LangSmith's retries can cap them.
 
 ### Changed
 
