@@ -8,9 +8,10 @@ import sys
 import threading
 import uuid
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from inspect import signature
 from typing import assert_never, cast
 from unittest.mock import ANY
 
@@ -187,7 +188,7 @@ def langfuse(langfuse_stand_in: LangfuseStandIn) -> LangfuseStandIn:
 
 class LangSmithServer(ThreadingHTTPServer):
     """LangSmith's end of the connection, on 127.0.0.1: records each request's path and JSON
-    body, and answers with `status` and an empty JSON object.
+    body, and answers with an empty JSON object and the next of `first_statuses`, then `status`.
     """
 
     def __init__(self) -> None:
@@ -196,6 +197,7 @@ class LangSmithServer(ThreadingHTTPServer):
             FeedbackHandler,
         )
         self.received: list[tuple[str, JSON]] = []
+        self.first_statuses: list[int] = []
         self.status = 200
 
     @property
@@ -218,7 +220,8 @@ class FeedbackHandler(BaseHTTPRequestHandler):
                 json.loads(body),
             ),
         )
-        self.send_response(server.status)
+        status = server.first_statuses.pop(0) if server.first_statuses else server.status
+        self.send_response(status)
         self.send_header(
             "Content-Type",
             "application/json",
@@ -256,6 +259,7 @@ def langsmith_server() -> Iterator[LangSmithServer]:
 def langsmith(langsmith_server: LangSmithServer) -> LangSmithServer:
     """The stand-in server, with no request received yet, answering 200."""
     langsmith_server.received.clear()
+    langsmith_server.first_statuses.clear()
     langsmith_server.status = 200
     return langsmith_server
 
@@ -750,6 +754,68 @@ def test_the_other_reports_are_sent_when_one_fails(
     assert [score["observationId"] for score in langfuse.read_scores()] == [SPAN_HEX]
 
 
+@pytest.fixture
+def monitor_with_one_attempt(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> Monitor | AsyncMonitor:
+    """A reported monitor whose LangSmith report makes one attempt, to a server that answers
+    404 to its first request and 200 to the next.
+    """
+    langsmith.first_statuses = [404]
+    return family.reported(
+        monitor=build_calm_llm(family),
+        reports=(
+            replace(
+                family.feedback(langsmith.url),
+                stop_after_attempt=1,
+            ),
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_report_capped_at_one_attempt_makes_one_request_when_the_run_is_not_found(
+    langsmith: LangSmithServer,
+    monitor_with_one_attempt: Monitor | AsyncMonitor,
+) -> None:
+    rate(monitor_with_one_attempt)
+
+    assert len(langsmith.received) == 1
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("family", "report"),
+    [
+        (
+            SYNCHRONOUS,
+            "LangSmithFeedback",
+        ),
+        (
+            ASYNCHRONOUS,
+            "AsyncLangSmithFeedback",
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_a_score_lost_to_a_run_not_found_after_one_attempt_is_logged_by_its_class_and_error_type(
+    monitor_with_one_attempt: Monitor | AsyncMonitor,
+    caplog: pytest.LogCaptureFixture,
+    report: str,
+) -> None:
+    rate(monitor_with_one_attempt)
+
+    assert [record for record in caplog.record_tuples if record[0].startswith("hyoshigi")] == [
+        (
+            "hyoshigi.monitors.reporting",
+            logging.WARNING,
+            f"{report} did not send the score: LangSmithNotFoundError.",
+        ),
+    ]
+
+
 # Rates with a reported monitor of each family in a process where no tracer provider is set
 # up, with hyoshigi's log records written to standard output.
 RATE_WITHOUT_A_TRACER_PROVIDER = """
@@ -1181,6 +1247,87 @@ def test_a_project_id_that_is_not_a_uuid_string_is_refused(
         report(
             client=client,
             project_id=project_id,
+        )
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("report", "create_feedback"),
+    [
+        (
+            LangSmithFeedback,
+            Client.create_feedback,
+        ),
+        (
+            AsyncLangSmithFeedback,
+            AsyncClient.create_feedback,
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_the_default_attempts_are_those_of_the_clients_create_feedback(
+    report: Callable[..., object],
+    create_feedback: Callable[..., object],
+) -> None:
+    expected = signature(create_feedback).parameters["stop_after_attempt"].default
+
+    declared = signature(report).parameters["stop_after_attempt"].default
+
+    assert declared == expected
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("report", "build_client"),
+    [
+        (
+            LangSmithFeedback,
+            build_client,
+        ),
+        (
+            AsyncLangSmithFeedback,
+            build_async_client,
+        ),
+    ],
+    ids=["sync", "async"],
+)
+@pytest.mark.parametrize(
+    ("attempts", "message"),
+    [
+        (
+            0,
+            "stop_after_attempt must be at least 1, got 0",
+        ),
+        (
+            -1,
+            "stop_after_attempt must be at least 1, got -1",
+        ),
+        (
+            True,
+            "stop_after_attempt must be a whole number of at least 1, got True",
+        ),
+        (
+            1.5,
+            "stop_after_attempt must be a whole number of at least 1, got 1.5",
+        ),
+    ],
+    ids=["zero", "negative", "bool", "float"],
+)
+def test_a_stop_after_attempt_that_is_not_a_positive_integer_is_refused(
+    report: Callable[..., object],
+    build_client: Callable[[], object],
+    attempts: object,
+    message: str,
+) -> None:
+    client = build_client()
+
+    with pytest.raises(ConfigurationError) as raised:
+        report(
+            client=client,
+            project_id=PROJECT_ID,
+            stop_after_attempt=attempts,
         )
 
     assert str(raised.value) == message
