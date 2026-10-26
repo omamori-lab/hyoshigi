@@ -863,7 +863,8 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
 
 
 # Each expected path writes the call id as RFC 9535, sec. 2.7, writes a member name in a
-# Normalized Path.
+# Normalized Path, and an unpaired surrogate, which no Normalized Path holds, in the four-digit
+# form of a control character. The low surrogate comes first, so the two are not a pair.
 @pytest.mark.parametrize(
     ("call_id", "path"),
     [
@@ -887,6 +888,11 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
             'call-3/"x" é\x7f\U0001f041',
             "$.subagents['call-3/\"x\" é\x7f\U0001f041']",
         ),
+        pytest.param(
+            "\udfff\ud800",
+            r"$.subagents['\udfff\ud800']",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "apostrophe",
@@ -894,6 +900,7 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
         "escapes-with-a-letter",
         "other-control-characters",
         "unescaped-characters",
+        "unpaired-surrogates",
     ],
 )
 def test_a_format_error_names_a_subagent_by_its_call_id_escaped_as_in_a_normalized_path(
