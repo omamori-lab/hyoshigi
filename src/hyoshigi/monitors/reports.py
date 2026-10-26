@@ -22,7 +22,7 @@ from hyoshigi.monitors.score import (
     SuspicionScore,
 )
 from hyoshigi.monitors.tracing import EVALUATION_NAME, name_cause
-from hyoshigi.options import check_instance, describe_option_value
+from hyoshigi.options import check_instance, describe_option_value, read_count
 from hyoshigi.trajectory.json_data import JSON
 
 if TYPE_CHECKING:
@@ -91,9 +91,11 @@ class LangSmithFeedback:
 
     The feedback is posted at once, with no trace id, and leaves the trace's retention as it
     is; the client rounds the score to 4 decimal places and retries as its create_feedback
-    does. `project_id` is the run's project id, a UUID string. An error from the client is
-    raised. A `client` that is not a langsmith.Client, a blank `name` or a `project_id` that
-    is not a UUID string raises ConfigurationError when the report is built.
+    does. `project_id` is the run's project id, a UUID string. `stop_after_attempt` is the
+    number of attempts create_feedback makes, a positive integer, 10 by default as in
+    LangSmith. An error from the client is raised. A `client` that is not a langsmith.Client,
+    a blank `name`, a `project_id` that is not a UUID string or a `stop_after_attempt` that is
+    not a positive integer raises ConfigurationError when the report is built.
 
     <https://omamori-lab.github.io/hyoshigi/how-to/reporting-scores-to-langfuse-and-langsmith/>
     """
@@ -101,6 +103,7 @@ class LangSmithFeedback:
     client: Client
     project_id: str
     name: str = EVALUATION_NAME
+    stop_after_attempt: int = 10
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].
@@ -114,6 +117,11 @@ class LangSmithFeedback:
         )
         _check_name(self.name)
         _check_project_id(self.project_id)
+        read_count(
+            self.stop_after_attempt,
+            name="stop_after_attempt",
+            minimum=1,
+        )
 
     def send(
         self,
@@ -134,6 +142,7 @@ class LangSmithFeedback:
             source_info=describe_score(score),
             session_id=self.project_id,
             extend_trace_retention=False,
+            stop_after_attempt=self.stop_after_attempt,
         )
 
 
@@ -143,11 +152,15 @@ class LangSmithFeedback:
     kw_only=True,
 )
 class AsyncLangSmithFeedback:
-    """Sends a score to LangSmith as LangSmithFeedback does, through an awaited client."""
+    """Sends a score to LangSmith as LangSmithFeedback does, through an awaited client.
+
+    The fields and the errors are those of LangSmithFeedback.
+    """
 
     client: AsyncClient
     project_id: str
     name: str = EVALUATION_NAME
+    stop_after_attempt: int = 10
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].
@@ -161,6 +174,11 @@ class AsyncLangSmithFeedback:
         )
         _check_name(self.name)
         _check_project_id(self.project_id)
+        read_count(
+            self.stop_after_attempt,
+            name="stop_after_attempt",
+            minimum=1,
+        )
 
     async def send(
         self,
@@ -181,6 +199,7 @@ class AsyncLangSmithFeedback:
             source_info=describe_score(score),
             session_id=self.project_id,
             extend_trace_retention=False,
+            stop_after_attempt=self.stop_after_attempt,
         )
 
 
