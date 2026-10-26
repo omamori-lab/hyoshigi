@@ -751,10 +751,9 @@ def test_a_failed_closed_score_records_the_cause_of_the_last_attempt(
             Unavailable(status=503),
             UNAVAILABLE_SCORE,
         ),
-        pytest.param(
+        (
             Rejected(status=400),
             REJECTED_SCORE,
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=["refused", "unavailable", "rejected"],

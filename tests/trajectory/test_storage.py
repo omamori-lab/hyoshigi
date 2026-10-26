@@ -240,6 +240,20 @@ CAUSES_STORED: list[tuple[Cause, dict[str, JSON]]] = [
         },
     ),
     (
+        Rejected(status=400),
+        {
+            "kind": "rejected",
+            "status": 400,
+        },
+    ),
+    (
+        Rejected(),
+        {
+            "kind": "rejected",
+            "status": None,
+        },
+    ),
+    (
         Unavailable(status=503),
         {
             "kind": "unavailable",
@@ -260,6 +274,8 @@ CAUSE_IDS = [
     "truncated",
     "refused-with-an-explanation",
     "refused-without-one",
+    "rejected-with-a-status",
+    "rejected-without-one",
     "unavailable-with-a-status",
     "unavailable-without-one",
 ]
@@ -1008,26 +1024,6 @@ SCORE_CASES = [
         )
         for cause, stored in CAUSES_STORED
     ],
-    pytest.param(
-        *build_failed_closed_case(
-            Rejected(status=400),
-            {
-                "kind": "rejected",
-                "status": 400,
-            },
-        ),
-        marks=pytest.mark.xfail(strict=True),
-    ),
-    pytest.param(
-        *build_failed_closed_case(
-            Rejected(),
-            {
-                "kind": "rejected",
-                "status": None,
-            },
-        ),
-        marks=pytest.mark.xfail(strict=True),
-    ),
 ]
 SCORE_IDS = [
     "rationale",
@@ -1035,8 +1031,6 @@ SCORE_IDS = [
     "labels",
     "composite",
     *CAUSE_IDS,
-    "rejected-with-a-status",
-    "rejected-without-one",
 ]
 
 

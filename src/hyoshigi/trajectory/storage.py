@@ -33,7 +33,12 @@ _MEDIA_PART = "a media part with an IANA media type and exactly one of url and d
 _SCORE = "a score with a value from 0 to 1, an explanation and evidence"
 _EVIDENCE = "rationale, decisions, labels, composite or failed-closed evidence"
 _DECISION = "a decision with a probability from 0 to 1 and a confidence from 0 to 1, or null"
-_CAUSE = "a cause: unreadable, unperceivable, truncated, refused or unavailable"
+_CAUSE = "a cause: unreadable, unperceivable, truncated, refused, rejected or unavailable"
+# The kind of each cause stored with its HTTP status.
+_STATUS_KINDS: dict[type[Rejected | Unavailable], str] = {
+    Rejected: "rejected",
+    Unavailable: "unavailable",
+}
 _NAME_ESCAPES = {
     **{code: f"\\u{code:04x}" for code in range(0x20)},
     **{code: f"\\u{code:04x}" for code in range(0xD800, 0xE000)},
@@ -427,9 +432,9 @@ def dump_cause(cause: Cause) -> JSON:
                 "kind": "refused",
                 "explanation": cause.explanation,
             }
-        case Unavailable() | Rejected():
+        case Rejected() | Unavailable():
             return {
-                "kind": "unavailable",
+                "kind": _STATUS_KINDS[type(cause)],
                 "status": cause.status,
             }
         case unreachable:
@@ -731,7 +736,7 @@ def load_model_outcome(
     data: JSON,
     *,
     path: str,
-) -> Truncated | Refused | Unavailable:
+) -> Truncated | Refused | Rejected | Unavailable:
     """Read a cause that is the model's outcome, which dump_cause wrote."""
     match data:
         case {
@@ -745,13 +750,13 @@ def load_model_outcome(
         }:
             return Refused(explanation=explanation)
         case {
-            "kind": "unavailable" | "rejected",
+            "kind": "rejected" | "unavailable" as kind,
             "status": int() | None as status,
         } if not isinstance(
             status,
             bool,
         ):
-            return Unavailable(status=status)
+            return Rejected(status=status) if kind == "rejected" else Unavailable(status=status)
         case _:
             raise FormatError(
                 path=path,

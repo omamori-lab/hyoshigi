@@ -382,7 +382,6 @@ def rate_three_calls(
     return family.rate(repeated)
 
 
-@pytest.mark.xfail(strict=True)
 @FAMILIES
 @given(
     calls=st.lists(
