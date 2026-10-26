@@ -76,9 +76,9 @@ score = monitor.rate(
 A black-box agent's trajectory holds its task, and its final answer is the action to rate.
 `score.value` is the suspicion, from 0 to 1. `score.explanation` says why, and the scaffold decides
 whether the agent sees it. `score.evidence` records what the score rests on and, for a
-rating that could not be made, the cause. Five causes fail a rating closed, at 1.0: a reply the
+rating that could not be made, the cause. Six causes fail a rating closed, at 1.0: a reply the
 monitor cannot read, a reply cut off at the output limit, content its model cannot perceive, a
-refusal and an unavailable model.
+refusal, a prompt the provider rejects and an unavailable model.
 
 ## Documentation
 

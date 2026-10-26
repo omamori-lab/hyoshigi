@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="626" viewBox="0 0 1000 626" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="672" viewBox="0 0 1000 672" role="img" aria-labelledby="title desc">
   <title id="title">When a rating cannot be made</title>
-  <desc id="desc">A monitor always returns a score. When it cannot rate the action, for one of five causes, the score fails closed. Unreadable: no readable score or label in the model&#x27;s replies, after any retries. Unperceivable: content in the action that the model cannot perceive. Truncated: a reply cut off at the model&#x27;s output limit. Refused: the model or its provider declined. Unavailable: no answer after the caller&#x27;s retries. The score that fails closed has suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A wrapper carries it on. RepeatedMonitor averages the calls that answered: it leaves out a call that failed as Unavailable while more than half the calls answered, and any other failure gives 1.0. CascadeMonitor escalates a failed fast score, which is 1.0, to its careful monitor, whose score replaces it, and a failed careful score is the result. CalibratedMonitor returns a failed score as it is, unranked. A GuardMonitor sets an unanswered sample aside by the same rule as RepeatedMonitor. Only CascadeMonitor puts another monitor&#x27;s score in place of a failed one.</desc>
+  <desc id="desc">A monitor always returns a score. When it cannot rate the action, for one of six causes, the score fails closed. Unreadable: no readable score or label in the model&#x27;s replies, after any retries. Unperceivable: content in the action that the model cannot perceive. Truncated: a reply cut off at the model&#x27;s output limit. Refused: the model or its provider declined. Rejected: the provider could not use the prompt. Unavailable: no answer after the caller&#x27;s retries. The score that fails closed has suspicion 1.0 and the cause as evidence, FailedClosed(model, cause). A wrapper carries it on. RepeatedMonitor averages the calls that answered: it leaves out a call that failed as Unavailable while more than half the calls answered, and any other failure gives 1.0. CascadeMonitor escalates a failed fast score, which is 1.0, to its careful monitor, whose score replaces it, and a failed careful score is the result. CalibratedMonitor returns a failed score as it is, unranked. A GuardMonitor sets an unanswered sample aside by the same rule as RepeatedMonitor. Only CascadeMonitor puts another monitor&#x27;s score in place of a failed one.</desc>
   <!-- Colours come from the brand tokens: diagrams/render.py fills this style block. -->
   <style>
     svg { color-scheme: light; }
@@ -46,39 +46,43 @@
   <text x="52.0" y="272.0" text-anchor="start" class="mono">Refused</text>
   <text x="182.0" y="272.0" text-anchor="start" class="small">the model or its provider declined</text>
   <rect class="box" x="32.0" y="296.0" width="470.0" height="34" rx="6"/>
-  <text x="52.0" y="318.0" text-anchor="start" class="mono">Unavailable</text>
-  <text x="182.0" y="318.0" text-anchor="start" class="small">no answer after the caller&#x27;s retries</text>
-  <rect class="box" x="578.0" y="170.0" width="390.0" height="102.0" rx="6"/>
-  <text x="773.0" y="201.0" text-anchor="middle" class="title">The score fails closed</text>
-  <text x="773.0" y="223.0" text-anchor="middle" class="small">suspicion 1.0, the cause as evidence:</text>
-  <text x="773.0" y="244.0" text-anchor="middle"><tspan class="mono">FailedClosed(model, cause)</tspan></text>
-  <path class="edge bold" d="M540.0,129.0 L540.0,313.0"/>
+  <text x="52.0" y="318.0" text-anchor="start" class="mono">Rejected</text>
+  <text x="182.0" y="318.0" text-anchor="start" class="small">the provider could not use the prompt</text>
+  <rect class="box" x="32.0" y="342.0" width="470.0" height="34" rx="6"/>
+  <text x="52.0" y="364.0" text-anchor="start" class="mono">Unavailable</text>
+  <text x="182.0" y="364.0" text-anchor="start" class="small">no answer after the caller&#x27;s retries</text>
+  <rect class="box" x="578.0" y="193.0" width="390.0" height="102.0" rx="6"/>
+  <text x="773.0" y="224.0" text-anchor="middle" class="title">The score fails closed</text>
+  <text x="773.0" y="246.0" text-anchor="middle" class="small">suspicion 1.0, the cause as evidence:</text>
+  <text x="773.0" y="267.0" text-anchor="middle"><tspan class="mono">FailedClosed(model, cause)</tspan></text>
+  <path class="edge bold" d="M540.0,129.0 L540.0,359.0"/>
   <path class="edge bold" d="M502.0,129.0 L540.0,129.0"/>
   <path class="edge bold" d="M502.0,175.0 L540.0,175.0"/>
   <path class="edge bold" d="M502.0,221.0 L540.0,221.0"/>
   <path class="edge bold" d="M502.0,267.0 L540.0,267.0"/>
   <path class="edge bold" d="M502.0,313.0 L540.0,313.0"/>
-  <path class="edge bold" d="M540.0,221.0 L576.0,221.0" marker-end="url(#arrow)"/>
-  <rect class="box" x="32.0" y="402.0" width="293.3" height="123.0" rx="6"/>
-  <text x="178.7" y="433.0" text-anchor="middle" class="title">Averages the answers</text>
-  <text x="178.7" y="455.0" text-anchor="middle"><tspan class="mono">RepeatedMonitor</tspan></text>
-  <text x="178.7" y="476.0" text-anchor="middle" class="small">leaves out an unanswered call while</text>
-  <text x="178.7" y="497.0" text-anchor="middle" class="small">most answered; other failures, 1.0</text>
-  <rect class="box" x="353.3" y="402.0" width="293.3" height="123.0" rx="6"/>
-  <text x="500.0" y="433.0" text-anchor="middle" class="title">Escalates a failed score</text>
-  <text x="500.0" y="455.0" text-anchor="middle"><tspan class="mono">CascadeMonitor</tspan></text>
-  <text x="500.0" y="476.0" text-anchor="middle" class="small">a failed fast score is 1.0, so it</text>
-  <text x="500.0" y="497.0" text-anchor="middle" class="small">escalates; a failed careful one stands</text>
-  <rect class="box" x="674.7" y="402.0" width="293.3" height="123.0" rx="6"/>
-  <text x="821.3" y="433.0" text-anchor="middle" class="title">Returns it unranked</text>
-  <text x="821.3" y="455.0" text-anchor="middle"><tspan class="mono">CalibratedMonitor</tspan></text>
-  <text x="821.3" y="476.0" text-anchor="middle" class="small">a failed score is returned</text>
-  <text x="821.3" y="497.0" text-anchor="middle" class="small">as it is, never ranked</text>
-  <path class="edge" d="M773.0,272.0 L773.0,362.0"/>
-  <path class="edge" d="M178.7,362.0 L821.3,362.0"/>
-  <path class="edge" d="M178.7,362.0 L178.7,400.0" marker-end="url(#arrow)"/>
-  <path class="edge" d="M500.0,362.0 L500.0,400.0" marker-end="url(#arrow)"/>
-  <path class="edge" d="M821.3,362.0 L821.3,400.0" marker-end="url(#arrow)"/>
-  <text x="32.0" y="569.0" text-anchor="start"><tspan class="small">A </tspan><tspan class="mono">GuardMonitor</tspan><tspan class="small"> sets an unanswered sample aside by the same rule as </tspan><tspan class="mono">RepeatedMonitor</tspan><tspan class="small">.</tspan></text>
-  <text x="32.0" y="594.0" text-anchor="start"><tspan class="small">Only </tspan><tspan class="mono">CascadeMonitor</tspan><tspan class="small"> puts another monitor&#x27;s score in place of a failed one.</tspan></text>
+  <path class="edge bold" d="M502.0,359.0 L540.0,359.0"/>
+  <path class="edge bold" d="M540.0,244.0 L576.0,244.0" marker-end="url(#arrow)"/>
+  <rect class="box" x="32.0" y="448.0" width="293.3" height="123.0" rx="6"/>
+  <text x="178.7" y="479.0" text-anchor="middle" class="title">Averages the answers</text>
+  <text x="178.7" y="501.0" text-anchor="middle"><tspan class="mono">RepeatedMonitor</tspan></text>
+  <text x="178.7" y="522.0" text-anchor="middle" class="small">leaves out an unanswered call while</text>
+  <text x="178.7" y="543.0" text-anchor="middle" class="small">most answered; other failures, 1.0</text>
+  <rect class="box" x="353.3" y="448.0" width="293.3" height="123.0" rx="6"/>
+  <text x="500.0" y="479.0" text-anchor="middle" class="title">Escalates a failed score</text>
+  <text x="500.0" y="501.0" text-anchor="middle"><tspan class="mono">CascadeMonitor</tspan></text>
+  <text x="500.0" y="522.0" text-anchor="middle" class="small">a failed fast score is 1.0, so it</text>
+  <text x="500.0" y="543.0" text-anchor="middle" class="small">escalates; a failed careful one stands</text>
+  <rect class="box" x="674.7" y="448.0" width="293.3" height="123.0" rx="6"/>
+  <text x="821.3" y="479.0" text-anchor="middle" class="title">Returns it unranked</text>
+  <text x="821.3" y="501.0" text-anchor="middle"><tspan class="mono">CalibratedMonitor</tspan></text>
+  <text x="821.3" y="522.0" text-anchor="middle" class="small">a failed score is returned</text>
+  <text x="821.3" y="543.0" text-anchor="middle" class="small">as it is, never ranked</text>
+  <path class="edge" d="M773.0,295.0 L773.0,408.0"/>
+  <path class="edge" d="M178.7,408.0 L821.3,408.0"/>
+  <path class="edge" d="M178.7,408.0 L178.7,446.0" marker-end="url(#arrow)"/>
+  <path class="edge" d="M500.0,408.0 L500.0,446.0" marker-end="url(#arrow)"/>
+  <path class="edge" d="M821.3,408.0 L821.3,446.0" marker-end="url(#arrow)"/>
+  <text x="32.0" y="615.0" text-anchor="start"><tspan class="small">A </tspan><tspan class="mono">GuardMonitor</tspan><tspan class="small"> sets an unanswered sample aside by the same rule as </tspan><tspan class="mono">RepeatedMonitor</tspan><tspan class="small">.</tspan></text>
+  <text x="32.0" y="640.0" text-anchor="start"><tspan class="small">Only </tspan><tspan class="mono">CascadeMonitor</tspan><tspan class="small"> puts another monitor&#x27;s score in place of a failed one.</tspan></text>
 </svg>

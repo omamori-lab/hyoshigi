@@ -365,7 +365,7 @@ sends `thinking` alone, so Anthropic's default effort applies, which is `medium`
 lists `none` to `max` for `reasoning.effort` and says that the supported values depend on the model
 [@openai2026reasoning, {Section} "Reasoning effort"]. A request the
 API rejects as invalid raises `ConfigurationError` at the first rating, which names the status only;
-[Handling a failed rating](handling-a-failed-rating.md#a-rejected-request-raises) lists which client
+[Handling a failed rating](handling-a-failed-rating.md#misuse-raises) lists which client
 errors raise.
 
 The monitor reads the text parts of a reply. A thinking block is no part of the reply, so a score
