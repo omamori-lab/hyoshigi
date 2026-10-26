@@ -38,6 +38,7 @@ from hyoshigi.models.model import (
     check_name,
     check_perceives,
     collect,
+    holds_media,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
@@ -112,13 +113,19 @@ def read_decision(response: SystemOneResponse) -> DecisionOutcome:
             return Unavailable()
 
 
-def is_rejection(error: TypeSafeAPIError) -> bool:
-    """Whether TypeSafe says it cannot use the request: a 413, or max_tokens_exceeded."""
+def is_rejection(
+    error: TypeSafeAPIError,
+    *,
+    state: tuple[PromptPart, ...],
+) -> bool:
+    """Whether TypeSafe says it cannot use the request: a 413, max_tokens_exceeded, or a 400 for
+    a state that holds an image.
+    """
     match error.body:
         case {"detail": {"error_type": "max_tokens_exceeded"}}:
             return True
         case _:
-            return error.status == 413
+            return error.status == 413 or (error.status == 400 and holds_media(state))
 
 
 def is_unavailable_error(error: TypeSafeAPIError) -> bool:
@@ -133,9 +140,13 @@ def is_unavailable_error(error: TypeSafeAPIError) -> bool:
     )
 
 
-def translate_error(error: TypeSafeError) -> Rejected | Unavailable:
-    """Translate a TypeSafe SDK error to Rejected or Unavailable, or raise ConfigurationError on
-    any other 4xx.
+def translate_error(
+    error: TypeSafeError,
+    *,
+    state: tuple[PromptPart, ...],
+) -> Rejected | Unavailable:
+    """Translate a TypeSafe SDK error about a question on this state to Rejected or Unavailable,
+    or raise ConfigurationError on any other 4xx.
     """
     if not isinstance(
         error,
@@ -145,7 +156,10 @@ def translate_error(error: TypeSafeError) -> Rejected | Unavailable:
         TypeSafeAPIResponseValidationError,
     ):
         return Unavailable()
-    if is_rejection(error):
+    if is_rejection(
+        error,
+        state=state,
+    ):
         return Rejected(status=error.status)
     if is_unavailable_error(error):
         return Unavailable(status=error.status)
@@ -191,7 +205,10 @@ def build_decision_model(
             error = caught
         else:
             return read_decision(response)
-        return translate_error(error)
+        return translate_error(
+            error,
+            state=question.state,
+        )
 
     return DecisionModel(
         name=name,
@@ -239,7 +256,10 @@ def build_async_decision_model(
             error = caught
         else:
             return read_decision(response)
-        return translate_error(error)
+        return translate_error(
+            error,
+            state=question.state,
+        )
 
     return AsyncDecisionModel(
         name=name,

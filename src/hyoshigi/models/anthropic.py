@@ -40,6 +40,7 @@ from hyoshigi.models.model import (
     check_name,
     check_perceives,
     collect,
+    holds_media,
 )
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
@@ -113,7 +114,10 @@ def build_model(
             reply: Message | Failure = client.messages.create(**request)
         except _FAILURES as error:
             reply = error
-        return read_reply(reply)
+        return read_reply(
+            reply,
+            content=prompt.content,
+        )
 
     return GenerativeModel(
         name=f"anthropic:{model}",
@@ -164,7 +168,10 @@ def build_async_model(
             reply: Message | Failure = await client.messages.create(**request)
         except _FAILURES as error:
             reply = error
-        return read_reply(reply)
+        return read_reply(
+            reply,
+            content=prompt.content,
+        )
 
     return AsyncGenerativeModel(
         name=f"anthropic:{model}",
@@ -335,8 +342,12 @@ def translate_text(data: bytes) -> DocumentBlockParam | None:
     }
 
 
-def read_reply(reply: Message | Failure) -> GenerationOutcome:
-    """The outcome of a reply, or of the failure that stood in for it.
+def read_reply(
+    reply: Message | Failure,
+    *,
+    content: tuple[PromptPart, ...],
+) -> GenerationOutcome:
+    """The outcome of a reply, or of the failure that stood in for it, to a prompt of this content.
 
     A reply that is not an assistant's message is unavailable.
     """
@@ -347,13 +358,20 @@ def read_reply(reply: Message | Failure) -> GenerationOutcome:
         ):
             return read_message(reply)
         case APIError() | ValueError():
-            return read_failure(reply)
+            return read_failure(
+                reply,
+                content=content,
+            )
         case _:
             return Unavailable()
 
 
-def read_failure(failure: Failure) -> Rejected | Unavailable:
-    """The outcome of a failure that stood in for a reply.
+def read_failure(
+    failure: Failure,
+    *,
+    content: tuple[PromptPart, ...],
+) -> Rejected | Unavailable:
+    """The outcome of a failure that stood in for a reply to a prompt of this content.
 
     A status that says the API cannot use the prompt is rejected with it. Any other client error
     except 408, 409 and 429 raises ConfigurationError naming only the status, and so does a
@@ -369,6 +387,7 @@ def read_failure(failure: Failure) -> Rejected | Unavailable:
         ) if is_rejection(
             status,
             body=body,
+            content=content,
         ):
             return Rejected(status=status)
         case APIStatusError(status_code=status) if (
@@ -389,12 +408,16 @@ def is_rejection(
     status: int,
     *,
     body: object,
+    content: tuple[PromptPart, ...],
 ) -> bool:
-    """Whether a status and its body say the API cannot use the prompt: a 413, or a 400 whose
-    message starts "prompt is too long", which is read and never kept.
+    """Whether a status and its body say the API cannot use the prompt: a 413, a 400 for a
+    prompt whose content holds media, or a 400 whose message starts "prompt is too long", which
+    is read and never kept.
     """
     match status, body:
         case 413, _:
+            return True
+        case 400, _ if holds_media(content):
             return True
         case 400, {
             "error": {

@@ -61,12 +61,13 @@ _FAILURES = (
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
 # The error codes that blame what the prompt holds, which an agent can shape, not the request:
 # an input beyond the context window (https://github.com/openai/openai-openapi, openapi.yaml,
-# schema SessionTurnErrorCodeResource) and an image that cannot be used (the same file, schema
-# ResponseErrorCode, less image_content_policy_violation, a policy refusal, and
-# image_file_not_found, which no request built here can cause).
+# schema SessionTurnErrorCodeResource), an invalid prompt and an image that cannot be used (the
+# same file, schema ResponseErrorCode, less image_content_policy_violation, a policy refusal,
+# and image_file_not_found, which no request built here can cause).
 _UNUSABLE_INPUT_CODES = frozenset(
     {
         "context_length_exceeded",
+        "invalid_prompt",
         "invalid_image",
         "invalid_image_format",
         "invalid_base64_image",

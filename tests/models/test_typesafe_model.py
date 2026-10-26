@@ -668,7 +668,6 @@ def test_a_request_typesafe_cannot_use_returns_rejected_with_its_status(
 
 # https://docs.typesafe.ai/images.md, "Errors": a 400 when "an image or asset was rejected",
 # for example one below the minimum width; the page gives no body.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_400_for_a_state_that_holds_an_image_returns_rejected(
     build_model: ModelBuilder,
