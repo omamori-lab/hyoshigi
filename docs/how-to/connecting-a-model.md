@@ -14,8 +14,9 @@ form:
 ## A monitor takes a model of its own family
 
 A model of the other family raises `ConfigurationError` when the monitor is built, and the message
-names the twin to use. `RepeatedMonitor`, `CascadeMonitor` and `CalibratedMonitor` check the
-monitors they wrap in the same way:
+names the twin to use. A model of the other kind names the monitors that take it: `DecisionMonitor`
+for a decision model, `LLMMonitor` or `GuardMonitor` for a generative one. `RepeatedMonitor`,
+`CascadeMonitor` and `CalibratedMonitor` check the monitors they wrap in the same way:
 
 ```python
 from hyoshigi import (
@@ -71,8 +72,11 @@ imports with no SDK. Each constructor takes the caller's client and the provider
 
 The constructors on `GenerativeModel` and `DecisionModel` take the sync client, and the same names
 on `AsyncGenerativeModel` and `AsyncDecisionModel` take the async client. OpenRouter's one client
-serves both. The model's name is the provider and the model id, as in
-`anthropic:claude-haiku-5-5`, and the score's evidence records it.
+serves both. A client of the other family raises `ConfigurationError` when the model is built, and
+the message names the constructor that takes it. A subclass of the client, such as `AzureOpenAI`,
+is taken; Anthropic's `AnthropicBedrock`, `AnthropicVertex` and `AnthropicBedrockMantle` subclass
+neither `Anthropic` nor `AsyncAnthropic`, and raise. The model's name is the provider and the model
+id, as in `anthropic:claude-haiku-5-5`, and the score's evidence records it.
 [Provider adapters](../reference/providers.md) gives the request each adapter sends and what each
 reply becomes.
 
@@ -121,8 +125,11 @@ content to rate in `content`, and returns an outcome. `DecisionModel(name=..., d
 perceives=...)` takes a function from a `Question`, a `statement` and the `state` it is about, to a
 `Decision`, `Refused` or `Unavailable`. A `Decision` holds the probability that the statement holds,
 and a confidence if the model gives one, each a number from 0 to 1; any other value raises
-`ConfigurationError`. The async classes take an `async def`. The `name` is required, and an empty
-one raises `ConfigurationError`.
+`ConfigurationError`. The async classes take an `async def`. A `name` that is empty or not a
+string, a function that is not callable and a `perceives` that is not a `MediaTypes` raise
+`ConfigurationError` when the model is built. A function that returns anything other than an
+outcome, such as the reply's text, raises `ConfigurationError` at the rating, and the message names
+the type it returned.
 
 A rating that cannot be made fails closed: its score is 1.0, so the action counts as the most
 suspicious ([why](../explanation/failing-closed.md)). The function reports a failure by returning
