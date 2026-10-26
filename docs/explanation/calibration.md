@@ -38,10 +38,11 @@ itself, hence tied + 1. A raw score of 0.2 among the honest scores 0.1, 0.2,
 [0.2, 0.8).
 
 The p-value is uniform on [0, 1] when the raw score and the honest scores are
-independent draws from one distribution [@vovk2016criteria, sec. 2].
-Exchangeability is enough: if reordering the scores leaves their joint
-distribution unchanged, a new score is equally likely to fall anywhere among
-the honest ones [@angelopoulos2021gentle, {Appendix D}]. For the caller,
+independent draws from one distribution [@vovk2016criteria, sec. 2]. Scores
+are exchangeable when reordering them leaves their joint distribution
+unchanged, and exchangeability is enough: a new score is then equally likely
+to fall anywhere among the honest ones
+[@angelopoulos2021gentle, {Appendix D}]. For the caller,
 exchangeable means honest scores from the same monitor with the same model,
 prompt, view and settings, on actions of runs the caller trusts, of the kind
 the monitor will rate. LinuxArena calibrates each attacking model against an

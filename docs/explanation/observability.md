@@ -108,9 +108,9 @@ The span carries the score's explanation, and a report sends it as the score's c
 explanation is the monitor's reasoning and can quote the action. Neither the rating's span nor the
 report carries the prompt or the trajectory. An instrumented client's span carries what its package
 records: a `langfuse.openai` generation records the call's input and output, and the input is the
-monitor's prompt.
+monitor's prompt (langfuse 5.0.2).
 
-An exception raised during a rating marks the span as an error by the exception's type alone, since
+An `Exception` raised during a rating marks the span as an error by the exception's type alone, since
 its message can quote the request, and the exception is raised on. Reporting never changes or loses
 a score: a report that raises is logged, the other reports are sent, and the score is returned. The
 log record names the report's class and the exception's type, never the trajectory, the explanation

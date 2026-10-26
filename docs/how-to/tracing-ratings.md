@@ -101,9 +101,10 @@ suspicious, as [A rating that cannot be made scores 1.0](../explanation/failing-
 out. Its span carries that score like any other, `hyoshigi.cause` names why, and the span's status
 stays unset. A wrapper that fails closed names the cause of the part it fails closed by.
 
-An exception raised while the monitor rates, such as the `ConfigurationError` an adapter raises for
-an invalid key, ends the span with the status `ERROR` and the exception's type as its description.
-The span records no exception event and carries no score, and the exception is raised on:
+An `Exception` raised while the monitor rates, such as the `ConfigurationError` an adapter raises
+for an invalid key, ends the span with the status `ERROR` and the exception's type as its
+description. The span records no exception event and carries no score, and the exception is raised
+on:
 
 ```python
 from contextlib import suppress
@@ -144,6 +145,9 @@ Refused, status UNSET
 status ERROR: ConfigurationError
 attributes {}, events []
 ```
+
+A cancelled async rating, such as one a timeout stops, ends its span with the status unset and no
+score.
 
 ## Wrapped ratings and model calls nest in the span
 
@@ -217,7 +221,8 @@ token usage, and no prompt or reply. The SDK also sends the span's trace context
 The OpenAI SDK opens no spans of its own, and two packages wrap it.
 
 `langsmith.wrappers.wrap_openai` patches one client's `responses.create`, which the client's
-`with_raw_response` calls, as `GenerativeModel.from_openai` does. LangSmith traces the call when
+`with_raw_response` calls, as `GenerativeModel.from_openai` does (langsmith 0.14.11). LangSmith
+traces the call when
 `LANGSMITH_TRACING` is `true`, and `LANGSMITH_TRACING_MODE` decides where the run goes. In the
 default mode, `langsmith`, the run goes to LangSmith's API as a trace of its own. In the `otel` mode
 it becomes a span nested in the rating's, and in the `hybrid` mode it does both. Those two modes
@@ -240,7 +245,7 @@ model = GenerativeModel.from_openai(
 rating's, and the SDK's own span moves to a trace of its own.
 
 Importing `langfuse.openai` patches the OpenAI SDK's classes for the whole process, `Responses.create`
-among them, and traces calls made through `with_raw_response`. Each call becomes a Langfuse
+among them, and traces calls made through `with_raw_response` (langfuse 5.0.2). Each call becomes a Langfuse
 generation, a span nested in the rating's. The generation records the call's input and output, and
 the input is the monitor's prompt:
 

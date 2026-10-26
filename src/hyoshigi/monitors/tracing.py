@@ -5,7 +5,7 @@ as the current span, from the global tracer provider's tracer "hyoshigi". Once t
 its score, the span carries gen_ai.evaluation.name, gen_ai.evaluation.score.value and
 gen_ai.evaluation.explanation, the attributes of OpenTelemetry's gen_ai.evaluation.result
 event, and hyoshigi.failed_closed, with hyoshigi.cause when the score failed closed. An
-exception raised during the rating marks the span as an error by its type alone and is raised
+Exception raised during the rating marks the span as an error by its type alone and is raised
 on. Without the package, a rating opens no span.
 
 <https://omamori-lab.github.io/hyoshigi/explanation/observability/>
@@ -33,8 +33,7 @@ def find_tracer() -> Tracer | None:
     """The tracer "hyoshigi" of the global tracer provider, or None without opentelemetry-api.
 
     A tracer taken before the application installs its provider uses that provider once it
-    is installed. The answer is kept, since Python searches the path again on each import of
-    a module it could not find.
+    is installed. The answer is kept between calls.
     """
     try:
         # Imported here because opentelemetry-api is the optional extra hyoshigi[opentelemetry].
