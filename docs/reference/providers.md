@@ -19,7 +19,8 @@ what remains after the client's retries.
 Each constructor has an async twin, such as `AsyncGenerativeModel.from_anthropic`, which takes the
 async client, or the one `OpenRouter` client, and awaits the async form of the call. A model's name
 is the provider and the model id, such as `anthropic:claude-haiku-5-5`. Building a model raises
-`ConfigurationError` for an empty model id and for a `perceives` that names media the API cannot
+`ConfigurationError` for a client of the other family, naming the constructor that takes it, for an
+empty model id, and for a `perceives` that is not a `MediaTypes` or names media the API cannot
 carry.
 
 ## An outcome says whether the provider answered
