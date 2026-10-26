@@ -827,7 +827,6 @@ def test_an_exception_from_the_model_propagates(rate: Rate) -> None:
         rate(script)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("returned", "message"),
     [
