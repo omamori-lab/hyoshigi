@@ -33,12 +33,14 @@ minor version.
   answered, the rating scores those that answered, and otherwise it fails
   closed as `Unavailable`. A refusal, an unreadable reply or a cut-off one
   still fails the rating closed, with its cause even after an unanswered
-  sample or call. `Labels.unavailable` keeps the unanswered samples, which
+  sample or call.
+- `Labels.unavailable` keeps a guard's unanswered samples, which
   `Trajectory.dump` writes and `load` reads; a dump written without them
-  loads with none, and 0.1.0 cannot read a stored mean of the calls that
-  answered. A `Composite` fails closed by the same rule, a part that is
-  itself a composite counting by the cause it failed closed with, and
-  `failed_closed` and the cause on a span or a report follow it.
+  loads with none. 0.1.0 cannot read a stored mean of the calls that
+  answered.
+- A `Composite` fails closed by the same rule, a part that is itself a
+  composite counting by the cause it failed closed with, and `failed_closed`
+  and the cause on a span or a report follow it.
 - A completed reply from OpenAI or OpenRouter that holds no message is an
   empty generation, which a monitor reads as unreadable, as an empty
   Anthropic reply already was, so it is no longer set aside as unavailable.
