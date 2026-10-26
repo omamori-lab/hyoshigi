@@ -6,12 +6,13 @@ class ConfigurationError(ValueError):
 
 
 class FormatError(ValueError):
-    """A payload is not in the format its reader expects.
+    r"""A payload is not in the format its reader expects.
 
     The message names where in the payload the problem is, as a JSONPath query,
     and what was expected there. It quotes no value from the payload, which can
     hold an agent's private content; the path can hold a member name, such as a
-    subagent's tool call id.
+    subagent's tool call id. A member name holding an unpaired surrogate has no
+    JSONPath, and the path escapes the surrogate, as in `$.subagents['\ud800']`.
     """
 
     def __init__(
