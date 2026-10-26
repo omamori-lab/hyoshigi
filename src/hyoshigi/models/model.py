@@ -284,9 +284,15 @@ def check_perceives(
     *,
     carries: MediaTypes,
 ) -> None:
-    """Raise ConfigurationError naming the first pattern, in sorted order, that the media an
-    API carries do not cover; a range such as image/* is covered only by a carried range.
+    """Raise ConfigurationError unless perceives is a MediaTypes, or naming the first pattern, in
+    sorted order, that the media an API carries do not cover; a range such as image/* is covered
+    only by a carried range.
     """
+    check_instance(
+        perceives,
+        expected=MediaTypes,
+        name="perceives",
+    )
     for pattern in sorted(perceives.patterns):
         if not carries.covers(pattern):
             raise ConfigurationError(f"the API cannot carry {pattern} media")
