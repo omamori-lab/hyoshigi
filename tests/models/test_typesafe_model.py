@@ -233,22 +233,23 @@ def test_a_model_that_perceives_media_typesafe_cannot_carry_raises_naming_it_whe
         )
 
 
+# The message names the client's class by its module, which is private to the SDK, so only the
+# text around the module's path is compared.
 @pytest.mark.parametrize(
-    ("build", "client", "message"),
+    ("build", "client", "start", "end"),
     [
         (
             DecisionModel.from_typesafe,
             AsyncTypeSafeClient(api_key="ts-test"),
-            "client must be a TypeSafeClient, got an instance of "
-            "typesafe_sdk._core.client.aio.client.AsyncTypeSafeClient. "
+            "client must be a TypeSafeClient, got an instance of typesafe_sdk.",
+            ".AsyncTypeSafeClient. "
             "Use AsyncDecisionModel.from_typesafe for an AsyncTypeSafeClient.",
         ),
         (
             AsyncDecisionModel.from_typesafe,
             TypeSafeClient(api_key="ts-test"),
-            "client must be an AsyncTypeSafeClient, got an instance of "
-            "typesafe_sdk._core.client.sync.client.TypeSafeClient. "
-            "Use DecisionModel.from_typesafe for a TypeSafeClient.",
+            "client must be an AsyncTypeSafeClient, got an instance of typesafe_sdk.",
+            ".TypeSafeClient. Use DecisionModel.from_typesafe for a TypeSafeClient.",
         ),
     ],
     ids=["async-client-for-the-sync-model", "sync-client-for-the-async-model"],
@@ -256,7 +257,8 @@ def test_a_model_that_perceives_media_typesafe_cannot_carry_raises_naming_it_whe
 def test_a_client_of_the_other_family_raises_when_the_model_is_built(
     build: Callable[..., object],
     client: object,
-    message: str,
+    start: str,
+    end: str,
 ) -> None:
     with pytest.raises(ConfigurationError) as raised:
         build(
@@ -264,7 +266,13 @@ def test_a_client_of_the_other_family_raises_when_the_model_is_built(
             model="jev-latest",
         )
 
-    assert str(raised.value) == message
+    assert (
+        str(raised.value).startswith(start),
+        str(raised.value).endswith(end),
+    ) == (
+        True,
+        True,
+    )
 
 
 @BUILDERS
