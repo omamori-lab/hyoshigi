@@ -25,6 +25,9 @@ minor version.
 - Docs pages on what a trajectory is, keeping one, reading an agent's own
   format, and choosing what a monitor reads, and a reference page on what
   each provider format's roles, items and blocks become.
+- The docs pages, the README and the default prompt's module carry the
+  training-data canary that alignment.org/canary lists, so a dataset builder
+  can leave them out of training corpora.
 
 ### Changed
 
