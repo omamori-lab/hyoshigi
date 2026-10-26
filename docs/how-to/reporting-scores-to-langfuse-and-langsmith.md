@@ -7,11 +7,12 @@ explanation](../explanation/observability.md) covers the ids a report sends and 
 arrive before its span.
 
 The `langfuse` and `langsmith` extras install each backend's client, and the `opentelemetry` extra
-OpenTelemetry's API, which a `ReportedMonitor` needs:
+OpenTelemetry's API, which a `ReportedMonitor` needs. Recording spans takes OpenTelemetry's SDK,
+which the Langfuse client installs and the LangSmith client does not:
 
 ```bash
 pip install 'hyoshigi[opentelemetry,langfuse]'
-pip install 'hyoshigi[opentelemetry,langsmith]'
+pip install 'hyoshigi[opentelemetry,langsmith]' opentelemetry-sdk
 ```
 
 A Langfuse client sends through the `httpx` client it is given, and a LangSmith client to the API
