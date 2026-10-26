@@ -233,7 +233,6 @@ def test_a_model_that_perceives_media_typesafe_cannot_carry_raises_naming_it_whe
         )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "client", "message"),
     [

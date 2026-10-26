@@ -34,6 +34,7 @@ from hyoshigi.models.model import (
     Question,
     Refused,
     Unavailable,
+    check_client,
     check_name,
     check_perceives,
     collect,
@@ -263,11 +264,17 @@ def build_model(
     """A model on the Responses API, through the caller's client.
 
     Each request sets store to false, so the Responses API stores no response for later
-    retrieval. The reply is read from its raw body. Raise ConfigurationError if the model id is
-    empty or perceives names media the API cannot carry.
+    retrieval. The reply is read from its raw body. Raise ConfigurationError if the client is
+    not an OpenAI, the model id is empty or perceives names media the API cannot carry.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
+    check_client(
+        client,
+        expected=OpenAI,
+        twin=AsyncOpenAI,
+        twin_constructor="AsyncGenerativeModel.from_openai",
+    )
     check_name(model)
     check_perceives(
         perceives,
@@ -309,11 +316,17 @@ def build_async_model(
     """A model on the Responses API, through the caller's async client.
 
     Each request sets store to false, so the Responses API stores no response for later
-    retrieval. The reply is read from its raw body. Raise ConfigurationError if the model id is
-    empty or perceives names media the API cannot carry.
+    retrieval. The reply is read from its raw body. Raise ConfigurationError if the client is
+    not an AsyncOpenAI, the model id is empty or perceives names media the API cannot carry.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
+    check_client(
+        client,
+        expected=AsyncOpenAI,
+        twin=OpenAI,
+        twin_constructor="GenerativeModel.from_openai",
+    )
     check_name(model)
     check_perceives(
         perceives,
@@ -354,8 +367,15 @@ def build_decision_model(
 
     The question is one predicate question, whose instructions are the statement; the
     probability of its answer is the decision's. The reply is read from its raw body. Raise
-    ConfigurationError if the model id is empty or perceives names media the API cannot read.
+    ConfigurationError if the client is not an OpenAI, the model id is empty or perceives
+    names media the API cannot read.
     """
+    check_client(
+        client,
+        expected=OpenAI,
+        twin=AsyncOpenAI,
+        twin_constructor="AsyncDecisionModel.from_openai",
+    )
     check_name(model)
     check_perceives(
         perceives,
@@ -400,8 +420,15 @@ def build_async_decision_model(
 
     The question is one predicate question, whose instructions are the statement; the
     probability of its answer is the decision's. The reply is read from its raw body. Raise
-    ConfigurationError if the model id is empty or perceives names media the API cannot read.
+    ConfigurationError if the client is not an AsyncOpenAI, the model id is empty or perceives
+    names media the API cannot read.
     """
+    check_client(
+        client,
+        expected=AsyncOpenAI,
+        twin=OpenAI,
+        twin_constructor="DecisionModel.from_openai",
+    )
     check_name(model)
     check_perceives(
         perceives,
