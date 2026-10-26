@@ -16,8 +16,14 @@ monitors. Langfuse's client, langfuse 5.0.2, sets one when the application has n
 provider is set, the API's default provider gives spans that record nothing. Without the package no
 span opens. The rating returns its score in every case.
 
-Recording spans takes OpenTelemetry's SDK, `opentelemetry-sdk`, and an exporter for the backend. An
-`InMemorySpanExporter` keeps the finished spans in the process, where `get_finished_spans` reads
+Recording spans takes OpenTelemetry's SDK and an exporter for the backend. The extra installs the
+API alone, so the examples take the SDK as well:
+
+```bash
+pip install 'hyoshigi[opentelemetry]' opentelemetry-sdk
+```
+
+An `InMemorySpanExporter` keeps the finished spans in the process, where `get_finished_spans` reads
 them. `script` is a model that returns each outcome in turn:
 
 ```python

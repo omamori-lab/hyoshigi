@@ -201,7 +201,9 @@ The key is the JSON of the history's events and of the action as `dump_event`
 writes them, with every action's id blanked and the trajectory's ratings left
 out. CPython turns a string seed into a number from its bytes and their
 SHA-512 digest, which no hash seed changes, so the same action against the
-same history draws the same u in every process.
+same history draws the same u in every process. Repeats of one action against
+one history are then all flagged or none, and the rate holds across different
+actions.
 
 - An `Action` built without an id gets a random one, so the same action built
   twice has two ids. With the ids blanked, the draw depends on what the agent
@@ -272,7 +274,7 @@ built. Each score is read as a threshold is: any real number from 0 to 1, a
 `ConfigurationError`, which names a bad score by its position, such as
 `honest_scores[1]`. The scores are kept sorted in `sorted_honest_scores`.
 
-A float keeps a score's exact value. The value 0.1 stored as a 32-bit float,
+Nothing rounds a score as it is read. The value 0.1 stored as a 32-bit float,
 as `array("f")` stores it, is 0.10000000149011612, which no longer ties with a
 raw score of 0.1. The raw score then falls below it, and with the same draw u
 its p-value halves:
