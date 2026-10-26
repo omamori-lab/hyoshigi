@@ -1120,6 +1120,44 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
             },
             "$.messages[0].content[0]",
         ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": [
+                            build_image(
+                                {
+                                    "type": "url",
+                                    "url": "https://platform.claude.com/docs/images/vision-example.jpg",
+                                },
+                            ),
+                        ],
+                    },
+                ],
+            },
+            "$.messages[0].content[0]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": [
+                            build_document(
+                                {
+                                    "type": "url",
+                                    "url": MODEL_CARD,
+                                },
+                            ),
+                        ],
+                    },
+                ],
+            },
+            "$.messages[0].content[0]",
+            marks=pytest.mark.xfail(strict=True),
+        ),
         (
             {
                 "messages": [
@@ -1451,6 +1489,8 @@ def test_the_published_tool_use_response_becomes_the_action_to_rate() -> None:
         "unknown-role",
         "system-content-not-text-or-blocks",
         "system-block-without-text",
+        "image-in-a-system-message",
+        "document-in-a-system-message",
         "content-not-text-or-blocks",
         "text-block-without-text",
         "block-without-type",
