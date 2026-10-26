@@ -885,13 +885,12 @@ def test_loading_a_malformed_payload_raises_format_error_at_its_path(
             r"$.subagents['\u0000\u0007\u000b\u000e\u001f']",
         ),
         (
-            'call-3/"x" é\x7f\U0001f041',
-            "$.subagents['call-3/\"x\" é\x7f\U0001f041']",
+            'call-3/"x" é\x7f\ud7ff\ue000\U0001f041',
+            "$.subagents['call-3/\"x\" é\x7f\ud7ff\ue000\U0001f041']",
         ),
         pytest.param(
             "\udfff\ud800",
             r"$.subagents['\udfff\ud800']",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
