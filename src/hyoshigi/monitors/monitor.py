@@ -2,6 +2,12 @@
 
 from abc import ABC, abstractmethod
 
+from hyoshigi.models.model import (
+    AsyncDecisionModel,
+    AsyncGenerativeModel,
+    DecisionModel,
+    GenerativeModel,
+)
 from hyoshigi.monitors.score import SuspicionScore
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
@@ -73,3 +79,37 @@ class AsyncMonitor(ABC):
             step.action,
             trajectory=step.trajectory,
         )
+
+
+def name_decision_monitor(
+    model: object,
+    *,
+    otherwise: str,
+) -> str:
+    """The hint for a generative monitor given a model it does not take: the monitor that takes
+    a decision model, and otherwise the hint naming the monitor's twin.
+    """
+    match model:
+        case DecisionModel():
+            return "Use DecisionMonitor for a DecisionModel."
+        case AsyncDecisionModel():
+            return "Use AsyncDecisionMonitor for an AsyncDecisionModel."
+        case _:
+            return otherwise
+
+
+def name_generative_monitors(
+    model: object,
+    *,
+    otherwise: str,
+) -> str:
+    """The hint for a decision monitor given a model it does not take: the monitors that take a
+    generative model, and otherwise the hint naming the monitor's twin.
+    """
+    match model:
+        case GenerativeModel():
+            return "Use LLMMonitor or GuardMonitor for a GenerativeModel."
+        case AsyncGenerativeModel():
+            return "Use AsyncLLMMonitor or AsyncGuardMonitor for an AsyncGenerativeModel."
+        case _:
+            return otherwise

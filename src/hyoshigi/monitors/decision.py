@@ -23,7 +23,7 @@ from hyoshigi.models.model import (
     Refused,
     Unavailable,
 )
-from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
+from hyoshigi.monitors.monitor import AsyncMonitor, Monitor, name_generative_monitors
 from hyoshigi.monitors.rendering import Rendering, merge_text, render
 from hyoshigi.monitors.score import (
     Decisions,
@@ -159,7 +159,10 @@ def check_decision_options(
         monitor.model,
         expected=expected_model,
         name="model",
-        hint=hint,
+        hint=name_generative_monitors(
+            monitor.model,
+            otherwise=hint,
+        ),
     )
     check_instance(
         monitor.view,

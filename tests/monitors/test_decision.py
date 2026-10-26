@@ -246,19 +246,17 @@ def test_default_options_use_view_default_statement_and_maximum_aggregation(
             "model must be an AsyncDecisionModel, got an instance of DecisionModel. "
             "Use DecisionMonitor for a sync model.",
         ),
-        pytest.param(
+        (
             DecisionMonitor,
             SYNC_GENERATIVE_MODEL,
             "model must be a DecisionModel, got an instance of GenerativeModel. "
             "Use LLMMonitor or GuardMonitor for a GenerativeModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             AsyncDecisionMonitor,
             ASYNC_GENERATIVE_MODEL,
             "model must be an AsyncDecisionModel, got an instance of AsyncGenerativeModel. "
             "Use AsyncLLMMonitor or AsyncGuardMonitor for an AsyncGenerativeModel.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
