@@ -55,6 +55,10 @@ minor version.
 
 ### Fixed
 
+- The OpenAI adapter's docstring said OpenAI retains none of the monitored
+  agent's content. `store: false` stops the Responses API storing the
+  response; OpenAI's abuse-monitoring logs, which can hold prompts, are
+  kept for up to 30 days whatever `store` says.
 - A `FormatError` from `Trajectory.load` inside a subagent named the subagent
   by its position, as in `$.subagents[1]`, which is not a JSONPath query:
   `subagents` is an object keyed by tool call id. The path now names the call

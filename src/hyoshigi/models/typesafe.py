@@ -48,7 +48,7 @@ CARRIED_MEDIA = MediaTypes("image/png", "image/jpeg")
 IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 # https://docs.typesafe.ai/images.md, "Turning on images".
 IMAGE_HEADERS = {"TypeSafe-Danger-Zone-Images": "true"}
-# https://docs.typesafe.ai/api.md, "Errors": 415 is an unsupported Content-Encoding or
+# https://docs.typesafe.ai/api/errors.md, "Errors": 415 is an unsupported Content-Encoding or
 # multiple compression layers (client configuration), so only transient or oversized 4xx
 # statuses map to Unavailable.
 UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})

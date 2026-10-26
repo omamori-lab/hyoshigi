@@ -206,8 +206,10 @@ def read_failure(
     """The outcome of an HTTP failure with this status and these error codes.
 
     A refusal is refused. No answer now (a status below 400, above 499 or one to ask again
-    later), or input the provider rejects, is unavailable. Any other rejection is misuse: it
-    raises ConfigurationError naming only the status.
+    later), or input the provider rejects, is unavailable. Any other rejection raises
+    ConfigurationError naming only the status.
+
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     if any(
         map(
@@ -228,9 +230,10 @@ def read_failure(
 def read_error(error: Failure) -> Refused | Unavailable:
     """The outcome of an exception the SDK raised.
 
-    A success status with a reply the SDK could not read has no status to report. This is
-    called outside the handler of the exception, so that the exception, whose message can
-    echo the prompt, is not in the chain of a ConfigurationError raised for a rejection.
+    A connection error, no response, or a success status with a reply the SDK could not read
+    is unavailable with no status; any other status is read by read_failure.
+
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     match error:
         case httpx.RequestError() | errors.NoResponseError():

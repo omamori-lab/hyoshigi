@@ -54,8 +54,8 @@ _FAILURES = (
 # the prompt's content can make a request too large (413), so these fail closed.
 _UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
 
-# The start of the message of the 400 for a prompt over the model's input limit, observed on
-# 2026-10-19 (issue #30).
+# The start of the message of the 400 for an input over the context window: Anthropic's "Context
+# windows" guide, section "Context window overflow behavior".
 _PROMPT_TOO_LONG = "prompt is too long"
 
 # The media translate_url and translate_data send: the image types, PDF and plain text documents
@@ -340,15 +340,13 @@ def read_reply(reply: Message | Failure) -> GenerationOutcome:
 def read_failure(failure: Failure) -> Unavailable:
     """The outcome of a failure that stood in for a reply.
 
-    A 400 whose message starts "prompt is too long" is unavailable with status 400. The
-    message is read for that start and never kept.
+    A 400 whose message starts "prompt is too long" is unavailable with status 400, and the
+    message is not kept. Any other client error except 408, 409, 413 and 429 raises
+    ConfigurationError naming only the status, and so does a plain ValueError, the SDK refusing
+    the request's arguments. Any other status is unavailable with it, and any other failure,
+    a ValueError's subclasses included, is unavailable.
 
-    Any other client error except 408, 409, 413 and 429 raises ConfigurationError naming the
-    status only, since the API's text can quote the prompt. So does a plain ValueError, which is
-    the SDK refusing the request's arguments before sending it; a body that is not JSON and
-    text that cannot be encoded are its subclasses. Both are raised here, outside the handler
-    of the SDK's error, so that error is not on the raised one's chain. Any other failure is
-    unavailable.
+    <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     match failure:
         case APIStatusError(
