@@ -1764,7 +1764,6 @@ def test_a_prompt_the_api_rejects_is_rejected_with_its_status(
 # https://platform.claude.com/docs/en/build-with-claude/vision, "Request limits": an image over
 # the many-image limit is rejected with an invalid_request_error; the body is the published
 # shape of an image's 400, from vision-coordinates, "Oversized image error".
-@pytest.mark.xfail(strict=True)
 def test_a_400_for_a_prompt_that_holds_media_is_rejected(
     build_driver: BuildDriver,
 ) -> None:

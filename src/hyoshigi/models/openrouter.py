@@ -36,6 +36,7 @@ from hyoshigi.models.model import (
     check_name,
     check_perceives,
     collect,
+    holds_media,
 )
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import MediaPart, TextPart
@@ -206,24 +207,56 @@ def read_failure(
 ) -> Refused | Rejected | Unavailable:
     """The outcome of an HTTP failure with this status and these error codes.
 
-    A refusal is refused. A 413, or input the provider rejects, is rejected with the status. No
-    answer now (a status below 400, above 499 or one to ask again later) is unavailable. Any
-    other rejection raises ConfigurationError naming only the status.
+    A 403 or a refusal is refused. Input the provider says it cannot use is rejected with the
+    status. No answer now (a status below 400, above 499 or one to ask again later) is
+    unavailable. Any other rejection raises ConfigurationError naming only the status.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
-    if any(
+    if status == 403 or any(
         map(
             responses.names_refusal,
             codes,
         ),
     ):
         return Refused()
-    if status == 413 or not REJECTED_INPUT.isdisjoint(codes):
+    if is_rejection(
+        status,
+        codes=codes,
+    ):
         return Rejected(status=status)
     if not 400 <= status < 500 or status in UNAVAILABLE_STATUSES:
         return Unavailable(status=status)
     raise ConfigurationError(f"OpenRouter answered HTTP {status}")
+
+
+def is_rejection(
+    status: int,
+    *,
+    codes: tuple[str, ...],
+) -> bool:
+    """Whether a status and its error codes say the provider cannot use the input: a 413, a code
+    of input it rejects, or invalid_prompt with no error type to say which failure it stands for.
+    """
+    return status == 413 or not REJECTED_INPUT.isdisjoint(codes) or codes == ("invalid_prompt",)
+
+
+def read_decision_error(
+    error: Failure,
+    *,
+    state: tuple[PromptPart, ...],
+) -> Refused | Rejected | Unavailable:
+    """The outcome of an exception the SDK raised for a Decisions request: a 400 that names no
+    reason, for a state that holds an image, is rejected; any other is read by read_error.
+    """
+    match error:
+        case errors.OpenRouterError(
+            status_code=400,
+            body=body,
+        ) if holds_media(state) and not read_codes(body):
+            return Rejected(status=400)
+        case _:
+            return read_error(error)
 
 
 def read_error(error: Failure) -> Refused | Rejected | Unavailable:
@@ -425,7 +458,10 @@ def build_decision_model(
             error = caught
         else:
             return read_decision(reply)
-        return read_error(error)
+        return read_decision_error(
+            error,
+            state=question.state,
+        )
 
     return DecisionModel(
         name=f"openrouter:{model}",
@@ -466,7 +502,10 @@ def build_async_decision_model(
             error = caught
         else:
             return read_decision(reply)
-        return read_error(error)
+        return read_decision_error(
+            error,
+            state=question.state,
+        )
 
     return AsyncDecisionModel(
         name=f"openrouter:{model}",

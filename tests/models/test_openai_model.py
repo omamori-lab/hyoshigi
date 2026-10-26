@@ -1457,10 +1457,7 @@ def test_a_failed_reply_is_unavailable_without_a_status(
     [
         "context_length_exceeded",
         "image_too_large",
-        pytest.param(
-            "invalid_prompt",
-            marks=pytest.mark.xfail(strict=True),
-        ),
+        "invalid_prompt",
     ],
 )
 def test_a_failed_reply_whose_code_says_the_prompt_cannot_be_used_is_rejected_without_a_status(
@@ -1787,11 +1784,7 @@ def test_an_http_error_that_may_pass_is_unavailable_with_its_status(
     ("status", "code"),
     [
         (400, "context_length_exceeded"),
-        pytest.param(
-            400,
-            "invalid_prompt",
-            marks=pytest.mark.xfail(strict=True),
-        ),
+        (400, "invalid_prompt"),
         (400, "invalid_image"),
         (400, "invalid_image_format"),
         (400, "invalid_base64_image"),

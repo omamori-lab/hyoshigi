@@ -2006,7 +2006,6 @@ def test_invalid_prompt_with_an_invalid_request_type_raises_naming_only_the_stat
 
 # https://openrouter.ai/docs/guides/community/multimodal-decisions, "Image size on Jev": an image
 # below the minimum dimensions returns a 400, whose body the page does not give.
-@pytest.mark.xfail(strict=True)
 def test_a_decision_400_that_names_no_reason_about_an_image_is_rejected(
     decide: Callable[..., DecisionOutcome],
 ) -> None:
@@ -2160,32 +2159,26 @@ DATA_REGION: JSON = {
         pytest.param(
             build_error(403),
             id="no-error-type",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_typed_error(403, "permission_denied"),
             id="permission-denied",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             GUARDRAIL_BLOCK,
             id="guardrail",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             MODERATION_FLAG,
             id="moderation",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             BUDGET_SPENT,
             id="budget",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             DATA_REGION,
             id="data-region",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -2297,7 +2290,6 @@ CODED_REJECTIONS = [
             400,
             build_coded_error("invalid_prompt"),
             id="invalid-prompt-without-a-type",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

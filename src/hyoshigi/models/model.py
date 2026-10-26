@@ -79,6 +79,17 @@ def check_parts(parts: tuple[PromptPart, ...]) -> None:
         raise ConfigurationError("a model is given text and media only")
 
 
+def holds_media(parts: tuple[PromptPart, ...]) -> bool:
+    """Whether any of the parts is media."""
+    return any(
+        isinstance(
+            part,
+            MediaPart,
+        )
+        for part in parts
+    )
+
+
 def collect[Item](items: list[Item | None]) -> list[Item] | None:
     """The items, or None if any is None; every item is built before this decides."""
     kept = [item for item in items if item is not None]
