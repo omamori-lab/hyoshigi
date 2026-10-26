@@ -1761,6 +1761,38 @@ def test_a_prompt_the_api_rejects_is_rejected_with_its_status(
     )
 
 
+# https://platform.claude.com/docs/en/build-with-claude/vision, "Request limits": an image over
+# the many-image limit is rejected with an invalid_request_error; the body is the published
+# shape of an image's 400, from vision-coordinates, "Oversized image error".
+@pytest.mark.xfail(strict=True)
+def test_a_400_for_a_prompt_that_holds_media_is_rejected(
+    build_driver: BuildDriver,
+) -> None:
+    model = build_driver(
+        Wire(
+            build_error(
+                "invalid_request_error",
+                "messages.0.content.0: image dimensions 1920x1080 exceed the maximum image "
+                "size of a model named on this request and would be downsized to 1456x819",
+            ),
+            status=400,
+        ).respond,
+    )
+    prompt = Prompt(
+        system=SYSTEM,
+        content=(
+            MediaPart(
+                media_type="image/jpeg",
+                data=JPEG_BYTES,
+            ),
+        ),
+    )
+
+    outcome = model.generate(prompt)
+
+    assert outcome == Rejected(status=400)
+
+
 # The published prefill error is another 400 invalid_request_error. The other bodies take the
 # overflow message under another status, under another error type, and after other text.
 @pytest.mark.parametrize(
