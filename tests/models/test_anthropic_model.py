@@ -613,6 +613,45 @@ def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when
         )
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("build", "client", "message"),
+    [
+        (
+            GenerativeModel.from_anthropic,
+            AsyncAnthropic(api_key="test-key"),
+            "client must be an Anthropic, got an instance of anthropic.AsyncAnthropic. "
+            "Use AsyncGenerativeModel.from_anthropic for an AsyncAnthropic.",
+        ),
+        (
+            AsyncGenerativeModel.from_anthropic,
+            Anthropic(api_key="test-key"),
+            "client must be an AsyncAnthropic, got an instance of anthropic.Anthropic. "
+            "Use GenerativeModel.from_anthropic for an Anthropic.",
+        ),
+        (
+            GenerativeModel.from_anthropic,
+            object(),
+            "client must be an Anthropic, got an instance of object",
+        ),
+    ],
+    ids=["async-client-for-the-sync-model", "sync-client-for-the-async-model", "not-a-client"],
+)
+def test_a_client_of_another_class_raises_when_the_model_is_built(
+    build: Callable[..., object],
+    client: object,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        build(
+            client,
+            model=MODEL_ID,
+            max_tokens=MAX_TOKENS,
+        )
+
+    assert str(raised.value) == message
+
+
 @pytest.mark.parametrize(
     ("model", "max_tokens", "argument"),
     [
