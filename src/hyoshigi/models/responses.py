@@ -19,6 +19,7 @@ from hyoshigi.models.model import (
     Prompt,
     PromptPart,
     Refused,
+    Rejected,
     Truncated,
     Unavailable,
     collect,
@@ -143,9 +144,14 @@ def names_refusal(code: str) -> bool:
     return code == "refusal" or "policy" in code
 
 
-def read_reply(body: JSON) -> GenerationOutcome:
+def read_reply(
+    body: JSON,
+    *,
+    rejections: frozenset[str],
+) -> GenerationOutcome:
     """The outcome of a reply's JSON body by its status; a body whose output is not what the
-    format documents is unavailable, whatever its status.
+    format documents is unavailable, whatever its status. `rejections` are the error codes of a
+    failed reply that say the prompt cannot be used.
     """
     messages = read_output(body)
     if messages is None:
@@ -159,7 +165,10 @@ def read_reply(body: JSON) -> GenerationOutcome:
         }:
             return Refused()
         case {"status": "failed"}:
-            return Refused() if is_blocked(body) else Unavailable()
+            return read_failed(
+                read_error_codes(body),
+                rejections=rejections,
+            )
         case _:
             return Truncated(text=join_text(messages))
 
@@ -198,18 +207,40 @@ def join_text(messages: list[Message]) -> str:
     )
 
 
-def is_blocked(body: JSON) -> bool:
-    """Whether a failed reply's error code, or its error type, is a refusal or names a policy.
+def read_error_codes(body: JSON) -> tuple[str, ...]:
+    """A failed reply's error code and its error type, each when it is text.
 
     The error type is OpenRouter's, at the top level of a failed reply, where
     https://openrouter.ai/docs/api_reference/errors-and-debugging puts it.
     """
+    codes: list[str] = []
     match body:
-        case {"error": {"code": str(code)}} if names_refusal(code):
-            return True
-        case {"error_type": str(error_type)} if names_refusal(error_type):
-            return True
-    return False
+        case {"error": {"code": str(code)}}:
+            codes.append(code)
+    match body:
+        case {"error_type": str(error_type)}:
+            codes.append(error_type)
+    return tuple(codes)
+
+
+def read_failed(
+    codes: tuple[str, ...],
+    *,
+    rejections: frozenset[str],
+) -> Refused | Rejected | Unavailable:
+    """A failed reply with these error codes: refused when one is a refusal or names a policy,
+    rejected when one is in `rejections`, else unavailable.
+    """
+    if any(
+        map(
+            names_refusal,
+            codes,
+        ),
+    ):
+        return Refused()
+    if not rejections.isdisjoint(codes):
+        return Rejected()
+    return Unavailable()
 
 
 def read_output(body: JSON) -> list[Message] | None:

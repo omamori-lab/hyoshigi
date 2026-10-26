@@ -33,6 +33,7 @@ from hyoshigi.models.model import (
     PromptPart,
     Question,
     Refused,
+    Rejected,
     Unavailable,
     check_client,
     check_name,
@@ -55,9 +56,9 @@ _FAILURES = (
     APIError,
     UnicodeError,
 )
-# Statuses that are no answer rather than a mistake: request timeout, conflict, payload too
-# large and too many requests.
-_UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
+# Statuses that are no answer rather than a mistake: request timeout, conflict and too many
+# requests.
+_UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
 # The error codes that blame what the prompt holds, which an agent can shape, not the request:
 # an input beyond the context window (https://github.com/openai/openai-openapi, openapi.yaml,
 # schema SessionTurnErrorCodeResource) and an image that cannot be used (the same file, schema
@@ -225,14 +226,14 @@ def read_decision(reply: JSON) -> DecisionOutcome:
             return Unavailable()
 
 
-def read_failure(error: Failure) -> Refused | Unavailable:
+def read_failure(error: Failure) -> Refused | Rejected | Unavailable:
     """The outcome of a request that failed after the client's retries.
 
-    An error code that is a refusal or names a policy is a refusal. A 4xx status other than 408,
-    409, 413 and 429, whose code does not blame the prompt's content, raises ConfigurationError
-    naming only the status. Any other status is unavailable with it, and any other failure, a
-    connection error, a timeout, a body that cannot be decoded or a prompt that cannot be
-    encoded, is unavailable.
+    An error code that is a refusal or names a policy is a refusal. A 413, or an error code that
+    says the prompt cannot be used, is rejected with the status. Any other 4xx status but 408,
+    409 and 429 raises ConfigurationError naming only the status. Any other status is unavailable
+    with it, and any other failure, a connection error, a timeout, a body that cannot be decoded
+    or a prompt that cannot be encoded, is unavailable.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
@@ -242,15 +243,29 @@ def read_failure(error: Failure) -> Refused | Unavailable:
         case APIStatusError(
             status_code=status,
             code=code,
-        ) if (
-            400 <= status < 500
-            and status not in _UNAVAILABLE_STATUSES
-            and code not in _UNUSABLE_INPUT_CODES
+        ) if is_rejection(
+            status,
+            code=code,
+        ):
+            return Rejected(status=status)
+        case APIStatusError(status_code=status) if (
+            400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
         ):
             raise ConfigurationError(f"OpenAI rejected the request with HTTP status {status}")
         case APIStatusError(status_code=status):
             return Unavailable(status=status)
     return Unavailable()
+
+
+def is_rejection(
+    status: int,
+    *,
+    code: object,
+) -> bool:
+    """Whether a status and its error code say the prompt cannot be used: a 413, or a code that
+    blames what the prompt holds.
+    """
+    return status == 413 or code in _UNUSABLE_INPUT_CODES
 
 
 def build_model(
@@ -295,7 +310,10 @@ def build_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return responses.read_reply(load_body(reply.http_response.content))
+            return responses.read_reply(
+                load_body(reply.http_response.content),
+                rejections=_UNUSABLE_INPUT_CODES,
+            )
         return read_failure(error)
 
     return GenerativeModel(
@@ -347,7 +365,10 @@ def build_async_model(
         except _FAILURES as caught:
             error = caught
         else:
-            return responses.read_reply(load_body(reply.http_response.content))
+            return responses.read_reply(
+                load_body(reply.http_response.content),
+                rejections=_UNUSABLE_INPUT_CODES,
+            )
         return read_failure(error)
 
     return AsyncGenerativeModel(

@@ -629,7 +629,6 @@ def test_a_transient_http_failure_returns_unavailable_with_its_status(
 # the request exceeds the model's context length, and 413 Payload Too Large that the body is
 # over 32 MiB. The 400 body's shape was observed from the live API, relayed by OpenRouter, on
 # 2026-10-17.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 @pytest.mark.parametrize(
     ("status", "body"),

@@ -1490,7 +1490,6 @@ def test_a_response_the_provider_blocks_is_refused(
 
 # The same page, "Responses API": a context overflow takes the code invalid_prompt and keeps
 # its error type at the top level of the failed reply.
-@pytest.mark.xfail(strict=True)
 def test_a_response_whose_error_type_says_the_input_cannot_be_used_is_rejected(
     generate: Callable[..., GenerationOutcome],
 ) -> None:
@@ -2137,7 +2136,6 @@ CODED_REJECTIONS = [
         ),
     ],
 )
-@pytest.mark.xfail(strict=True)
 def test_input_the_provider_rejects_is_rejected_with_the_status(
     ask: Ask,
     status: int,

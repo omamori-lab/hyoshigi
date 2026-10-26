@@ -32,6 +32,7 @@ from hyoshigi.models.model import (
     MediaTypes,
     PromptPart,
     Question,
+    Rejected,
     Unavailable,
     check_client,
     check_name,
@@ -50,9 +51,9 @@ IMAGE_SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 # https://docs.typesafe.ai/images.md, "Turning on images".
 IMAGE_HEADERS = {"TypeSafe-Danger-Zone-Images": "true"}
 # https://docs.typesafe.ai/api/errors.md, "Errors": 415 is an unsupported Content-Encoding or
-# multiple compression layers (client configuration), so only transient or oversized 4xx
-# statuses map to Unavailable.
-UNAVAILABLE_STATUSES = frozenset({408, 409, 413, 429})
+# multiple compression layers (client configuration), so only transient 4xx statuses map to
+# Unavailable.
+UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
 
 
 def format_model_name(model: str) -> str:
@@ -111,24 +112,31 @@ def read_decision(response: SystemOneResponse) -> DecisionOutcome:
             return Unavailable()
 
 
-def is_unavailable_error(error: TypeSafeAPIError) -> bool:
-    """Whether an HTTP failure from TypeSafe is a transient or content-length outcome."""
+def is_rejection(error: TypeSafeAPIError) -> bool:
+    """Whether TypeSafe says it cannot use the request: a 413, or max_tokens_exceeded."""
     match error.body:
         case {"detail": {"error_type": "max_tokens_exceeded"}}:
             return True
         case _:
-            return (
-                isinstance(
-                    error,
-                    TypeSafeInternalServerError,
-                )
-                or error.status < 400
-                or error.status in UNAVAILABLE_STATUSES
-            )
+            return error.status == 413
 
 
-def translate_error(error: TypeSafeError) -> Unavailable:
-    """Translate a TypeSafe SDK error to Unavailable, or raise ConfigurationError on 4xx."""
+def is_unavailable_error(error: TypeSafeAPIError) -> bool:
+    """Whether an HTTP failure from TypeSafe is a transient outcome."""
+    return (
+        isinstance(
+            error,
+            TypeSafeInternalServerError,
+        )
+        or error.status < 400
+        or error.status in UNAVAILABLE_STATUSES
+    )
+
+
+def translate_error(error: TypeSafeError) -> Rejected | Unavailable:
+    """Translate a TypeSafe SDK error to Rejected or Unavailable, or raise ConfigurationError on
+    any other 4xx.
+    """
     if not isinstance(
         error,
         TypeSafeAPIError,
@@ -137,6 +145,8 @@ def translate_error(error: TypeSafeError) -> Unavailable:
         TypeSafeAPIResponseValidationError,
     ):
         return Unavailable()
+    if is_rejection(error):
+        return Rejected(status=error.status)
     if is_unavailable_error(error):
         return Unavailable(status=error.status)
     raise ConfigurationError(f"TypeSafe request failed with HTTP {error.status}")
