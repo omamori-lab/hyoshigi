@@ -775,7 +775,6 @@ def monitor_with_one_attempt(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_report_capped_at_one_attempt_makes_one_request_when_the_run_is_not_found(
     langsmith: LangSmithServer,
     monitor_with_one_attempt: Monitor | AsyncMonitor,
@@ -785,7 +784,6 @@ def test_a_report_capped_at_one_attempt_makes_one_request_when_the_run_is_not_fo
     assert len(langsmith.received) == 1
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("family", "report"),
     [
@@ -1252,7 +1250,6 @@ def test_a_project_id_that_is_not_a_uuid_string_is_refused(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "create_feedback"),
     [
@@ -1278,7 +1275,6 @@ def test_the_default_attempts_are_those_of_the_clients_create_feedback(
     assert declared == expected
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "build_client"),
     [
