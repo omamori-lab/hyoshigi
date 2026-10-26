@@ -406,8 +406,10 @@ feedback = LangSmithFeedback(
 )
 ```
 
-A 404 is then retried once, after about a second, and the score of a run not yet ingested may be
-lost, which the report [logs](#a-failed-report-is-logged-and-the-score-is-returned).
+With 2, the client retries a 404 once, after about a second, and the synchronous client retries a
+429 once, after the answer's `Retry-After` seconds, 30 when it has none. A score whose last attempt
+gets an error, such as a run not yet ingested, is lost, and the report
+[logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
 
 `project_id` is the id of the run's project, which LangSmith asks of feedback on a run
 [@langsmith2026feedbackformat]. The client sends it as `session_id`.
