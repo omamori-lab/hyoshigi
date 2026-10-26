@@ -25,6 +25,9 @@ langchain-sync-monitors will be rebuilt on it.
   never how to use the page they are on.
 - **One gate.** `scripts/check.sh` runs every check; it passes before a
   commit, and CI runs the same script.
+- **One way to merge.** A pull request merges by rebase only, so every commit,
+  the failing tests before their code included, reaches `main` as written.
+  omamori lab's [commit and merge rules](https://github.com/omamori-lab/.github/blob/main/CONTRIBUTING.md) apply to every repository.
 
 ## Code
 
