@@ -231,7 +231,8 @@ def read_error(error: Failure) -> Refused | Unavailable:
     """The outcome of an exception the SDK raised.
 
     A connection error, no response, or a success status with a reply the SDK could not read
-    is unavailable with no status; any other status is read by read_failure.
+    is unavailable with no status; any other status is read by read_failure, which raises
+    ConfigurationError for a rejection.
 
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """

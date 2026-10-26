@@ -395,7 +395,8 @@ The client's retries add requests to each call. On a stand-in server that answer
 429, a `GuardMonitor` of five samples on the Anthropic adapter puts 15 requests on the wire. The
 client's default is two retries [@anthropic2026pythonsdk, {Section} "Retries"], so each of the five
 calls sends three requests. A `RepeatedMonitor` of three such guards puts 45. The async monitors put
-the same totals on the wire, 15 of them at once.
+the same totals on the wire, and a call's retries run one after another: at most 5 requests at once
+for the guard, and 15 for the three guards.
 
 A rate limit is the client's to handle. Its retries wait it out, and a 429 that outlasts them is
 `Unavailable(status=429)`. [Handling a failed
