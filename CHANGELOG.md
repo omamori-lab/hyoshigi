@@ -95,7 +95,9 @@ minor version.
   reply. It raises `ConfigurationError` naming the value's type only.
 - A model built with a function that is not callable, a `perceives` that is
   not a `MediaTypes` or a name that is not a string failed only at the first
-  rating, if at all. Each model class raises `ConfigurationError` when built.
+  rating, if at all, and a provider constructor given such a `perceives`
+  raised `AttributeError`. Each model class and each provider constructor
+  raises `ConfigurationError` when the model is built.
 - A monitor given a model of the other kind named its own twin in the hint,
   as `LLMMonitor` given a `DecisionModel` said to use `AsyncLLMMonitor`. It
   names the monitors that take that model: `DecisionMonitor` for a decision

@@ -613,7 +613,6 @@ def test_a_model_that_perceives_media_the_api_cannot_carry_raises_naming_it_when
         )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_perceives_that_is_not_media_types_raises_when_the_model_is_built(
     build_driver: BuildDriver,
 ) -> None:
