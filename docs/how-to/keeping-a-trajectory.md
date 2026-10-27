@@ -77,10 +77,12 @@ A scaffold starts a run with an empty `Trajectory()` and records the user's task
 monitor rates each action while it is not yet in the trajectory. A score under the scaffold's
 threshold lets the action run: the scaffold records it with `act`, attaches the score with `attach`,
 runs its tools and records each result with `observe`. A score at the threshold blocks the action.
-The scaffold records the monitor's feedback as an observation, and the action stays out of the
-trajectory. The comparison with a threshold is the scaffold's own code. A score that failed closed
-has the value 1.0, so `score.value >= threshold` blocks it under every threshold up to 1.0
-([Handling a failed rating](handling-a-failed-rating.md)).
+This loop records only the monitor's feedback, as an observation, so the blocked action stays out of
+the trajectory. Recorded with `record` and a `Block`, a blocked action joins the history instead,
+followed by the monitor's error observation for each of its tool calls, or by one observation by the
+monitor when it made none, and it gets no rating. The comparison with a threshold is the scaffold's
+own code. A score that failed closed has the value 1.0, so `score.value >= threshold` blocks it
+under every threshold up to 1.0 ([Handling a failed rating](handling-a-failed-rating.md)).
 
 The scripted agent proposes a rename and then an upload, the scripted monitor rates them 1 and 9,
 and each tool result is the placeholder `ran`:
@@ -282,9 +284,10 @@ print(len(notes.history))
 `attach(score, to=action)` records a monitor's score of an action that is in the trajectory.
 `trajectory.ratings` holds the `Rating`s in the order they were attached, each an `action_id` and a
 `score`. An action can be rated again, and each rating is kept. An action that is not in the
-trajectory raises `ConfigurationError`, so an action the scaffold blocked keeps no rating there. A
-value that is not a `SuspicionScore` raises it too. A rating belongs to the scaffold's record, and
-the monitor's prompt is built from the history alone:
+trajectory raises `ConfigurationError`. A blocked action gets no rating: a scaffold that records
+with `act` alone leaves it out of the trajectory, and `record` with a `Block` adds it to the history
+without one. A value that is not a `SuspicionScore` raises it too. A rating belongs to the
+scaffold's record, and the monitor's prompt is built from the history alone:
 
 ```python
 score = kept.ratings[0].score
@@ -421,7 +424,8 @@ True
 attribute and its message give where the first problem is and what was expected there, and never the
 value found, which can hold an agent's private content. A different `format` or `version`, a missing
 key or a value of another shape, an author that is not one of the seven, a rating of an action that
-is not in the history, a repeated action id or call id, a subagent under a call that is not in the
+is not in the history, a record at a position past the end of the history or whose `proposal` names
+none of its proposals, a repeated action id or call id, a subagent under a call that is not in the
 history, and composite scores or subagents nested more than 32 levels deep all raise it. Keys that
 `dump` does not write are ignored.
 
@@ -452,8 +456,9 @@ $.ratings[0].action_id: expected the id of an action in the history
 A stored trajectory, or the transcript of a finished turn, can end in the action to rate.
 `split_latest_step` returns a `Step`, a named tuple of a new trajectory of everything before the
 latest action, and that action. The new trajectory keeps the ratings and subagents of the earlier
-actions, and shares the subagents' trajectories. The trajectory it was split from is unchanged. When
-the latest entry is not an action, `split_latest_step` raises `ConfigurationError`.
+actions and the records whose position is before the latest action, and shares the subagents'
+trajectories. The trajectory it was split from is unchanged. When the latest entry is not an action,
+`split_latest_step` raises `ConfigurationError`.
 
 `rate_latest_step(trajectory)` splits the trajectory and rates the action against the part before
 it. Every monitor has it, and an `AsyncMonitor` has it as a coroutine function. [Reading an agent's
