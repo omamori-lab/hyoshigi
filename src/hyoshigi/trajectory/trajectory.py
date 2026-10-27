@@ -11,6 +11,7 @@ from typing import NamedTuple, Self, assert_never
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.monitors.score import SuspicionScore
 from hyoshigi.options import check_instance
+from hyoshigi.protocols.decisions import ProtocolDecision
 from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation
@@ -74,6 +75,7 @@ class Trajectory:
         self._call_ids: set[str] = set()
         self._ratings: list[Rating] = []
         self._subagents: dict[str, Trajectory] = {}
+        self._records: list[ProtocolDecision] = []
 
     @classmethod
     def from_run(
@@ -180,6 +182,11 @@ class Trajectory:
         """The ratings of the actions in the history, in the order they were attached."""
         return tuple(self._ratings)
 
+    @property
+    def records(self) -> tuple[ProtocolDecision, ...]:
+        """The control protocol's decisions, in the order they were recorded."""
+        return tuple(self._records)
+
     def split_latest_step(self) -> Step:
         """Return the latest action, and a new trajectory of everything before it.
 
@@ -242,6 +249,12 @@ class Trajectory:
                 score=score,
             ),
         )
+
+    def record(
+        self,
+        decision: ProtocolDecision,
+    ) -> None:
+        """Record a control protocol's decision. A stub: it records nothing yet."""
 
     def act(
         self,

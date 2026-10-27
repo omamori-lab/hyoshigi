@@ -7,12 +7,20 @@ import pytest
 from hyoshigi import (
     JSON,
     Action,
+    Audit,
     Author,
+    Block,
     Description,
     FormatError,
+    Halt,
     MediaPart,
     Observation,
     OpaquePart,
+    Policy,
+    Proposal,
+    ProtocolDecision,
+    Replace,
+    Run,
     TextPart,
     ToolCall,
     ToolObservation,
@@ -1537,8 +1545,9 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "hidden_reasoning": [],
                 },
             ),
-            "$.ratings[0].score.evidence.unavailable",
+            EVIDENCE_PATH,
             id="labels-unavailable-not-a-list",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -1736,19 +1745,6 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
                     "kind": "labels",
                     "model": "m",
                     "labels": ["safe"],
-                    "unavailable": None,
-                    "hidden_reasoning": [],
-                },
-            ),
-            "$.ratings[0].score.evidence.unavailable: expected a list of unavailable causes",
-            id="unavailable-not-a-list",
-        ),
-        pytest.param(
-            build_evidence_payload(
-                {
-                    "kind": "labels",
-                    "model": "m",
-                    "labels": ["safe"],
                     "unavailable": [{"kind": "unreadable"}],
                     "hidden_reasoning": [],
                 },
@@ -1893,3 +1889,545 @@ def test_nesting_past_32_levels_raises_format_error_at_the_33rd(
         levels,
         True,
     )
+
+
+DELETE_FILE = Action(
+    id="a2",
+    tool_calls=(
+        ToolCall(
+            id="call_2",
+            name="delete_file",
+            arguments='{"path": "q3.csv"}',
+        ),
+    ),
+)
+STORED_DELETE_FILE: dict[str, JSON] = {
+    "kind": "action",
+    "id": "a2",
+    "thought": [],
+    "parts": [],
+    "tool_calls": [
+        {
+            "id": "call_2",
+            "name": "delete_file",
+            "arguments": '{"path": "q3.csv"}',
+        },
+    ],
+}
+SUMMARISE = Action(
+    id="t1",
+    parts=(TextPart(text="Revenue grew 4%."),),
+)
+STORED_SUMMARISE: dict[str, JSON] = {
+    "kind": "action",
+    "id": "t1",
+    "thought": [],
+    "parts": [
+        {
+            "kind": "text",
+            "text": "Revenue grew 4%.",
+        },
+    ],
+    "tool_calls": [],
+}
+PROPOSED_DELETE = Proposal(
+    action=DELETE_FILE,
+    score=REFUSED,
+    policy=Policy.UNTRUSTED,
+)
+STORED_PROPOSED_DELETE: dict[str, JSON] = {
+    "action": STORED_DELETE_FILE,
+    "score": STORED_REFUSED,
+    "policy": "untrusted",
+}
+PROPOSED_SUMMARY = Proposal(
+    action=SUMMARISE,
+    score=None,
+    policy=Policy.TRUSTED,
+)
+STORED_PROPOSED_SUMMARY: dict[str, JSON] = {
+    "action": STORED_SUMMARISE,
+    "score": None,
+    "policy": "trusted",
+}
+REASON = "Deleting q3.csv is outside the task."
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("decision", "stored"),
+    [
+        pytest.param(
+            Run(
+                action=DELETE_FILE,
+                proposals=(PROPOSED_DELETE,),
+                position=4,
+            ),
+            {
+                "kind": "run",
+                "proposal": 0,
+                "proposals": [STORED_PROPOSED_DELETE],
+                "position": 4,
+            },
+            id="run",
+        ),
+        pytest.param(
+            Replace(
+                action=SUMMARISE,
+                proposals=(
+                    PROPOSED_DELETE,
+                    PROPOSED_SUMMARY,
+                ),
+                position=4,
+            ),
+            {
+                "kind": "replace",
+                "proposal": 1,
+                "proposals": [
+                    STORED_PROPOSED_DELETE,
+                    STORED_PROPOSED_SUMMARY,
+                ],
+                "position": 4,
+            },
+            id="replace",
+        ),
+        pytest.param(
+            Block(
+                action=DELETE_FILE,
+                reason=REASON,
+                proposals=(PROPOSED_DELETE,),
+                position=4,
+            ),
+            {
+                "kind": "block",
+                "proposal": 0,
+                "reason": REASON,
+                "proposals": [STORED_PROPOSED_DELETE],
+                "position": 4,
+            },
+            id="block",
+        ),
+        pytest.param(
+            Audit(
+                action=DELETE_FILE,
+                proposals=(
+                    PROPOSED_SUMMARY,
+                    PROPOSED_DELETE,
+                    PROPOSED_DELETE,
+                ),
+                position=4,
+            ),
+            {
+                "kind": "audit",
+                "proposal": 1,
+                "proposals": [
+                    STORED_PROPOSED_SUMMARY,
+                    STORED_PROPOSED_DELETE,
+                    STORED_PROPOSED_DELETE,
+                ],
+                "position": 4,
+            },
+            id="audit-of-an-action-proposed-twice",
+        ),
+        pytest.param(
+            Halt(
+                reason=REASON,
+                proposals=(PROPOSED_DELETE,),
+                position=4,
+            ),
+            {
+                "kind": "halt",
+                "reason": REASON,
+                "proposals": [STORED_PROPOSED_DELETE],
+                "position": 4,
+            },
+            id="halt",
+        ),
+    ],
+)
+def test_a_record_dumps_to_the_stored_format(
+    trajectory: Trajectory,
+    decision: ProtocolDecision,
+    stored: dict[str, JSON],
+) -> None:
+    trajectory.record(decision)
+
+    dumped = trajectory.dump()
+
+    assert dumped.get("records") == [stored]
+
+
+STORED_RUN: dict[str, JSON] = {
+    "kind": "run",
+    "proposal": 0,
+    "proposals": [STORED_PROPOSED_DELETE],
+    "position": 1,
+}
+STORED_HALT: dict[str, JSON] = {
+    "kind": "halt",
+    "reason": REASON,
+    "proposals": [STORED_PROPOSED_DELETE],
+    "position": 1,
+}
+RECORD_PATH = "$.records[0]"
+PROPOSAL_PATH = "$.records[0].proposals[0]"
+EXPECTED_TO_FAIL = pytest.mark.xfail(strict=True)
+
+
+def build_record_payload(record: JSON) -> dict[str, JSON]:
+    """A stored trajectory of one action, with the record."""
+    return {
+        **ENVELOPE,
+        "version": 2,
+        "history": [ACTION],
+        "records": [record],
+    }
+
+
+def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
+    """A stored trajectory whose one record is a run of a proposal with these fields."""
+    return build_record_payload(
+        {
+            **STORED_RUN,
+            "proposals": [
+                {
+                    **STORED_PROPOSED_DELETE,
+                    **fields,
+                },
+            ],
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "path"),
+    [
+        pytest.param(
+            {
+                "format": "hyoshigi.trajectory",
+                "version": 1,
+                "history": [],
+                "ratings": [],
+                "subagents": {},
+            },
+            "$",
+            id="version-1",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            {
+                "format": "hyoshigi.trajectory",
+                "version": 2,
+                "history": [],
+                "ratings": [],
+                "subagents": {},
+            },
+            "$",
+            id="records-missing",
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "records": {},
+            },
+            "$",
+            id="records-not-a-list",
+        ),
+        pytest.param(
+            build_record_payload("run"),
+            RECORD_PATH,
+            id="record-not-a-mapping",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "allow",
+                },
+            ),
+            RECORD_PATH,
+            id="unknown-kind",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    "proposal": 0,
+                    "proposals": [STORED_PROPOSED_DELETE],
+                    "position": 1,
+                },
+            ),
+            RECORD_PATH,
+            id="kind-missing",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    "kind": "run",
+                    "proposal": 0,
+                    "proposals": [STORED_PROPOSED_DELETE],
+                },
+            ),
+            RECORD_PATH,
+            id="position-missing",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "position": True,
+                },
+            ),
+            RECORD_PATH,
+            id="position-a-bool",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "position": "1",
+                },
+            ),
+            RECORD_PATH,
+            id="position-text",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "position": -1,
+                },
+            ),
+            "$.records[0].position",
+            id="position-below-zero",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "position": 2,
+                },
+            ),
+            "$.records[0].position",
+            id="position-past-the-history",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_HALT,
+                    "proposals": {},
+                },
+            ),
+            RECORD_PATH,
+            id="proposals-not-a-list",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_HALT,
+                    "proposals": [],
+                },
+            ),
+            RECORD_PATH,
+            id="no-proposals",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposals": ["a2"],
+                },
+            ),
+            PROPOSAL_PATH,
+            id="proposal-not-a-mapping",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposals": [
+                        {
+                            "action": STORED_DELETE_FILE,
+                            "score": STORED_REFUSED,
+                        },
+                    ],
+                },
+            ),
+            PROPOSAL_PATH,
+            id="proposal-without-a-policy",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(policy="monitor"),
+            PROPOSAL_PATH,
+            id="unknown-policy",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(action=OBSERVATION),
+            "$.records[0].proposals[0].action",
+            id="action-an-observation",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(action={"kind": "action"}),
+            "$.records[0].proposals[0].action",
+            id="action-malformed",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(score={"value": 1.0}),
+            "$.records[0].proposals[0].score",
+            id="score-malformed",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(score=None),
+            PROPOSAL_PATH,
+            id="untrusted-proposal-without-a-score",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_proposal_payload(policy="trusted"),
+            PROPOSAL_PATH,
+            id="trusted-proposal-with-a-score",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    "kind": "run",
+                    "proposals": [STORED_PROPOSED_DELETE],
+                    "position": 1,
+                },
+            ),
+            "$.records[0].proposal",
+            id="proposal-index-missing",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposal": 1,
+                },
+            ),
+            "$.records[0].proposal",
+            id="proposal-index-past-the-proposals",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposal": -1,
+                },
+            ),
+            "$.records[0].proposal",
+            id="proposal-index-below-zero",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposal": False,
+                },
+            ),
+            "$.records[0].proposal",
+            id="proposal-index-a-bool",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "block",
+                },
+            ),
+            RECORD_PATH,
+            id="block-without-a-reason",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "block",
+                    "reason": "",
+                },
+            ),
+            RECORD_PATH,
+            id="block-with-an-empty-reason",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_HALT,
+                    "reason": 5,
+                },
+            ),
+            RECORD_PATH,
+            id="halt-reason-not-text",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [TASK_CALL],
+                    },
+                ],
+                "records": [],
+                "subagents": {
+                    "call_7": {
+                        **build_record_payload(
+                            {
+                                **STORED_RUN,
+                                "position": 2,
+                            },
+                        ),
+                        "history": [],
+                    },
+                },
+            },
+            "$.subagents['call_7'].records[0].position",
+            id="subagent-record-past-its-history",
+            marks=EXPECTED_TO_FAIL,
+        ),
+        pytest.param(
+            build_evidence_payload(
+                {
+                    "kind": "labels",
+                    "model": "gpt-oss-safeguard-20b",
+                    "labels": ["safe"],
+                    "hidden_reasoning": [],
+                },
+            ),
+            EVIDENCE_PATH,
+            id="labels-without-unavailable",
+            marks=EXPECTED_TO_FAIL,
+        ),
+    ],
+)
+def test_loading_a_malformed_record_raises_format_error_at_its_path(
+    payload: JSON,
+    path: str,
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert raised.value.path == path
