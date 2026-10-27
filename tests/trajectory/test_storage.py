@@ -2429,7 +2429,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="audit-at-the-position-of-a-run-before-it",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2441,7 +2440,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="a-run-recorded-twice",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2462,7 +2460,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="records-reversed",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2491,7 +2488,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="a-record-over-a-blocks-feedback",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2519,7 +2515,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="a-record-over-the-feedback-of-a-block-without-calls",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(

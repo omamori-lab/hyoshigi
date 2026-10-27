@@ -26,7 +26,7 @@ from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservat
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.storage.events import dump_event, load_event
-from hyoshigi.trajectory.storage.records import dump_record, load_record
+from hyoshigi.trajectory.storage.records import dump_record, load_records
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score, load_score
 
 FORMAT = "hyoshigi.trajectory"
@@ -447,14 +447,11 @@ class Trajectory:
                     ratings,
                     path=f"{path}.ratings",
                 )
-                trajectory._records = [
-                    load_record(
-                        record,
-                        path=f"{path}.records[{index}]",
-                        history=trajectory._history,
-                    )
-                    for index, record in enumerate(records)
-                ]
+                trajectory._records = load_records(
+                    records,
+                    path=f"{path}.records",
+                    history=trajectory._history,
+                )
                 trajectory._load_subagents(
                     subagents,
                     path=f"{path}.subagents",
