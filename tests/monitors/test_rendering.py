@@ -181,6 +181,27 @@ def build_text(content: str) -> tuple[PromptPart, ...]:
             Channel.TOOL_CALLS,
             '<tool_error call_id="c1">No such file</tool_error>',
         ),
+        pytest.param(
+            ToolObservation(
+                call_id="c1",
+                is_error=True,
+                author=Author.MONITOR,
+                parts=build_text("Outside the task."),
+            ),
+            Channel.TOOL_CALLS,
+            '<tool_error call_id="c1" author="monitor">Outside the task.</tool_error>',
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            ToolObservation(
+                call_id="c1",
+                author=Author.SCAFFOLD,
+                parts=build_text("Revenue: 4.2M"),
+            ),
+            Channel.TOOL_OBSERVATIONS,
+            '<tool_result call_id="c1" author="scaffold">Revenue: 4.2M</tool_result>',
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "user",
@@ -192,6 +213,8 @@ def build_text(content: str) -> tuple[PromptPart, ...]:
         "tool-not-answering-a-call",
         "tool-result",
         "tool-error",
+        "tool-error-by-the-monitor",
+        "tool-result-by-the-scaffold",
     ],
 )
 def test_an_observation_renders_as_its_element_on_its_channel(

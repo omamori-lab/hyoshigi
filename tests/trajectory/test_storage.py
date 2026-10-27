@@ -2511,6 +2511,21 @@ def test_a_format_error_for_a_record_says_what_was_expected(
     assert str(raised.value) == message
 
 
+def test_a_document_of_another_version_raises_naming_the_version_load_reads() -> None:
+    payload: JSON = {
+        "format": "hyoshigi.trajectory",
+        "version": 1,
+        "history": [],
+        "ratings": [],
+        "subagents": {},
+    }
+
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert str(raised.value) == "$: expected a hyoshigi.trajectory, format version 2"
+
+
 def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
     payload = build_proposal_payload(score=nest_score(32))
 
