@@ -229,7 +229,7 @@ def read_failed(
     rejections: frozenset[str],
 ) -> Refused | Rejected | Unavailable:
     """A failed reply with these error codes: refused when one is a refusal or names a policy,
-    rejected when one is in `rejections`, else unavailable.
+    rejected when they say the provider cannot use the input, else unavailable.
     """
     if any(
         map(
@@ -238,9 +238,23 @@ def read_failed(
         ),
     ):
         return Refused()
-    if not rejections.isdisjoint(codes):
+    if is_input_rejection(
+        codes,
+        rejections=rejections,
+    ):
         return Rejected()
     return Unavailable()
+
+
+def is_input_rejection(
+    codes: tuple[str, ...],
+    *,
+    rejections: frozenset[str],
+) -> bool:
+    """Whether error codes say the provider cannot use the input: one is in `rejections`, or the
+    one code is invalid_prompt, with no error type to say which failure it stands for.
+    """
+    return not rejections.isdisjoint(codes) or codes == ("invalid_prompt",)
 
 
 def read_output(body: JSON) -> list[Message] | None:

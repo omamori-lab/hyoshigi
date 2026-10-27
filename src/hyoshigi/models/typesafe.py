@@ -118,12 +118,14 @@ def is_rejection(
     *,
     state: tuple[PromptPart, ...],
 ) -> bool:
-    """Whether TypeSafe says it cannot use the request: a 413, max_tokens_exceeded, or a 400 for
-    a state that holds an image.
+    """Whether TypeSafe says it cannot use the request: a 413, max_tokens_exceeded, or a 400 with
+    no error type for a state that holds an image.
     """
     match error.body:
         case {"detail": {"error_type": "max_tokens_exceeded"}}:
             return True
+        case {"detail": {"error_type": _}}:
+            return error.status == 413
         case _:
             return error.status == 413 or (error.status == 400 and holds_media(state))
 

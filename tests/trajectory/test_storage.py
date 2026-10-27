@@ -1067,7 +1067,6 @@ def test_a_rating_dumps_to_the_stored_format(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("cause", "stored"),
     [

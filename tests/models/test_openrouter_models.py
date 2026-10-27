@@ -1505,7 +1505,6 @@ def test_a_response_the_provider_blocks_is_refused(
         pytest.param(
             {},
             id="no-type",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
