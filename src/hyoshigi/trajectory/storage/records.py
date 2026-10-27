@@ -98,6 +98,55 @@ def dump_proposal(proposal: Proposal) -> JSON:
     }
 
 
+def load_records(
+    records: list[JSON],
+    *,
+    path: str,
+    history: list[Event],
+) -> list[ProtocolDecision]:
+    """Read the decisions that dump_record wrote, in the order they were recorded.
+
+    Each decision's position is at least the end of what the decisions before it added to the
+    history; otherwise FormatError is raised at its path.
+    """
+    decisions: list[ProtocolDecision] = []
+    earliest = 0
+    for index, data in enumerate(records):
+        record_path = f"{path}[{index}]"
+        decision = load_record(
+            data,
+            path=record_path,
+            history=history,
+        )
+        if decision.position < earliest:
+            raise FormatError(
+                path=record_path,
+                expected="a record at or after what the records before it added to the history",
+            )
+        earliest = decision.position + count_added(decision)
+        decisions.append(decision)
+    return decisions
+
+
+def count_added(decision: ProtocolDecision) -> int:
+    """The number of entries record adds to the history for a decision: a run's or a replace's
+    action; a block's action and its feedback, one entry for each tool call or one when there
+    are none; nothing for an audit or a halt.
+    """
+    match decision:
+        case Run() | Replace():
+            return 1
+        case Block(action=action):
+            return 1 + max(
+                len(action.tool_calls),
+                1,
+            )
+        case Audit() | Halt():
+            return 0
+        case unreachable:
+            assert_never(unreachable)
+
+
 def load_record(
     data: JSON,
     *,
