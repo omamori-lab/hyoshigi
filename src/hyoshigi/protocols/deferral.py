@@ -112,8 +112,9 @@ class DeferToResample:
         for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
-        longer the request's position long, proposals that are not a tuple of Action, and more
-        proposals than the request asks for raise ConfigurationError.
+        longer the request's position long, proposals that are not a tuple of Action, more
+        proposals than the request asks for, and a TrustedStep answered with one of the agent's
+        proposals raise ConfigurationError.
         """
         check_answer(
             request,
@@ -191,8 +192,9 @@ class AsyncDeferToResample:
         for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
-        longer the request's position long, proposals that are not a tuple of Action, and more
-        proposals than the request asks for raise ConfigurationError.
+        longer the request's position long, proposals that are not a tuple of Action, more
+        proposals than the request asks for, and a TrustedStep answered with one of the agent's
+        proposals raise ConfigurationError.
         """
         check_answer(
             request,
@@ -264,7 +266,8 @@ def check_answer(
     trajectory: Trajectory,
 ) -> None:
     """Raise ConfigurationError unless the request is a Resample or a TrustedStep at the length
-    of the history, and the proposals a tuple of at most as many actions as it asks for.
+    of the history, and the proposals a tuple of at most as many actions as it asks for, none of
+    them, for a TrustedStep, one of the agent's proposals.
     """
     limit = _read_limit(request)
     if request.position != len(trajectory.history):
@@ -283,6 +286,14 @@ def check_answer(
     if len(proposals) > limit:
         raise ConfigurationError(
             f"the request asks for {limit} or fewer proposals, got {len(proposals)}",
+        )
+    if isinstance(
+        request,
+        TrustedStep,
+    ) and any(proposal.action in proposals for proposal in request.proposals):
+        raise ConfigurationError(
+            "a TrustedStep's answer must be the trusted model's action, not one of the agent's "
+            "proposals",
         )
 
 

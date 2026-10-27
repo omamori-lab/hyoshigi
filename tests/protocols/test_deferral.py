@@ -1147,7 +1147,6 @@ TRUSTED_STEP_AT_1 = TrustedStep(
             "a TrustedStep's answer must be the trusted model's action, not one of the agent's "
             "proposals",
             id="a-trusted-step-answered-with-the-agents-proposal",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
