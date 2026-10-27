@@ -2068,6 +2068,30 @@ def test_a_record_dumps_to_the_stored_format(
     assert dumped.get("records") == [stored]
 
 
+def test_a_persons_run_after_an_audit_loads_back_at_the_same_position(
+    trajectory: Trajectory,
+) -> None:
+    audit = Audit(
+        action=DELETE_FILE,
+        proposals=(PROPOSED_DELETE,),
+        position=4,
+    )
+    run = Run(
+        action=DELETE_FILE,
+        proposals=(PROPOSED_DELETE,),
+        position=4,
+    )
+    trajectory.record(audit)
+    trajectory.record(run)
+
+    loaded = Trajectory.load(trajectory.dump())
+
+    assert loaded.records == (
+        audit,
+        run,
+    )
+
+
 STORED_RUN: dict[str, JSON] = {
     "kind": "run",
     "proposal": 0,
@@ -2391,6 +2415,111 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             RECORD_PATH,
             id="block-of-an-action-not-at-its-position",
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "records": [
+                    STORED_RUN,
+                    {
+                        **STORED_RUN,
+                        "kind": "audit",
+                    },
+                ],
+            },
+            "$.records[1]",
+            id="audit-at-the-position-of-a-run-before-it",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "records": [
+                    STORED_RUN,
+                    STORED_RUN,
+                ],
+            },
+            "$.records[1]",
+            id="a-run-recorded-twice",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    STORED_DELETE_FILE,
+                    STORED_SUMMARISE,
+                ],
+                "records": [
+                    {
+                        "kind": "run",
+                        "proposal": 0,
+                        "proposals": [STORED_PROPOSED_SUMMARY],
+                        "position": 1,
+                    },
+                    STORED_RUN,
+                ],
+            },
+            "$.records[1]",
+            id="records-reversed",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    STORED_DELETE_FILE,
+                    {
+                        **TOOL_OBSERVATION,
+                        "call_id": "call_2",
+                        "is_error": True,
+                        "author": "monitor",
+                    },
+                ],
+                "records": [
+                    {
+                        **STORED_RUN,
+                        "kind": "block",
+                        "reason": REASON,
+                    },
+                    {
+                        **STORED_RUN,
+                        "kind": "audit",
+                        "position": 1,
+                    },
+                ],
+            },
+            "$.records[1]",
+            id="a-record-over-a-blocks-feedback",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    STORED_SUMMARISE,
+                    {
+                        **OBSERVATION,
+                        "author": "monitor",
+                    },
+                ],
+                "records": [
+                    {
+                        "kind": "block",
+                        "proposal": 0,
+                        "reason": REASON,
+                        "proposals": [STORED_PROPOSED_SUMMARY],
+                        "position": 0,
+                    },
+                    {
+                        **STORED_HALT,
+                        "position": 1,
+                    },
+                ],
+            },
+            "$.records[1]",
+            id="a-record-over-the-feedback-of-a-block-without-calls",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
