@@ -88,6 +88,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.FailureResponse
 
+::: hyoshigi.Resampling
+
 ::: hyoshigi.ProtocolRequest
 
 ::: hyoshigi.Resample

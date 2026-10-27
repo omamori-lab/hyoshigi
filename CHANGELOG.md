@@ -13,6 +13,18 @@ minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- `DeferToResample` and `AsyncDeferToResample` take `resampling`, a
+  `Resampling`. With `SEQUENTIAL`, the default, `decide` asks for one
+  resample, and `resume` asks for one more while no proposal is below
+  `defer_threshold` and fewer than `max_resamples` are drawn. `PARALLEL`
+  asks for all `max_resamples` in one request, as 0.3.0 did. This is a
+  breaking change: a program that answers a `Resample` with more proposals
+  than its `count` raises `ConfigurationError`, and one that calls `resume`
+  once for a decision gets another request. `resampling=Resampling.PARALLEL`
+  keeps the requests of 0.3.0.
+
 ## [0.3.0] - 2026-10-27
 
 ### Added
