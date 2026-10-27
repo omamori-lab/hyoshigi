@@ -510,12 +510,13 @@ A rating that fails closed scores 1.0, and its cause decides what happens to the
 ([Handling a failed rating](handling-a-failed-rating.md)). The agent's own content can provoke a
 reply the monitor cannot read, a refusal, a reply cut off at the output limit or a prompt the
 provider rejects, and its action can hold content the monitor's model cannot perceive. Each of
-these sends the proposal to a person as `Audit`. A rating that got no answer, `Unavailable`, gets
-what `on_unavailable` says, `AUDIT` by default:
+these sends the proposal to a person as `Audit`, or as a `Flag` under `on_audit=AuditResponse.FLAG`,
+which runs the action first. A rating that got no answer, `Unavailable`, gets what `on_unavailable`
+says, `AUDIT` by default:
 
 | `on_unavailable` | Decision |
 |---|---|
-| `AUDIT` | `Audit`: a person decides |
+| `AUDIT` | `Audit`: a person decides, or a `Flag` under `on_audit=AuditResponse.FLAG` |
 | `BLOCK` | `Block`, with the score's explanation as the reason |
 | `TRUSTED_STEP` | a `TrustedStep` request; `BlockAndFeedBack` refuses this value when it is built, since it asks for no proposals |
 | `RUN` | `Run`: the action runs with no verdict from the monitor, and `record` attaches its failed score |
