@@ -1015,17 +1015,33 @@ def test_a_resample_answered_with_fewer_proposals_than_asked_rates_those_it_got(
                     build_score(0.7),
                 ),
             ),
+            SECOND,
+            id="a-resample-whose-monitor-got-no-answer-is-set-aside",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            (
+                PROPOSED_AT_0_6,
+                build_proposal(
+                    FIRST,
+                    FAILURES_WITH_AN_ANSWER[0][1],
+                ),
+                build_proposal(
+                    SECOND,
+                    build_score(0.7),
+                ),
+            ),
             FIRST,
-            id="a-resample-whose-monitor-got-no-answer",
+            id="a-resample-that-failed-closed-with-an-answer-is-kept",
         ),
         pytest.param(
             (PROPOSED_UNAVAILABLE,),
             PROPOSED,
-            id="the-proposal-whose-monitor-got-no-answer",
+            id="the-proposal-whose-monitor-got-no-answer-is-kept",
         ),
     ],
 )
-def test_a_trusted_step_answered_with_no_action_audits_the_most_suspicious_proposal(
+def test_a_trusted_step_answered_with_no_action_audits_the_most_suspicious_remaining_proposal(
     family: AnyFamily,
     proposals: tuple[Proposal, ...],
     audited: Action,
