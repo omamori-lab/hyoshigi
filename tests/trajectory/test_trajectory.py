@@ -38,6 +38,11 @@ WRITE = ToolCall(
     name="write_file",
     arguments='{"path": "summary.md"}',
 )
+DELEGATE = ToolCall(
+    id="call_7",
+    name="task",
+    arguments="{}",
+)
 DELETE_UNDER_READS_ID = ToolCall(
     id="call_1",
     name="delete_file",
@@ -342,6 +347,64 @@ def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Traject
             INSTRUCTION,
             call_id="call_7",
         )
+
+
+def delegate_a_chain(
+    trajectory: Trajectory,
+    *,
+    depth: int,
+) -> Trajectory:
+    """Delegate a chain of subagents `depth` levels below the trajectory, each by a call of id
+    call_7, and return the deepest.
+    """
+    deepest = trajectory
+    for _ in range(depth):
+        deepest.act(
+            Action(
+                id="a1",
+                tool_calls=(DELEGATE,),
+            ),
+        )
+        deepest = deepest.delegate(
+            INSTRUCTION,
+            call_id="call_7",
+        )
+    return deepest
+
+
+def test_a_chain_of_subagents_32_levels_deep_loads_back_unchanged(trajectory: Trajectory) -> None:
+    delegate_a_chain(
+        trajectory,
+        depth=32,
+    )
+
+    loaded = Trajectory.load(trajectory.dump())
+
+    assert loaded.dump() == trajectory.dump()
+
+
+@pytest.mark.xfail(strict=True)
+def test_delegating_from_a_subagent_32_levels_deep_raises_naming_the_limit(
+    trajectory: Trajectory,
+) -> None:
+    deepest = delegate_a_chain(
+        trajectory,
+        depth=32,
+    )
+    deepest.act(
+        Action(
+            id="a1",
+            tool_calls=(DELEGATE,),
+        ),
+    )
+
+    with pytest.raises(ConfigurationError) as raised:
+        deepest.delegate(
+            INSTRUCTION,
+            call_id="call_7",
+        )
+
+    assert str(raised.value) == "subagents are nested at most 32 deep"
 
 
 def test_a_new_trajectory_has_no_ratings(trajectory: Trajectory) -> None:
