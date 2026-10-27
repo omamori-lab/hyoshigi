@@ -385,12 +385,12 @@ as it is. The client rounds the score to 4 decimal places, so 0.123456 is sent a
 The client tries again before it raises, and the rating waits (langsmith 0.14.11). After a 404 it
 makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about 8.5 minutes in
 all. It retries a 404 because the run may not be ingested yet ([why a score may arrive before its
-span](../explanation/observability.md)). It retries a connection error and a 408, 500, 502, 503 or
-504 answer too. The synchronous client also retries a 429, with waits that start at the answer's
-`Retry-After` seconds, 30 when it has none, and double, which can hold a rating for over 4 hours.
-Within each attempt, the synchronous client's HTTP session sends up to 3 more requests after a
-connection error or a 408, 425, 429, 500, 502, 503 or 504 answer, waiting the answer's `Retry-After`
-seconds when it has them. A 401 is raised at once.
+span](../explanation/observability.md)). It retries a connection error and a 408 or 500 answer too,
+and the asynchronous client a 425, 502, 503 or 504 answer as well. The synchronous client also
+retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it has none, and
+double, which can hold a rating for over 4 hours. Within each attempt, the synchronous client's HTTP
+session sends up to 3 more requests after a connection error or a 408, 425, 429, 500, 502, 503 or
+504 answer, waiting the answer's `Retry-After` seconds when it has them. A 401 is raised at once.
 
 `stop_after_attempt` caps the attempts, a positive integer that is 10 by default, as in the client's
 `create_feedback`, and the synchronous client's `retry_config` sets its session's retries. A control
@@ -412,7 +412,7 @@ feedback = LangSmithFeedback(
 )
 ```
 
-The report then sends at most 2 requests. The client retries a 404 once, after about a second, and
+The report then sends the score in at most 2 requests. The client retries a 404 once, after about a second, and
 the synchronous client retries a 429 once, after the answer's `Retry-After` seconds, 30 when it has
 none. A score whose last attempt gets an error, such as a run not yet ingested, is lost, and the
 report [logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
