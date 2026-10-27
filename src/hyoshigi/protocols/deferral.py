@@ -57,7 +57,8 @@ class DeferToResample:
     proposals weighed, in the order they were rated, and the length of the history.
 
     With `max_resamples` at 0 this is defer to trusted, and with equal thresholds as well,
-    trusted monitoring (Greenblatt et al. 2023, "AI Control", secs. 3.3, 3.2).
+    trusted monitoring (Greenblatt et al. 2023, "AI Control", secs. 3.3, 3.2), except at an
+    audit: where the paper also runs an action at an audited step, this decides Audit alone.
 
     The thresholds are numbers from 0 to 1, `defer_threshold` at most `audit_threshold`, kept
     as floats; `max_resamples` is a whole number of at least 0, kept as an int; `monitor` is a
