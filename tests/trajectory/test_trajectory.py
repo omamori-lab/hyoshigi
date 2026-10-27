@@ -383,7 +383,6 @@ def test_a_chain_of_subagents_32_levels_deep_loads_back_unchanged(trajectory: Tr
     assert loaded.dump() == trajectory.dump()
 
 
-@pytest.mark.xfail(strict=True)
 def test_delegating_from_a_subagent_32_levels_deep_raises_naming_the_limit(
     trajectory: Trajectory,
 ) -> None:

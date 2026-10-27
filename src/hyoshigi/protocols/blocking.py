@@ -3,7 +3,6 @@ many blocks a person audits the next proposal.
 """
 
 from dataclasses import dataclass
-from operator import itemgetter
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
 from hyoshigi.errors import ConfigurationError
@@ -23,7 +22,7 @@ from hyoshigi.protocols.decisions import (
 )
 from hyoshigi.protocols.requests import FailureResponse, decide_on_unavailable
 from hyoshigi.trajectory.history import Action
-from hyoshigi.trajectory.trajectory import Trajectory, find_delegation
+from hyoshigi.trajectory.trajectory import Trajectory, list_run_records
 
 
 @dataclass(
@@ -43,11 +42,8 @@ class BlockAndFeedBack:
     Halt otherwise changes neither. This follows Claude Code's permission-modes page, "When auto
     mode falls back".
 
-    The run's records are those of every trajectory in its delegation tree, replayed from the root:
-    a trajectory's own records in order, with each subagent's merged in after the records whose
-    position is at or before that of the action that delegated it, ordered by that position and,
-    for subagents of one action, in the order they were delegated. A trajectory split from a
-    subagent's takes that subagent's place.
+    The run's records are those of every trajectory in its delegation tree, replayed in the order
+    they were recorded. A trajectory split from a subagent's takes that subagent's place.
 
     Below both limits, a score that failed closed is Audit, or, when the monitor got no answer,
     what `on_unavailable` says: Audit, Block with the score's explanation as the reason, or Run.
@@ -245,12 +241,12 @@ def reaches_a_limit(
     blocks_in_total: int,
 ) -> bool:
     """Whether the trajectory's own records hold at least `blocks_in_a_row` blocks in a row, or the
-    records of its run, merged by merge_run, at least `blocks_in_total` in total.
+    records of its run, in the order they were recorded, at least `blocks_in_total` in total.
     """
     return (
         count_blocks_in_a_row(trajectory.records) >= blocks_in_a_row
         or count_blocks_in_total(
-            merge_run(trajectory),
+            list_run_records(trajectory),
             limit=blocks_in_total,
         )
         >= blocks_in_total
@@ -302,72 +298,3 @@ def count_blocks_in_total(
         ):
             in_total = 0
     return in_total
-
-
-def merge_run(trajectory: Trajectory) -> tuple[ProtocolDecision, ...]:
-    """Return the records of the run the trajectory is in, merged up to the root of its delegation
-    tree: the trajectory's merged records stand in for the subagent under its call in its parent's,
-    and the parent's for the subagent under its own call, and so on.
-    """
-    records = merge_records(
-        trajectory,
-        placed={},
-    )
-    delegation = find_delegation(trajectory)
-    while delegation is not None:
-        records = merge_records(
-            delegation.parent,
-            placed={delegation.call_id: records},
-        )
-        delegation = find_delegation(delegation.parent)
-    return records
-
-
-def merge_records(
-    trajectory: Trajectory,
-    *,
-    placed: dict[str, tuple[ProtocolDecision, ...]],
-) -> tuple[ProtocolDecision, ...]:
-    """Return the trajectory's records in order, with each subagent's merged records after the
-    records whose position is at or before that of the action that delegated it.
-
-    Subagents go in the order of those positions and, for one action, in the order they were
-    delegated. The records `placed` under a call id stand in for those of its subagent.
-    """
-    delegated_at = {
-        call.id: position
-        for position, event in enumerate(trajectory.history)
-        if isinstance(
-            event,
-            Action,
-        )
-        for call in event.tool_calls
-    }
-    subagents = {
-        call_id: merge_records(
-            subagent,
-            placed={},
-        )
-        for call_id, subagent in trajectory.subagents.items()
-    } | placed
-    # sorted keeps the order of entries at one position: the records, then the subagents.
-    timeline = sorted(
-        [
-            *(
-                (
-                    record.position,
-                    (record,),
-                )
-                for record in trajectory.records
-            ),
-            *(
-                (
-                    delegated_at[call_id],
-                    records,
-                )
-                for call_id, records in subagents.items()
-            ),
-        ],
-        key=itemgetter(0),
-    )
-    return tuple(record for _, records in timeline for record in records)

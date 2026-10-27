@@ -32,7 +32,7 @@ _ACTION_KINDS = {
 }
 
 
-def dump_record(decision: ProtocolDecision) -> JSON:
+def dump_record(decision: ProtocolDecision) -> dict[str, JSON]:
     """Return a decision and the proposals it weighed as JSON-compatible data.
 
     The decision's action is written as the index of the first proposal of that action.
@@ -350,3 +350,36 @@ def load_action(
                 path=path,
                 expected="an action",
             )
+
+
+def read_sequence_numbers(
+    records: list[JSON],
+    *,
+    path: str,
+    seen: set[int],
+) -> list[int]:
+    """Read each stored record's sequence number, and add it to the numbers `seen` in the run.
+
+    A number that is not a whole number of at least 0, greater than the one before it, that no
+    other record in the run has raises FormatError at its path.
+    """
+    numbers: list[int] = []
+    for index, data in enumerate(records):
+        match data:
+            case {"sequence": int(number)} if (
+                not isinstance(
+                    number,
+                    bool,
+                )
+                and number > (numbers[-1] if numbers else -1)
+                and number not in seen
+            ):
+                numbers.append(number)
+                seen.add(number)
+            case _:
+                raise FormatError(
+                    path=f"{path}[{index}].sequence",
+                    expected="a whole number of at least 0, greater than the one before it, that "
+                    "no other record in the run has",
+                )
+    return numbers

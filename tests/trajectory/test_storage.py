@@ -292,7 +292,7 @@ CAUSE_IDS = [
 # The stored format, written out by hand: base64 of the bytes 89 50 4E 47 is "iVBORw==".
 STORED: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 2,
+    "version": 3,
     "history": [
         {
             "kind": "observation",
@@ -370,7 +370,7 @@ STORED: dict[str, JSON] = {
 
 DELEGATING: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 2,
+    "version": 3,
     "history": [
         {
             "kind": "action",
@@ -413,7 +413,7 @@ DELEGATING: dict[str, JSON] = {
     "subagents": {
         "call_7": {
             "format": "hyoshigi.trajectory",
-            "version": 2,
+            "version": 3,
             "history": [
                 {
                     "kind": "observation",
@@ -456,14 +456,14 @@ DELEGATING: dict[str, JSON] = {
 
 ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 2,
+    "version": 3,
     "ratings": [],
     "records": [],
     "subagents": {},
 }
 UNRATED_ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 2,
+    "version": 3,
     "records": [],
     "subagents": {},
 }
@@ -558,7 +558,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         (
             {
                 **ENVELOPE,
-                "version": 3,
+                "version": 4,
                 "history": [],
             },
             "$",
@@ -1980,6 +1980,7 @@ REASON = "Deleting q3.csv is outside the task."
                 "proposal": 0,
                 "proposals": [STORED_PROPOSED_DELETE],
                 "position": 4,
+                "sequence": 0,
             },
             id="run",
         ),
@@ -2014,6 +2015,7 @@ REASON = "Deleting q3.csv is outside the task."
                     STORED_PROPOSED_SUMMARY,
                 ],
                 "position": 4,
+                "sequence": 0,
             },
             id="replace",
         ),
@@ -2030,6 +2032,7 @@ REASON = "Deleting q3.csv is outside the task."
                 "reason": REASON,
                 "proposals": [STORED_PROPOSED_DELETE],
                 "position": 4,
+                "sequence": 0,
             },
             id="block",
         ),
@@ -2052,6 +2055,7 @@ REASON = "Deleting q3.csv is outside the task."
                     STORED_PROPOSED_DELETE,
                 ],
                 "position": 4,
+                "sequence": 0,
             },
             id="audit-of-an-action-proposed-twice",
         ),
@@ -2066,6 +2070,7 @@ REASON = "Deleting q3.csv is outside the task."
                 "reason": REASON,
                 "proposals": [STORED_PROPOSED_DELETE],
                 "position": 4,
+                "sequence": 0,
             },
             id="halt",
         ),
@@ -2144,12 +2149,14 @@ STORED_RUN: dict[str, JSON] = {
     "proposal": 0,
     "proposals": [STORED_PROPOSED_DELETE],
     "position": 0,
+    "sequence": 0,
 }
 STORED_HALT: dict[str, JSON] = {
     "kind": "halt",
     "reason": REASON,
     "proposals": [STORED_PROPOSED_DELETE],
     "position": 1,
+    "sequence": 1,
 }
 RECORD_PATH = "$.records[0]"
 PROPOSAL_PATH = "$.records[0].proposals[0]"
@@ -2196,7 +2203,7 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
         pytest.param(
             {
                 "format": "hyoshigi.trajectory",
-                "version": 2,
+                "version": 3,
                 "history": [],
                 "ratings": [],
                 "subagents": {},
@@ -2653,15 +2660,13 @@ def test_loading_a_malformed_record_raises_format_error_at_its_path(
 
 
 def build_sequence_payload(*records: JSON) -> dict[str, JSON]:
-    """A stored trajectory, format version 3, of the action STORED_RUN runs, with the records."""
+    """A stored trajectory of the action STORED_RUN runs, with the records."""
     return {
         **build_record_payload(STORED_RUN),
-        "version": 3,
         "records": list(records),
     }
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("payload", "path"),
     [
@@ -2880,7 +2885,6 @@ PROPOSAL_EXPECTED = (
             "$.records[0].sequence: expected a whole number of at least 0, greater than the one "
             "before it, that no other record in the run has",
             id="negative-sequence-number",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -2894,7 +2898,6 @@ def test_a_format_error_for_a_record_says_what_was_expected(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "payload",
     [
@@ -2963,6 +2966,7 @@ def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
                         **STORED_RUN,
                         "kind": "audit",
                         "position": 2,
+                        "sequence": 1,
                     },
                 ],
             },
@@ -2985,6 +2989,7 @@ def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
                         "reason": REASON,
                         "proposals": [STORED_PROPOSED_SUMMARY],
                         "position": 0,
+                        "sequence": 0,
                     },
                     {
                         **STORED_HALT,

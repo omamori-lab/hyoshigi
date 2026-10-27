@@ -326,8 +326,9 @@ score must be a SuspicionScore, got an instance of float
 ## A subagent has a trajectory of its own
 
 `delegate(instruction, call_id=...)` starts a subagent's trajectory under the id of the tool call
-that delegated it, and returns it. The call must be one an action in this trajectory made, and a
-call delegates once. The instruction becomes the subagent's first observation, written by the
+that delegated it, and returns it. The call must be one an action in this trajectory made, a call
+delegates once, and a subagent is at most 32 levels below the root, the depth `load` reads. The
+instruction becomes the subagent's first observation, written by the
 delegator. The subagent's actions and observations go into its own trajectory with the same methods,
 and its result goes into the parent as the observation of the call. A monitor that rates an action
 of the parent reads that result as a subagent report and none of the subagent's entries. A monitor
@@ -395,10 +396,11 @@ counts every block in the run in one total
 
 `dump` returns the trajectory, its ratings and its subagents as JSON-compatible data, and `load`
 rebuilds a trajectory from it. The data is an object with six keys: `format`, the text
-`"hyoshigi.trajectory"`; `version`, the number 2; `history`, one object for each entry, whose `kind`
+`"hyoshigi.trajectory"`; `version`, the number 3; `history`, one object for each entry, whose `kind`
 is `action`, `observation` or `tool_observation`; `ratings`, each an `action_id` and a `score`;
-`records`, each a control protocol's decision with the proposals it weighed; and `subagents`, the
-dump of each subagent under its call id. Media bytes are written in base64.
+`records`, each a control protocol's decision with the proposals it weighed and its `sequence`, the
+record's number in the order the run recorded it; and `subagents`, the dump of each subagent under
+its call id. Media bytes are written in base64.
 
 ```python
 import json
@@ -429,8 +431,9 @@ value found, which can hold an agent's private content. A different `format` or 
 key or a value of another shape, an author that is not one of the seven, a rating of an action that
 is not in the history, a record at a position past the end of the history, whose `proposal` names
 none of its proposals, or that runs, replaces or blocks an action not at its position in the
-history, a record at a position before the entries the records before it added, a repeated action id
-or call id, a subagent under a call that is not in the history, and composite scores or subagents
+history, a record at a position before the entries the records before it added, a record whose
+`sequence` is not a whole number of at least 0, greater than the one before it, that no other record
+in the run has, a repeated action id or call id, a subagent under a call that is not in the history, and composite scores or subagents
 nested more than 32 levels deep all raise it. Keys that `dump` does not write are ignored.
 
 ```python
@@ -438,7 +441,7 @@ unknown_action = json.loads(text)
 unknown_action["ratings"][0]["action_id"] = "missing"
 wrong_version = {
     **data,
-    "version": 3,
+    "version": 4,
 }
 for tampered in (
     wrong_version,
@@ -451,7 +454,7 @@ for tampered in (
 ```
 
 ```text
-$: expected a hyoshigi.trajectory, format version 2
+$: expected a hyoshigi.trajectory, format version 3
 $.ratings[0].action_id: expected the id of an action in the history
 ```
 

@@ -50,13 +50,22 @@ minor version.
   `ConfigurationError`, and `resume` can return another `Resample`.
   `resampling=Resampling.PARALLEL` keeps the requests of 0.3.0.
 - `BlockAndFeedBack` and `AsyncBlockAndFeedBack` count `blocks_in_total`
-  over the whole run: every record of the delegation tree, merged from its
-  root, so a subagent and its delegator count the same total. The trajectory
-  that `split_latest_step` returns for a subagent counts in the subagent's
-  place. The count in a row still reads the trajectory's own records. In
+  over the whole run: every record of the delegation tree, in the order it
+  was recorded, so a subagent and its delegator count the same total. The
+  trajectory that `split_latest_step` returns for a subagent counts in the
+  subagent's place. The count in a row still reads the trajectory's own records. In
   0.3.0 each trajectory counted only its own blocks, so an agent could stay
   under the total by delegating. This is a breaking change for a run with
   subagents, which can now reach `Audit` where 0.3.0 ran.
+- The stored trajectory format is version 3, in which each record holds its
+  `sequence`, its number in the order the run recorded it, and `load` reads
+  only version 3. A repeated, decreasing or negative `sequence` raises
+  `FormatError`. This is a breaking change: a version-2 file raises
+  `FormatError`, since it lacks the order of records across a run; rebuild
+  the trajectory from the run and dump it again.
+- `Trajectory.delegate` raises `ConfigurationError` for a subagent more than
+  32 levels below the root, the depth `load` reads. This is a breaking
+  change for a deeper tree, which 0.3.0 built and dumped but could not load.
 
 ## [0.3.0] - 2026-10-27
 
