@@ -5,8 +5,8 @@ a change must pass and how to send a pull request.
 
 ## Where to start
 
-- The library is in design: nothing is released yet. For anything larger
-  than a fix, open an issue first, so the design is agreed before the code.
+- For anything larger than a fix, open an issue first, so the design is
+  agreed before the code.
 - `AGENTS.md` holds the rules for code and tests, for people and coding
   agents alike: design before code, primary sources only, canonical terms,
   failures as typed outcomes, tests first with an oracle independent of the
