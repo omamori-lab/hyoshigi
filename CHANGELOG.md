@@ -15,14 +15,17 @@ minor version.
 
 ### Added
 
-- `LangSmithFeedback` takes an `executor` and `AsyncLangSmithFeedback` a
-  `task_group`. With one, `send` submits the post to the executor, or
-  creates a task for it in the group, and returns at once, so a rating
-  returns without waiting for LangSmith's answer. A post that fails or is
-  cancelled there is logged by the report's class and the error's type, and
-  never raised. `executor.shutdown(wait=True)`, or leaving the group, waits
-  for the posts left. Without either, the report posts and waits, as in
-  0.2.0.
+- `LangSmithFeedback` takes an `executor`. With one, `send` submits the post
+  to it and returns at once, so a rating returns without waiting for
+  LangSmith's answer; a post that fails or is cancelled there is logged by
+  the report's class and the error's type, never raised, and
+  `executor.shutdown(wait=True)` waits for the posts left. Without one, the
+  report posts and waits, as in 0.2.0.
+- `AsyncLangSmithFeedback` takes a `task_group`. With one, `send` creates a
+  task for the post in the group and returns at once; a post that fails or
+  is cancelled there is logged by the report's class and the error's type,
+  never raised, and leaving the group waits for the posts left. Without
+  one, the report awaits the post, as in 0.2.0.
 
 ### Changed
 

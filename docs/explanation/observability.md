@@ -92,9 +92,8 @@ and `AsyncClient.create_feedback`). Without a worker, the LangSmith report waits
 answer. For a run that never arrives, the waits add up to 511 seconds, so the rating returns its
 score about eight and a half minutes later, and the log record names `LangSmithNotFoundError`. With
 an executor or a task group, the rating returns at once, and the worker waits the same 511 seconds
-before it logs the same record. A `ThreadPoolExecutor` holds the program's exit until its posts
-finish [see @python2026concurrentfutures, {Section} "ThreadPoolExecutor"]. The report's
-`stop_after_attempt` caps the attempts, and with them the wait.
+before it logs the same record. The report's `stop_after_attempt` caps the attempts, and with them
+the wait.
 
 ## The reported score is the wrapped monitor's
 
