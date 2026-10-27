@@ -795,6 +795,38 @@ def test_a_subagent_delegated_by_a_split_copy_counts_its_own_blocks(family: AnyF
 
 
 @pytest.mark.xfail(strict=True)
+def test_a_split_copys_new_records_follow_the_runs(family: AnyFamily) -> None:
+    trajectory = build_trajectory()
+    subagent = start_subagent(trajectory)
+    subagent.act(build_action("later"))
+    record_steps(
+        trajectory,
+        (
+            BLOCK("a2"),
+            BLOCK("a3"),
+        ),
+    )
+    earlier = subagent.split_latest_step().trajectory
+    record_steps(
+        earlier,
+        (
+            AUDIT("s1"),
+            RUN("s1"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=earlier,
+        blocks_in_total=2,
+    )
+
+    assert decided == build_run(2)
+
+
+@pytest.mark.xfail(strict=True)
 def test_a_run_loaded_from_a_dump_replays_its_records_in_the_order_they_were_recorded(
     family: AnyFamily,
 ) -> None:
