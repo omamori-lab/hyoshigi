@@ -1,4 +1,4 @@
-"""A control protocol's decisions and proposals: the values that cannot work."""
+"""A control protocol's decisions, requests and proposals: the values that cannot work."""
 
 import pytest
 
@@ -12,8 +12,10 @@ from hyoshigi import (
     Proposal,
     Rationale,
     Replace,
+    Resample,
     Run,
     SuspicionScore,
+    TrustedStep,
 )
 
 READ = Action(id="a1")
@@ -200,6 +202,76 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             SCORED_BY_POLICY,
             id="trusted-with-a-score",
+        ),
+        pytest.param(
+            Resample,
+            {
+                "count": 0,
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            "count must be at least 1, got 0",
+            id="resample-of-none",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Resample,
+            {
+                "count": True,
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            "count must be a whole number of at least 1, got True",
+            id="resample-count-a-bool",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Resample,
+            {
+                "count": 2,
+                "proposals": [PROPOSED_READ],
+                "position": 0,
+            },
+            "proposals must be a tuple, got an instance of list",
+            id="resample-proposals-a-list",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            TrustedStep,
+            {
+                "proposals": (),
+                "position": 0,
+            },
+            "proposals must hold at least one Proposal",
+            id="trusted-step-without-proposals",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            TrustedStep,
+            {
+                "proposals": (PROPOSED_READ,),
+                "position": -1,
+            },
+            "position must be at least 0, got -1",
+            id="trusted-step-position-below-zero",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            TrustedStep,
+            {
+                "proposals": (
+                    PROPOSED_READ,
+                    Proposal(
+                        action=WRITE,
+                        score=None,
+                        policy=Policy.TRUSTED,
+                    ),
+                ),
+                "position": 0,
+            },
+            "a request holds the agent's proposals, each untrusted",
+            id="trusted-step-holding-a-trusted-proposal",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

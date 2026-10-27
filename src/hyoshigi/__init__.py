@@ -59,6 +59,7 @@ from hyoshigi.monitors.score import (
     Unreadable,
 )
 from hyoshigi.monitors.view import Channel, View
+from hyoshigi.protocols.blocking import AsyncBlockAndFeedBack, BlockAndFeedBack
 from hyoshigi.protocols.decisions import (
     Audit,
     Block,
@@ -69,6 +70,8 @@ from hyoshigi.protocols.decisions import (
     Replace,
     Run,
 )
+from hyoshigi.protocols.deferral import AsyncDeferToResample, DeferToResample
+from hyoshigi.protocols.requests import FailureResponse, ProtocolRequest, Resample, TrustedStep
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role, marked
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
@@ -84,10 +87,12 @@ __all__ = [
     "QWEN3GUARD",
     "Action",
     "Aggregation",
+    "AsyncBlockAndFeedBack",
     "AsyncCalibratedMonitor",
     "AsyncCascadeMonitor",
     "AsyncDecisionModel",
     "AsyncDecisionMonitor",
+    "AsyncDeferToResample",
     "AsyncGenerativeModel",
     "AsyncGuardMonitor",
     "AsyncLLMMonitor",
@@ -100,6 +105,7 @@ __all__ = [
     "Authorship",
     "BlackBoxRun",
     "Block",
+    "BlockAndFeedBack",
     "CalibratedMonitor",
     "CascadeMonitor",
     "Cause",
@@ -111,10 +117,12 @@ __all__ = [
     "DecisionMonitor",
     "DecisionOutcome",
     "Decisions",
+    "DeferToResample",
     "Description",
     "Event",
     "Evidence",
     "FailedClosed",
+    "FailureResponse",
     "FormatError",
     "Generation",
     "GenerationOutcome",
@@ -139,6 +147,7 @@ __all__ = [
     "PromptPart",
     "Proposal",
     "ProtocolDecision",
+    "ProtocolRequest",
     "Question",
     "Rating",
     "Rationale",
@@ -147,6 +156,7 @@ __all__ = [
     "RepeatedMonitor",
     "Replace",
     "ReportedMonitor",
+    "Resample",
     "Run",
     "StatementDecision",
     "Step",
@@ -156,6 +166,7 @@ __all__ = [
     "ToolObservation",
     "Trajectory",
     "Truncated",
+    "TrustedStep",
     "Unavailable",
     "Unperceivable",
     "Unreadable",
