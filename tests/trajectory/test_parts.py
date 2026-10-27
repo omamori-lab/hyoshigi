@@ -1,8 +1,10 @@
-"""Media parts: the media type and the source each one must give."""
+"""Parts: the media type and the source a media part must give, and the fields that cannot
+work.
+"""
 
 import pytest
 
-from hyoshigi import ConfigurationError, MediaPart
+from hyoshigi import Author, ConfigurationError, Description, MediaPart, OpaquePart, TextPart
 
 CHART_URL = "https://example.com/chart.png"
 PNG_SIGNATURE = b"\x89PNG"
@@ -74,3 +76,87 @@ def test_a_media_type_in_the_iana_grammar_is_accepted(media_type: str) -> None:
     )
 
     assert part.media_type == media_type
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("kind", "fields", "message"),
+    [
+        pytest.param(
+            TextPart,
+            {"text": b"Revenue: 4.2M"},
+            "text must be a str, got an instance of bytes",
+            id="text-bytes",
+        ),
+        pytest.param(
+            Description,
+            {
+                "text": None,
+                "author": Author.AGENT,
+            },
+            "text must be a str, got None",
+            id="description-text-none",
+        ),
+        pytest.param(
+            Description,
+            {
+                "text": "A bar chart of revenue by quarter",
+                "author": "agent",
+            },
+            "author must be an Author, got an instance of str",
+            id="description-author-a-string",
+        ),
+        pytest.param(
+            MediaPart,
+            {
+                "media_type": 1,
+                "url": CHART_URL,
+            },
+            "media_type must be a str, got an instance of int",
+            id="media-type-a-number",
+        ),
+        pytest.param(
+            MediaPart,
+            {
+                "media_type": "image/png",
+                "url": 1,
+            },
+            "url must be a str, got an instance of int",
+            id="url-a-number",
+        ),
+        pytest.param(
+            MediaPart,
+            {
+                "media_type": "image/png",
+                "data": "iVBORw0KGgo=",
+            },
+            "data must be a bytes, got an instance of str",
+            id="data-base64-text",
+        ),
+        pytest.param(
+            MediaPart,
+            {
+                "media_type": "image/png",
+                "url": CHART_URL,
+                "description": "A bar chart of revenue by quarter",
+            },
+            "description must be a Description, got an instance of str",
+            id="description-a-string",
+        ),
+        pytest.param(
+            OpaquePart,
+            {"kind": None},
+            "kind must be a str, got None",
+            id="kind-none",
+        ),
+    ],
+)
+def test_a_field_of_the_wrong_type_raises_naming_it(
+    kind: type,
+    fields: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        kind(**fields)
+
+    assert str(raised.value) == message
