@@ -206,6 +206,7 @@ def load_evidence(
             "kind": "labels",
             "model": str(model),
             "labels": list(labels),
+            "unavailable": list(unavailable),
             "hidden_reasoning": list(reasoning),
         }:
             return Labels(
@@ -215,8 +216,8 @@ def load_evidence(
                     path=f"{path}.labels",
                 ),
                 unavailable=load_unavailable(
-                    data,
-                    path=path,
+                    unavailable,
+                    path=f"{path}.unavailable",
                 ),
                 hidden_reasoning=load_texts(
                     reasoning,
@@ -283,29 +284,18 @@ def load_composite(
 
 
 def load_unavailable(
-    labels: JSON,
+    samples: list[JSON],
     *,
     path: str,
 ) -> tuple[Unavailable, ...]:
-    """Read the samples that got no answer from labels that dump_evidence wrote, as unavailable
-    causes; labels stored without them have none.
-    """
-    match labels:
-        case {"unavailable": list(samples)}:
-            return tuple(
-                load_unavailable_sample(
-                    sample,
-                    path=f"{path}.unavailable[{index}]",
-                )
-                for index, sample in enumerate(samples)
-            )
-        case {"unavailable": _}:
-            raise FormatError(
-                path=f"{path}.unavailable",
-                expected="a list of unavailable causes",
-            )
-        case _:
-            return ()
+    """Read the samples that got no answer, which dump_evidence wrote as unavailable causes."""
+    return tuple(
+        load_unavailable_sample(
+            sample,
+            path=f"{path}[{index}]",
+        )
+        for index, sample in enumerate(samples)
+    )
 
 
 def load_unavailable_sample(

@@ -28,6 +28,7 @@ def dump_event(event: Event) -> JSON:
                 "kind": "tool_observation",
                 "call_id": event.call_id,
                 "is_error": event.is_error,
+                "author": event.author.value,
                 "source": event.source,
                 "parts": dump_parts(event.parts),
             }
@@ -127,12 +128,17 @@ def load_event(
             "kind": "tool_observation",
             "call_id": str(call_id),
             "is_error": bool(is_error),
+            "author": str(author),
             "source": str() | None as source,
             "parts": list(parts),
         }:
             return ToolObservation(
                 call_id=call_id,
                 is_error=is_error,
+                author=load_author(
+                    author,
+                    path=f"{path}.author",
+                ),
                 source=source,
                 parts=load_parts(
                     parts,

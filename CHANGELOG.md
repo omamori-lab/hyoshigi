@@ -41,6 +41,12 @@ minor version.
   at once, as with a refusal, and a trajectory stores it as a `rejected`
   cause, which 0.1.0 cannot read. A model function of one's own can return
   it.
+- `Trajectory.record` keeps a control protocol's decision, a `Run`,
+  `Replace`, `Block`, `Audit` or `Halt` with the `Proposal`s it weighed and
+  its position, in `Trajectory.records`, and adds to the history what the
+  decision ran or blocked. A blocked action joins the history with the
+  reason as the monitor's error for each of its tool calls, so
+  `ToolObservation` takes an `author`, `TOOL` by default.
 
 ### Changed
 
@@ -62,9 +68,14 @@ minor version.
   still fails the rating closed, with its cause even after an unanswered
   sample or call.
 - `Labels.unavailable` keeps a guard's unanswered samples, which
-  `Trajectory.dump` writes and `load` reads; a dump written without them
-  loads with none. 0.1.0 cannot read a stored mean of the calls that
-  answered.
+  `Trajectory.dump` writes and `load` reads. 0.1.0 cannot read a stored mean
+  of the calls that answered.
+- The stored trajectory format is version 2, which holds the records, each
+  tool observation's author and every label's unanswered samples, and `load`
+  reads only version 2. A version-1 file raises `FormatError`: rebuild the
+  trajectory, from the run or with a version that reads the file, and dump it
+  again. A seeded `CalibratedMonitor` keys its draw on the stored history, so
+  its draw for a history that holds a tool observation changes.
 - A `Composite` fails closed by the same rule, a part that is itself a
   composite counting by the cause it failed closed with, and `failed_closed`
   and the cause on a span or a report follow it.

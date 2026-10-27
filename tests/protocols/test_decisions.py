@@ -34,7 +34,6 @@ NO_REASON = "reason must be a non-empty string"
 SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted one None"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "fields", "message"),
     [
@@ -160,7 +159,7 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
                 "proposals": (PROPOSED_READ,),
                 "position": 0,
             },
-            NO_REASON,
+            "reason must be a str, got an instance of int",
             id="halt-with-a-number-as-the-reason",
         ),
         pytest.param(

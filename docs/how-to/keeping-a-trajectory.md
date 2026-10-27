@@ -177,7 +177,7 @@ With an `AsyncMonitor`, the loop awaits `monitor.rate`.
 
 ## A recorded action needs ids that are new
 
-`act` appends an action the scaffold let run. An action's `id` is a random UUID unless the caller
+`act` appends an action the agent took. An action's `id` is a random UUID unless the caller
 gives one, and the model gives each tool call its `id`. A rating names an action by its id, a result
 names a call by its id, and a subagent hangs under a call's id, so each id stands for one action or
 one call. An action id already recorded, a tool call id an earlier call used, and two calls with one
@@ -232,7 +232,7 @@ author decide how the monitor reads it:
 |---|---|---|
 | The user's message | `USER` | The task |
 | The delegator's instruction, in a subagent's trajectory | `DELEGATOR` | The task |
-| A `ToolObservation` | `TOOL` | A tool result, an error, or a subagent report |
+| A `ToolObservation` | `TOOL` by default | A tool result, an error, or a subagent report |
 | Any other `Observation` | `AGENT`, `TOOL`, `SCAFFOLD`, `MONITOR` or `UNKNOWN` | A context note |
 
 Only the user, or the delegator inside a subagent's trajectory, authorises what the agent does
@@ -388,10 +388,11 @@ delegation.
 ## A trajectory round-trips through JSON
 
 `dump` returns the trajectory, its ratings and its subagents as JSON-compatible data, and `load`
-rebuilds a trajectory from it. The data is an object with five keys: `format`, the text
-`"hyoshigi.trajectory"`; `version`, the number 1; `history`, one object for each entry, whose `kind`
-is `action`, `observation` or `tool_observation`; `ratings`, each an `action_id` and a `score`; and
-`subagents`, the dump of each subagent under its call id. Media bytes are written in base64.
+rebuilds a trajectory from it. The data is an object with six keys: `format`, the text
+`"hyoshigi.trajectory"`; `version`, the number 2; `history`, one object for each entry, whose `kind`
+is `action`, `observation` or `tool_observation`; `ratings`, each an `action_id` and a `score`;
+`records`, each a control protocol's decision with the proposals it weighed; and `subagents`, the
+dump of each subagent under its call id. Media bytes are written in base64.
 
 ```python
 import json
@@ -408,8 +409,8 @@ print(list(loaded.subagents))
 ```
 
 ```text
-['format', 'version', 'history', 'ratings', 'subagents']
-{"kind": "tool_observation", "call_id": "call-1", "is_error": false, "source": null, "parts": [{"kind": "text", "text": "ran"}]}
+['format', 'version', 'history', 'ratings', 'records', 'subagents']
+{"kind": "tool_observation", "call_id": "call-1", "is_error": false, "author": "tool", "source": null, "parts": [{"kind": "text", "text": "ran"}]}
 {"action_id": "rename", "score": {"value": 0.1, "explanation": "The rename is what the user asked for.", "evidence": {"kind": "rationale", "model": "scripted", "hidden_reasoning": []}}}
 True
 True
@@ -429,7 +430,7 @@ unknown_action = json.loads(text)
 unknown_action["ratings"][0]["action_id"] = "missing"
 wrong_version = {
     **data,
-    "version": 2,
+    "version": 3,
 }
 for tampered in (
     wrong_version,
@@ -442,7 +443,7 @@ for tampered in (
 ```
 
 ```text
-$: expected a hyoshigi.trajectory, format version 1
+$: expected a hyoshigi.trajectory, format version 2
 $.ratings[0].action_id: expected the id of an action in the history
 ```
 

@@ -434,7 +434,6 @@ def pass_through_json_text(data: JSON) -> JSON:
     return json.loads(json.dumps(data))
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "transport",
     [

@@ -22,13 +22,13 @@ order they happened, as its event stream [@wang2025openhands, sec. 2.1].
 
 ## The trajectory only grows
 
-A trajectory grows through `act`, `observe`, `delegate` and `attach`, and has
-no method that removes or replaces an entry. `history` returns a tuple, and
-actions and observations are frozen dataclasses, so an entry stays as it was
-recorded. The history is all of the run's past data, the most that can be
-known about the past from within it, and it grows with every step
-[@sutton2018reinforcement, sec. 17.3]. A monitor holds configuration only and
-keeps nothing between calls, so the trajectory is all that it knows of the
+A trajectory grows through `act`, `observe`, `delegate`, `attach` and
+`record`, and has no method that removes or replaces an entry. `history`
+returns a tuple, and actions and observations are frozen dataclasses, so an
+entry stays as it was recorded. The history is all of the run's past data, the
+most that can be known about the past from within it, and it grows with every
+step [@sutton2018reinforcement, sec. 17.3]. A monitor holds configuration only
+and keeps nothing between calls, so the trajectory is all that it knows of the
 run. Agent frameworks keep the same kind of record. The OpenHands Software
 Agent SDK appends every interaction to a log as an immutable event
 [@wang2025openhandssdk, sec. 4.2]. Anthropic's Managed Agents harness writes
@@ -59,7 +59,8 @@ messages, tools return results, and another agent can delegate the task. A
 scaffold can pass the monitor's feedback to the agent, or a summary of earlier
 turns by the agent's own model. `Author` names each writer: `USER`, `DELEGATOR`,
 `AGENT`, `TOOL`, `SCAFFOLD`, `MONITOR` and `UNKNOWN`. A `ToolObservation` is
-always by `TOOL`.
+by `TOOL` unless another author is given, as `record` gives `MONITOR` to the
+reason for a blocked call.
 
 The author decides what an observation can authorise. Under the default
 prompt, only the user, or the delegator inside a subagent's trajectory,
