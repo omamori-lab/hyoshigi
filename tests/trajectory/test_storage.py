@@ -490,6 +490,14 @@ TASK_CALL: dict[str, JSON] = {
 }
 
 
+class CallersRejected(Rejected):
+    """A caller's own kind of rejection."""
+
+
+class CallersUnavailable(Unavailable):
+    """A caller's own kind of unavailable outcome."""
+
+
 @pytest.fixture
 def trajectory() -> Trajectory:
     trajectory = Trajectory()
@@ -1055,6 +1063,51 @@ def test_a_rating_dumps_to_the_stored_format(
         {
             "action_id": "a1",
             "score": stored,
+        },
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("cause", "stored"),
+    [
+        (
+            CallersRejected(status=400),
+            {
+                "kind": "rejected",
+                "status": 400,
+            },
+        ),
+        (
+            CallersUnavailable(status=503),
+            {
+                "kind": "unavailable",
+                "status": 503,
+            },
+        ),
+    ],
+    ids=["rejected", "unavailable"],
+)
+def test_a_subclass_of_a_cause_dumps_as_the_kind_it_subclasses(
+    trajectory: Trajectory,
+    cause: Rejected | Unavailable,
+    stored: dict[str, JSON],
+) -> None:
+    score, stored_score = build_failed_closed_case(
+        cause,
+        stored,
+    )
+    trajectory.attach(
+        score,
+        to=READ_FILE,
+    )
+
+    dumped = trajectory.dump()
+
+    assert dumped.get("ratings") == [
+        {
+            "action_id": "a1",
+            "score": stored_score,
         },
     ]
 
