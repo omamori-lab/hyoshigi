@@ -387,7 +387,9 @@ delegate takes the id of a tool call in this trajectory
 ```
 
 [Choosing what a monitor reads](choosing-what-a-monitor-reads.md) shows what each view reads of a
-delegation.
+delegation. A subagent's trajectory stays in its delegator's run: `BlockAndFeedBack`, given either,
+counts every block in the run in one total
+([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
 
 ## A trajectory round-trips through JSON
 
@@ -459,8 +461,10 @@ A stored trajectory, or the transcript of a finished turn, can end in the action
 `split_latest_step` returns a `Step`, a named tuple of a new trajectory of everything before the
 latest action, and that action. The new trajectory keeps the ratings and subagents of the earlier
 actions and the records whose position is before the latest action, and shares the subagents'
-trajectories. The trajectory it was split from is unchanged. When the latest entry is not an action,
-`split_latest_step` raises `ConfigurationError`.
+trajectories. The trajectory it was split from is unchanged. A new trajectory split from a
+subagent's takes the subagent's place in its run, and the run's total of blocks counted from it
+leaves out the latest step's records. When the latest entry is not an action, `split_latest_step`
+raises `ConfigurationError`.
 
 `rate_latest_step(trajectory)` splits the trajectory and rates the action against the part before
 it. Every monitor has it, and an `AsyncMonitor` has it as a coroutine function. [Reading an agent's
