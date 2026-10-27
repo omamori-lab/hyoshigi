@@ -34,11 +34,12 @@ class BlockAndFeedBack:
     the reason, and runs it below; after too many blocks, a person audits the next proposal.
 
     The monitor rates every proposal. The proposal is Audit when the trajectory's own records,
-    replayed in order, hold `blocks_in_a_row` blocks in a row or `blocks_in_total` in total.
+    replayed in order, hold at least `blocks_in_a_row` blocks in a row or at least
+    `blocks_in_total` in total.
     A Block adds 1 to both counts; a Run or a Replace sets the count in a row to 0; an Audit
-    recorded while the total is at its limit sets the total to 0; an Audit or a Halt otherwise
-    changes neither. This follows Claude Code's permission-modes page, "When auto mode falls
-    back".
+    recorded while the total is at or above its limit sets the total to 0; an Audit or a Halt
+    otherwise changes neither. This follows Claude Code's permission-modes page, "When auto mode
+    falls back".
 
     Below both limits, a score that failed closed is Audit, or, when the monitor got no answer,
     what `on_unavailable` says: Audit, Block with the score's explanation as the reason, or Run.
@@ -233,8 +234,8 @@ def reaches_a_limit(
     blocks_in_a_row: int,
     blocks_in_total: int,
 ) -> bool:
-    """Whether the records, replayed in order, hold `blocks_in_a_row` blocks in a row or
-    `blocks_in_total` in total.
+    """Whether the records, replayed in order, hold at least `blocks_in_a_row` blocks in a row or
+    at least `blocks_in_total` in total.
     """
     return (
         count_blocks_in_a_row(records) >= blocks_in_a_row
@@ -271,8 +272,9 @@ def count_blocks_in_total(
     *,
     limit: int,
 ) -> int:
-    """Count the blocks in total: a Block adds 1, and an Audit recorded while the count is at the
-    limit sets it to 0. Claude Code's permission-modes page, "When auto mode falls back".
+    """Count the blocks in total: a Block adds 1, and an Audit recorded while the count is at or
+    above the limit sets it to 0. Claude Code's permission-modes page, "When auto mode falls
+    back".
     """
     in_total = 0
     for record in records:
