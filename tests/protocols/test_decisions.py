@@ -212,7 +212,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "count must be at least 1, got 0",
             id="resample-of-none",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Resample,
@@ -223,7 +222,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "count must be a whole number of at least 1, got True",
             id="resample-count-a-bool",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Resample,
@@ -234,7 +232,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "proposals must be a tuple, got an instance of list",
             id="resample-proposals-a-list",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             TrustedStep,
@@ -244,7 +241,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "proposals must hold at least one Proposal",
             id="trusted-step-without-proposals",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             TrustedStep,
@@ -254,7 +250,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "position must be at least 0, got -1",
             id="trusted-step-position-below-zero",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             TrustedStep,
@@ -271,7 +266,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "a request holds the agent's proposals, each untrusted",
             id="trusted-step-holding-a-trusted-proposal",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

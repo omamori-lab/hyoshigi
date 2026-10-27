@@ -78,6 +78,22 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ## Protocols
 
+::: hyoshigi.DeferToResample
+
+::: hyoshigi.AsyncDeferToResample
+
+::: hyoshigi.BlockAndFeedBack
+
+::: hyoshigi.AsyncBlockAndFeedBack
+
+::: hyoshigi.FailureResponse
+
+::: hyoshigi.ProtocolRequest
+
+::: hyoshigi.Resample
+
+::: hyoshigi.TrustedStep
+
 ::: hyoshigi.ProtocolDecision
 
 ::: hyoshigi.Run

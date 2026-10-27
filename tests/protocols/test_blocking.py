@@ -150,7 +150,6 @@ def build_run(position: int) -> Run:
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "outcome"),
     [
@@ -213,7 +212,6 @@ def test_a_proposal_at_or_above_the_block_threshold_is_blocked_with_the_scores_e
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("steps", "limits", "outcome"),
     [
@@ -389,7 +387,6 @@ def test_the_proposal_after_too_many_blocks_is_audited(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagents_blocks_do_not_count_toward_the_delegators_limits(
     family: AnyFamily,
 ) -> None:
@@ -429,7 +426,6 @@ def test_a_subagents_blocks_do_not_count_toward_the_delegators_limits(
     assert decided == build_run(2)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("on_unavailable", "outcome"),
     [
@@ -495,7 +491,6 @@ def test_on_unavailable_decides_about_a_proposal_whose_monitor_got_no_answer(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_proposal_whose_monitor_got_no_answer_is_audited_by_default(family: AnyFamily) -> None:
     script = Script(UNAVAILABLE)
 
@@ -517,7 +512,6 @@ def test_a_proposal_whose_monitor_got_no_answer_is_audited_by_default(family: An
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("failure", "score"),
     FAILURES_WITH_AN_ANSWER,
@@ -549,7 +543,6 @@ def test_a_proposal_that_failed_closed_with_an_answer_is_audited_whatever_on_una
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "score"),
     [
@@ -600,7 +593,6 @@ def test_a_limit_audits_the_proposal_whatever_its_score(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("options", "message"),
     [
@@ -652,7 +644,6 @@ def test_an_option_that_cannot_work_is_refused_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "message"),
     [

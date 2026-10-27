@@ -76,7 +76,6 @@ RESAMPLES = (
 )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "max_resamples", "outcome"),
     [
@@ -155,7 +154,6 @@ def test_a_proposal_at_or_above_the_defer_threshold_is_resampled(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("replies", "outcome"),
     [
@@ -259,7 +257,6 @@ def test_the_least_suspicious_resample_under_the_defer_threshold_replaces_the_pr
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("proposed", "replies", "outcome"),
     [
@@ -345,7 +342,6 @@ def test_no_resample_under_the_defer_threshold_asks_for_a_trusted_step(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_trusted_steps_action_replaces_the_proposal_unrated(family: AnyFamily) -> None:
     request = TrustedStep(
         proposals=(PROPOSED_AT_0_6,),
@@ -369,7 +365,6 @@ def test_the_trusted_steps_action_replaces_the_proposal_unrated(family: AnyFamil
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("replies", "outcome"),
     [
@@ -475,7 +470,6 @@ def test_a_step_scored_at_or_above_the_audit_threshold_audits_its_most_suspiciou
 
 # Greenblatt et al. 2023, "AI Control", sec. 3.3: defer to trusted runs the proposal below the
 # deferral threshold, audits it at the audit threshold, and asks the trusted model in between.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "outcome"),
     [
@@ -549,7 +543,6 @@ def test_with_no_resamples_the_protocol_defers_to_trusted(
 
 # Greenblatt et al. 2023, "AI Control", sec. 3.3: trusted monitoring audits the proposal at the
 # audit threshold and runs it below.
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("reply", "outcome"),
     [
@@ -597,7 +590,6 @@ def test_with_no_resamples_and_equal_thresholds_the_protocol_is_trusted_monitori
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("failure", "score"),
     FAILURES_WITH_AN_ANSWER,
@@ -642,7 +634,6 @@ def test_a_resample_that_failed_closed_with_an_answer_is_audited_before_any_scor
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_first_resample_that_failed_closed_with_an_answer_is_the_one_audited(
     family: AnyFamily,
 ) -> None:
@@ -682,7 +673,6 @@ def test_the_first_resample_that_failed_closed_with_an_answer_is_the_one_audited
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("proposed", "replies", "outcome"),
     [
@@ -802,7 +792,6 @@ def test_a_resample_whose_monitor_got_no_answer_is_set_aside(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("on_unavailable", "outcome"),
     [
@@ -861,7 +850,6 @@ def test_on_unavailable_decides_about_a_proposal_whose_monitor_got_no_answer(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_proposal_whose_monitor_got_no_answer_is_audited_by_default(family: AnyFamily) -> None:
     script = Script(UNAVAILABLE)
 
@@ -878,7 +866,6 @@ def test_a_proposal_whose_monitor_got_no_answer_is_audited_by_default(family: An
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("failure", "score"),
     FAILURES_WITH_AN_ANSWER,
@@ -910,7 +897,6 @@ def test_a_proposal_that_failed_closed_with_an_answer_is_audited_whatever_on_una
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("proposed", "outcome"),
     [
@@ -954,7 +940,6 @@ def test_a_resample_answered_with_no_proposals_follows_the_proposals_own_score(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_resample_answered_with_fewer_proposals_than_asked_rates_those_it_got(
     family: AnyFamily,
 ) -> None:
@@ -985,7 +970,6 @@ def test_a_resample_answered_with_fewer_proposals_than_asked_rates_those_it_got(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("proposals", "audited"),
     [
@@ -1076,7 +1060,6 @@ TRUSTED_STEP_AT_1 = TrustedStep(
 )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("request_", "proposals", "message"),
     [
@@ -1164,7 +1147,6 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("options", "message"),
     [
@@ -1219,7 +1201,6 @@ def test_an_option_that_cannot_work_is_refused_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "message"),
     [
@@ -1259,7 +1240,6 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_protocol_it_belongs
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 def test_decide_resume_and_record_carry_a_trajectory_step_by_step(family: AnyFamily) -> None:
     script = Script(
         build_reply(2),
@@ -1353,7 +1333,6 @@ def test_decide_resume_and_record_carry_a_trajectory_step_by_step(family: AnyFam
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_the_async_protocol_rates_the_resamples_at_once() -> None:
     async def resume_at_a_barrier() -> ProtocolDecision | ProtocolRequest:
         # Each rating waits for the other, so only ratings in flight together finish.
