@@ -30,8 +30,14 @@ jobs:
           persist-credentials: false
 
       # mkdocs-bibtex formats citations with Pandoc, and refuses one older than 2.11.
+      # A pinned Pandoc release from GitHub, checked against the SHA-256 on its release
+      # page, so the install depends on neither Ubuntu's mirror nor the runner image.
       - name: Install Pandoc
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends pandoc
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/pandoc.tar.gz" https://github.com/jgm/pandoc/releases/download/3.13/pandoc-3.13-linux-amd64.tar.gz
+          echo "38aa33b325a2bc96a4c39409631212db55702f564250bcdbead180b3bf646389  $RUNNER_TEMP/pandoc.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/pandoc.tar.gz" -C "$RUNNER_TEMP" pandoc-3.13/bin/pandoc
+          echo "$RUNNER_TEMP/pandoc-3.13/bin" >> "$GITHUB_PATH"
 
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
