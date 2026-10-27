@@ -46,7 +46,9 @@ minor version.
   its position, in `Trajectory.records`, and adds to the history what the
   decision ran or blocked. A blocked action joins the history with the
   reason as the monitor's error for each of its tool calls, so
-  `ToolObservation` takes an `author`, `TOOL` by default.
+  `ToolObservation` takes an `author`, `TOOL` by default. A monitor reads
+  another author in the element, as `<tool_error call_id="call-1"
+  author="monitor">`.
 
 ### Changed
 
