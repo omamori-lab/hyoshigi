@@ -13,7 +13,7 @@ from hyoshigi.trajectory.formats.media import read_data_url
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, MediaPart, OpaquePart, Part, TextPart
-from hyoshigi.trajectory.storage import decode_data
+from hyoshigi.trajectory.storage.events import decode_data
 
 # input_audio's formats as media types; audio/mpeg is RFC 3003's.
 _AUDIO_TYPES = {

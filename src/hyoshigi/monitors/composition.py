@@ -30,7 +30,7 @@ from hyoshigi.options import (
     read_threshold,
 )
 from hyoshigi.trajectory.history import Action, Event, Observation
-from hyoshigi.trajectory.storage import dump_event
+from hyoshigi.trajectory.storage.events import dump_event
 from hyoshigi.trajectory.trajectory import Trajectory
 
 

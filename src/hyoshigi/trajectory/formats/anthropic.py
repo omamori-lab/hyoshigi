@@ -13,7 +13,7 @@ from hyoshigi.trajectory.formats.media import build_media
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, MediaPart, OpaquePart, Part, TextPart
-from hyoshigi.trajectory.storage import decode_data
+from hyoshigi.trajectory.storage.events import decode_data
 
 _CONTENT = "a string or a list of content blocks"
 
