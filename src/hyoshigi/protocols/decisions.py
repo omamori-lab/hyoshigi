@@ -28,8 +28,9 @@ class Policy(StrEnum):
 class Proposal:
     """An action a protocol weighed, its score, and the policy that wrote it.
 
-    An untrusted proposal has a SuspicionScore. A trusted step is not rated, so its score is
-    None. Anything else raises ConfigurationError.
+    The action is an Action and the policy a Policy. An untrusted proposal has a
+    SuspicionScore; a trusted step is not rated, so its score is None. Anything else raises
+    ConfigurationError.
     """
 
     action: Action
@@ -37,6 +38,16 @@ class Proposal:
     policy: Policy
 
     def __post_init__(self) -> None:
+        check_instance(
+            self.action,
+            expected=Action,
+            name="action",
+        )
+        check_instance(
+            self.policy,
+            expected=Policy,
+            name="policy",
+        )
         match self.policy, self.score:
             case (
                 Policy.UNTRUSTED,
@@ -103,8 +114,8 @@ class Block:
     """Nothing runs, and the agent is told the reason.
 
     The action is one of the proposals the protocol weighed, at least one, the reason is a
-    non-empty string, and the position is the length of the history when it decided, a whole
-    number of at least 0; anything else raises ConfigurationError.
+    string, and the position is the length of the history when it decided, a whole number of
+    at least 0; anything else raises ConfigurationError.
     """
 
     action: Action
@@ -145,9 +156,9 @@ class Audit:
 class Halt:
     """The run stops.
 
-    The proposals are those the protocol weighed, at least one, the reason is a non-empty
-    string, and the position is the length of the history when it decided, a whole number of
-    at least 0; anything else raises ConfigurationError.
+    The proposals are those the protocol weighed, at least one, the reason is a string, and
+    the position is the length of the history when it decided, a whole number of at least 0;
+    anything else raises ConfigurationError.
     """
 
     reason: str
@@ -163,7 +174,7 @@ type ProtocolDecision = Run | Replace | Block | Audit | Halt
 
 def check_decision(decision: ProtocolDecision) -> None:
     """Raise ConfigurationError unless the decision weighed a tuple of at least one Proposal, at a
-    position of at least 0, its action is one of theirs and its reason is not empty; set its
+    position of at least 0, its action is one of theirs and its reason is a string; set its
     position as an int.
     """
     check_proposals(decision.proposals)
@@ -191,9 +202,17 @@ def check_decision(decision: ProtocolDecision) -> None:
                 action,
                 proposals=decision.proposals,
             )
-            check_reason(reason)
+            check_instance(
+                reason,
+                expected=str,
+                name="reason",
+            )
         case Halt(reason=reason):
-            check_reason(reason)
+            check_instance(
+                reason,
+                expected=str,
+                name="reason",
+            )
         case unreachable:
             assert_never(unreachable)
 
@@ -212,7 +231,7 @@ def check_proposals(proposals: tuple[Proposal, ...]) -> None:
             name=f"proposals[{index}]",
         )
     if not proposals:
-        raise ConfigurationError("a decision weighs at least one proposal")
+        raise ConfigurationError("proposals must hold at least one Proposal")
 
 
 def check_proposed(
@@ -223,14 +242,3 @@ def check_proposed(
     """Raise ConfigurationError unless the action is the action of one of the proposals."""
     if action not in [proposal.action for proposal in proposals]:
         raise ConfigurationError("the action must be the action of one of the proposals")
-
-
-def check_reason(reason: str) -> None:
-    """Raise ConfigurationError unless the reason is a string of at least one character."""
-    check_instance(
-        reason,
-        expected=str,
-        name="reason",
-    )
-    if not reason:
-        raise ConfigurationError("reason must be a non-empty string")

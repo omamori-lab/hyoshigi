@@ -424,10 +424,11 @@ True
 attribute and its message give where the first problem is and what was expected there, and never the
 value found, which can hold an agent's private content. A different `format` or `version`, a missing
 key or a value of another shape, an author that is not one of the seven, a rating of an action that
-is not in the history, a record at a position past the end of the history or whose `proposal` names
-none of its proposals, a repeated action id or call id, a subagent under a call that is not in the
-history, and composite scores or subagents nested more than 32 levels deep all raise it. Keys that
-`dump` does not write are ignored.
+is not in the history, a record at a position past the end of the history, whose `proposal` names
+none of its proposals, or that runs, replaces or blocks an action not at its position in the
+history, a repeated action id or call id, a subagent under a call that is not in the history, and
+composite scores or subagents nested more than 32 levels deep all raise it. Keys that `dump` does
+not write are ignored.
 
 ```python
 unknown_action = json.loads(text)

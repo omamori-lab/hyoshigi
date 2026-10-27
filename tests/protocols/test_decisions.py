@@ -68,7 +68,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "proposals must hold at least one Proposal",
             id="no-proposals",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Run,
@@ -160,7 +159,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "action must be an Action, got an instance of str",
             id="action-an-id",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Proposal,
@@ -171,7 +169,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             "policy must be a Policy, got an instance of str",
             id="policy-a-string",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Proposal,
@@ -206,7 +203,6 @@ def test_a_value_that_cannot_work_raises_naming_the_problem(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "fields"),
     [
