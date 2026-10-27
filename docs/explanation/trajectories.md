@@ -67,7 +67,9 @@ prompt, only the user, or the delegator inside a subagent's trajectory,
 authorises what the agent does, as
 [What the default prompt asks](the-default-prompt.md) sets out. A monitor
 reads an observation by the user or the delegator as the task, and a
-`ToolObservation` under the tags for tool output. Any other observation is a
+`ToolObservation` under the tags for tool output, which name its author when
+it is not the tool, as in `<tool_error call_id="call-1" author="monitor">`.
+Any other observation is a
 `<context_note>` that names its author, which a view shows once it adds
 `Channel.CONTEXT`. `delegate` starts a subagent's trajectory whose first
 observation is the instruction, by `DELEGATOR`.

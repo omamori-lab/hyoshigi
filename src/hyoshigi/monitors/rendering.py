@@ -309,7 +309,8 @@ def _render_tool_observation(
     delegations: set[str],
     perceives: MediaTypes,
 ) -> _Entry:
-    """Render a tool's result as an error, a subagent's report or a plain result.
+    """Render a tool's result as an error, a subagent's report or a plain result, with an author
+    attribute when its author is not the tool.
 
     A tool error is on the tool calls' channel, so a view that shows a call shows that it
     failed or did not run, even when the call delegated to a subagent.
@@ -326,6 +327,7 @@ def _render_tool_observation(
         tag=tag,
         perceives=perceives,
         call_id=observation.call_id,
+        author=None if observation.author is Author.TOOL else observation.author.value,
     )
 
 

@@ -17,7 +17,7 @@ channels a monitor reads of the history:
 | Channel | What it holds | `View()` |
 |---|---|---|
 | `TASK` | Observations by the user, or by the delegator inside a subagent's trajectory | read |
-| `TOOL_CALLS` | Tool calls and tool errors; with `CONTEXT` left out, also the opaque parts of an observation whose author is unknown | read |
+| `TOOL_CALLS` | Tool calls and tool errors, a monitor's reason for blocking a call among them; with `CONTEXT` left out, also the opaque parts of an observation whose author is unknown | read |
 | `SUBAGENT_REPORTS` | Results of calls recorded with `Trajectory.delegate`, or of tools named in `View.delegation_tools` | read |
 | `CONTEXT` | Every other observation, as a context note: system and developer messages, summaries of earlier turns, the monitor's feedback, user-role messages that `marked` leaves unmarked | left out |
 | `THOUGHTS` | Each action's thought | left out |

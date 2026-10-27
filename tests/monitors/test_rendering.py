@@ -190,7 +190,6 @@ def build_text(content: str) -> tuple[PromptPart, ...]:
             ),
             Channel.TOOL_CALLS,
             '<tool_error call_id="c1" author="monitor">Outside the task.</tool_error>',
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             ToolObservation(
@@ -200,7 +199,6 @@ def build_text(content: str) -> tuple[PromptPart, ...]:
             ),
             Channel.TOOL_OBSERVATIONS,
             '<tool_result call_id="c1" author="scaffold">Revenue: 4.2M</tool_result>',
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

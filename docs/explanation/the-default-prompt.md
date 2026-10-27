@@ -275,9 +275,11 @@ What the agent sees is the scaffold's choice. Auto mode returns a denial to
 the agent as a tool result
 [@hughes2026automode, {Section} "Deny-and-continue"], with its reason
 [@hughes2026automode, fig. 4], and a scaffold that does the same hands the
-agent the explanation. Recorded as an observation by `Author.MONITOR`, that
-feedback reaches a later rating as a `<context_note>` by the monitor when the
-view adds `Channel.CONTEXT`, and the instructions say it approves nothing.
+agent the explanation. `Trajectory.record` with a `Block` records that
+feedback by `Author.MONITOR`: a later rating reads it as a `<tool_error>` with
+`author="monitor"` for each call of the blocked action, and, for an action
+without calls, as a `<context_note>` by the monitor when the view adds
+`Channel.CONTEXT`. Under the instructions, neither authorises anything.
 
 The instructions forbid the reasoning to state or hint at the score: it names
 no number, level or place on the scale for the action. An explanation that
