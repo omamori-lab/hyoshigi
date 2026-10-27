@@ -24,8 +24,7 @@ minor version.
   and any other settings raise `ConfigurationError` when the protocol is
   built. `Trajectory.record` adds a `Flag`'s action and its score to the
   history, as for `Run`, and a `Flag` ends a run of blocks. The stored
-  records gain the kind `flag`, with the format version still 2; 0.3.0
-  cannot read a file that holds a flag.
+  records gain the kind `flag`; 0.3.0 cannot read a file that holds a flag.
 
 ### Changed
 
