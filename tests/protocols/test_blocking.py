@@ -435,7 +435,197 @@ def test_a_proposal_is_audited_only_once_the_blocks_reach_a_limit(
     assert decided == outcome
 
 
-def test_a_subagents_blocks_do_not_count_toward_the_delegators_limits(
+INSTRUCTION = "Find the q3 revenue"
+DELEGATING = Action(
+    id="delegating",
+    tool_calls=(
+        ToolCall(
+            id="call_1",
+            name="delegate",
+            arguments='{"task": "Find the q3 revenue"}',
+        ),
+    ),
+)
+DELEGATING_PROPOSALS = (
+    build_proposal(
+        DELEGATING,
+        build_score(
+            0.8,
+            REASON,
+        ),
+    ),
+)
+NINETEEN_BLOCKS = tuple(BLOCK(f"b{number}") for number in range(19))
+# The audit of the calm proposal of action s2, the latest of audited_run's subagent, decided again
+# on the trajectory before it.
+REDECIDED = Audit(
+    action=build_action("s2"),
+    proposals=(
+        build_proposal(
+            build_action("s2"),
+            build_score(0.2),
+        ),
+    ),
+    position=3,
+)
+
+
+def start_subagent(trajectory: Trajectory) -> Trajectory:
+    """Act DELEGATING, and return the trajectory of the subagent its call delegates."""
+    trajectory.act(DELEGATING)
+    return trajectory.delegate(
+        INSTRUCTION,
+        call_id="call_1",
+    )
+
+
+@pytest.fixture
+def audited_run() -> Trajectory:
+    """A delegator that blocked once, then delegated a subagent that blocked once and had its next
+    action audited and run.
+    """
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        (BLOCK("a1"),),
+    )
+    subagent = start_subagent(trajectory)
+    record_steps(
+        subagent,
+        (
+            BLOCK("s1"),
+            AUDIT("s2"),
+            RUN("s2"),
+        ),
+    )
+    return trajectory
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_subagent_counts_its_delegators_blocks_in_its_total(family: AnyFamily) -> None:
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        NINETEEN_BLOCKS,
+    )
+    subagent = start_subagent(trajectory)
+    record_steps(
+        subagent,
+        (BLOCK("s1"),),
+    )
+    script = Script(build_reply(9))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=subagent,
+    )
+
+    assert decided == Audit(
+        action=PROPOSED,
+        proposals=(
+            build_proposal(
+                PROPOSED,
+                build_score(0.9),
+            ),
+        ),
+        position=3,
+    )
+
+
+@pytest.mark.parametrize(
+    ("limits", "outcome"),
+    [
+        pytest.param(
+            {"blocks_in_total": 3},
+            build_audit(2),
+            id="in-total",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {},
+            build_run(2),
+            id="not-in-a-row",
+        ),
+    ],
+)
+def test_a_delegator_counts_its_subagents_blocks_in_its_total_only(
+    family: AnyFamily,
+    limits: dict[str, int],
+    outcome: ProtocolDecision,
+) -> None:
+    trajectory = build_trajectory()
+    subagent = start_subagent(trajectory)
+    record_steps(
+        subagent,
+        (
+            BLOCK("s1"),
+            BLOCK("s2"),
+            BLOCK("s3"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=trajectory,
+        **limits,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("deciding", "position"),
+    [
+        pytest.param(
+            lambda root: root,
+            4,
+            id="the-root",
+        ),
+        pytest.param(
+            lambda root: root.subagents["call_1"].subagents["call_1"],
+            3,
+            id="the-deepest-subagent",
+        ),
+    ],
+)
+def test_the_total_counts_the_blocks_of_subagents_nested_two_levels_deep(
+    family: AnyFamily,
+    deciding: Callable[[Trajectory], Trajectory],
+    position: int,
+) -> None:
+    root = build_trajectory()
+    record_steps(
+        root,
+        (BLOCK("r1"),),
+    )
+    subagent = start_subagent(root)
+    record_steps(
+        subagent,
+        (BLOCK("s1"),),
+    )
+    nested = start_subagent(subagent)
+    record_steps(
+        nested,
+        (BLOCK("n1"),),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=deciding(root),
+        blocks_in_total=3,
+    )
+
+    assert decided == build_audit(position)
+
+
+@pytest.mark.xfail(strict=True)
+def test_subagents_of_one_action_are_counted_in_the_order_they_were_delegated(
     family: AnyFamily,
 ) -> None:
     trajectory = build_trajectory()
@@ -446,21 +636,135 @@ def test_a_subagents_blocks_do_not_count_toward_the_delegators_limits(
                 ToolCall(
                     id="call_1",
                     name="delegate",
+                    arguments='{"task": "Find the q4 revenue"}',
+                ),
+                ToolCall(
+                    id="call_2",
+                    name="delegate",
                     arguments='{"task": "Find the q3 revenue"}',
                 ),
             ),
         ),
     )
+    first = trajectory.delegate(
+        INSTRUCTION,
+        call_id="call_2",
+    )
+    record_steps(
+        first,
+        (
+            BLOCK("f1"),
+            AUDIT("f2"),
+        ),
+    )
+    second = trajectory.delegate(
+        "Find the q4 revenue",
+        call_id="call_1",
+    )
+    record_steps(
+        second,
+        (BLOCK("s1"),),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == build_audit(2)
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("before", "after", "outcome"),
+    [
+        pytest.param(
+            (),
+            (BLOCK("a2"),),
+            build_audit(4),
+            id="a-subagents-audit-below-the-limit-leaves-the-total",
+        ),
+        pytest.param(
+            (BLOCK("a1"),),
+            (BLOCK("a3"),),
+            build_run(6),
+            id="a-subagents-audit-at-the-limit-resets-the-total",
+        ),
+    ],
+)
+def test_the_reset_applies_over_the_merged_order_of_the_records(
+    family: AnyFamily,
+    before: tuple[Step, ...],
+    after: tuple[Step, ...],
+    outcome: ProtocolDecision,
+) -> None:
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        before,
+    )
+    subagent = start_subagent(trajectory)
+    record_steps(
+        subagent,
+        (
+            BLOCK("s1"),
+            AUDIT("s2"),
+        ),
+    )
+    record_steps(
+        trajectory,
+        after,
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_subagents_records_follow_the_records_at_the_position_of_the_action_that_delegated_it(
+    family: AnyFamily,
+) -> None:
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        (
+            BLOCK("a1"),
+            BLOCK("a2"),
+        ),
+    )
+    trajectory.record(
+        Audit(
+            action=DELEGATING,
+            proposals=DELEGATING_PROPOSALS,
+            position=5,
+        ),
+    )
+    trajectory.record(
+        Run(
+            action=DELEGATING,
+            proposals=DELEGATING_PROPOSALS,
+            position=5,
+        ),
+    )
     subagent = trajectory.delegate(
-        "Find the q3 revenue",
+        INSTRUCTION,
         call_id="call_1",
     )
     record_steps(
         subagent,
         (
-            BLOCK("a1"),
-            BLOCK("a2"),
-            BLOCK("a3"),
+            BLOCK("s1"),
+            BLOCK("s2"),
         ),
     )
     script = Script(build_reply(2))
@@ -469,9 +773,47 @@ def test_a_subagents_blocks_do_not_count_toward_the_delegators_limits(
         script,
         proposed=PROPOSED,
         trajectory=trajectory,
+        blocks_in_total=2,
     )
 
-    assert decided == build_run(2)
+    assert decided == build_audit(6)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
+    family: AnyFamily,
+    audited_run: Trajectory,
+) -> None:
+    step = audited_run.subagents["call_1"].split_latest_step()
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=step.action,
+        trajectory=step.trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == REDECIDED
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_run_loaded_from_a_dump_counts_as_it_did_before_it_was_dumped(
+    family: AnyFamily,
+    audited_run: Trajectory,
+) -> None:
+    loaded = Trajectory.load(audited_run.dump())
+    step = loaded.subagents["call_1"].split_latest_step()
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=step.action,
+        trajectory=step.trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == REDECIDED
 
 
 @pytest.mark.parametrize(
