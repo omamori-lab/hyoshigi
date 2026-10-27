@@ -78,7 +78,8 @@ monitor rates each action while it is not yet in the trajectory. A score under t
 threshold lets the action run: the scaffold records it with `act`, attaches the score with `attach`,
 runs its tools and records each result with `observe`. A score at the threshold blocks the action.
 This loop records only the monitor's feedback, as an observation, so the blocked action stays out of
-the trajectory. Recorded with `record` and a `Block`, a blocked action joins the history instead,
+the trajectory. Recorded with `record` and a `Block` from a
+[control protocol](running-a-control-protocol.md), a blocked action joins the history instead,
 followed by the monitor's error observation for each of its tool calls, or by one observation by the
 monitor when it made none, and it gets no rating. The comparison with a threshold is the scaffold's
 own code. A score that failed closed has the value 1.0, so `score.value >= threshold` blocks it

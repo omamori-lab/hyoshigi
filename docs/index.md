@@ -2,8 +2,9 @@
 
 hyoshigi rates each action an AI agent proposes against the trajectory it would join, before the
 action runs, and returns a suspicion score from 0 to 1. The library holds the trajectory, the models
-a monitor asks and the monitors. The control protocol that acts on a score, to audit an action or
-defer it to a trusted model [@greenblatt2023aicontrol, secs. 3.2, 3.3], is the caller's own.
+a monitor asks, the monitors and the control protocols that decide from the scores whether an action
+runs, is audited or is deferred to a trusted model [@greenblatt2023aicontrol, secs. 3.2, 3.3]. The
+program running the agent enforces each decision ([Running a control protocol](how-to/running-a-control-protocol.md)).
 
 The check follows security practice and AI control. A reference monitor validates each reference a
 program makes before it is granted [@anderson1972planning, sec. 4.1.1, p. 22]. In AI control, a
