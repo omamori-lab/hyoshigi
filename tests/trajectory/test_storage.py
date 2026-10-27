@@ -2657,6 +2657,18 @@ PROPOSAL_EXPECTED = (
             "history",
             id="run-of-an-action-not-at-its-position",
         ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "records": [
+                    STORED_RUN,
+                    STORED_RUN,
+                ],
+            },
+            "$.records[1]: expected a record at or after what the records before it added to "
+            "the history",
+            id="a-run-recorded-twice",
+        ),
     ],
 )
 def test_a_format_error_for_a_record_says_what_was_expected(
@@ -2687,6 +2699,72 @@ def test_a_document_of_another_version_raises_naming_the_version_load_reads() ->
 def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
     payload = build_proposal_payload(score=nest_score(32))
 
+    loaded = Trajectory.load(payload)
+
+    assert loaded.dump() == payload
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    STORED_DELETE_FILE,
+                    {
+                        **TOOL_OBSERVATION,
+                        "call_id": "call_2",
+                        "is_error": True,
+                        "author": "monitor",
+                    },
+                ],
+                "records": [
+                    {
+                        **STORED_RUN,
+                        "kind": "block",
+                        "reason": REASON,
+                    },
+                    {
+                        **STORED_RUN,
+                        "kind": "audit",
+                        "position": 2,
+                    },
+                ],
+            },
+            id="after-a-block-of-an-action-with-a-tool-call",
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    STORED_SUMMARISE,
+                    {
+                        **OBSERVATION,
+                        "author": "monitor",
+                    },
+                ],
+                "records": [
+                    {
+                        "kind": "block",
+                        "proposal": 0,
+                        "reason": REASON,
+                        "proposals": [STORED_PROPOSED_SUMMARY],
+                        "position": 0,
+                    },
+                    {
+                        **STORED_HALT,
+                        "position": 2,
+                    },
+                ],
+            },
+            id="after-a-block-of-an-action-without-tool-calls",
+        ),
+    ],
+)
+def test_a_record_right_after_a_blocks_feedback_loads_back_unchanged(
+    payload: dict[str, JSON],
+) -> None:
     loaded = Trajectory.load(payload)
 
     assert loaded.dump() == payload
