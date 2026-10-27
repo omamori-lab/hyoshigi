@@ -278,6 +278,8 @@ class Trajectory:
         record only. A decision that is not one of the five, a position that is not the length
         of the history, and an action act refuses raise ConfigurationError, and nothing is
         recorded.
+
+        <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
         """
         if not isinstance(
             decision,

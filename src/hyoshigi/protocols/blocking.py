@@ -49,6 +49,8 @@ class BlockAndFeedBack:
     at least 1, kept as ints; `monitor` is a Monitor; `on_unavailable` is a FailureResponse
     other than TRUSTED_STEP, since this protocol never asks for proposals. Anything else raises
     ConfigurationError when the protocol is built.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """
 
     monitor: Monitor

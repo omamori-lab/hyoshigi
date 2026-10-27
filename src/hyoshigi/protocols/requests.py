@@ -16,6 +16,8 @@ class FailureResponse(StrEnum):
 
     AUDIT holds it for a person, BLOCK blocks it with the score's explanation as the reason,
     TRUSTED_STEP asks for an action from the trusted model, and RUN runs it unrated.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """
 
     AUDIT = "audit"
