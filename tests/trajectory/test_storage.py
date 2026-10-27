@@ -2524,6 +2524,15 @@ PROPOSAL_EXPECTED = (
             "$.records[0].proposals[0].action: expected an action",
             id="action-an-observation",
         ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [ACTION],
+            },
+            "$.records[0]: expected a run, replace or block of the action at its position in the "
+            "history",
+            id="run-of-an-action-not-at-its-position",
+        ),
     ],
 )
 def test_a_format_error_for_a_record_says_what_was_expected(

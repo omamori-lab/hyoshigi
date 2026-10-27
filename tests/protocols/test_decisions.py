@@ -131,6 +131,17 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             id="audit-of-an-action-not-proposed",
         ),
         pytest.param(
+            Block,
+            {
+                "action": READ,
+                "reason": 5,
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            "reason must be a str, got an instance of int",
+            id="block-with-a-number-as-the-reason",
+        ),
+        pytest.param(
             Halt,
             {
                 "reason": 5,
