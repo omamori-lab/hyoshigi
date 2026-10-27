@@ -3,6 +3,7 @@ the step.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import NamedTuple, assert_never
 
 from hyoshigi.concurrency import Plan, drive, drive_concurrently
@@ -28,6 +29,13 @@ from hyoshigi.protocols.requests import (
 )
 from hyoshigi.trajectory.history import Action
 from hyoshigi.trajectory.trajectory import Trajectory
+
+
+class Resampling(StrEnum):
+    """How a protocol draws the resamples of a suspicious step."""
+
+    SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
 
 
 @dataclass(
@@ -73,6 +81,7 @@ class DeferToResample:
     audit_threshold: float
     max_resamples: int
     on_unavailable: FailureResponse = FailureResponse.AUDIT
+    resampling: Resampling = Resampling.SEQUENTIAL
 
     def __post_init__(self) -> None:
         check_instance(
@@ -153,6 +162,7 @@ class AsyncDeferToResample:
     audit_threshold: float
     max_resamples: int
     on_unavailable: FailureResponse = FailureResponse.AUDIT
+    resampling: Resampling = Resampling.SEQUENTIAL
 
     def __post_init__(self) -> None:
         check_instance(
