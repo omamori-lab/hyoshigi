@@ -501,7 +501,6 @@ def audited_run() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagent_counts_its_delegators_blocks_in_its_total(family: AnyFamily) -> None:
     trajectory = build_trajectory()
     record_steps(
@@ -540,7 +539,6 @@ def test_a_subagent_counts_its_delegators_blocks_in_its_total(family: AnyFamily)
             {"blocks_in_total": 3},
             build_audit(2),
             id="in-total",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {},
@@ -576,7 +574,6 @@ def test_a_delegator_counts_its_subagents_blocks_in_its_total_only(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("deciding", "position"),
     [
@@ -624,7 +621,6 @@ def test_the_total_counts_the_blocks_of_subagents_nested_two_levels_deep(
     assert decided == build_audit(position)
 
 
-@pytest.mark.xfail(strict=True)
 def test_subagents_of_one_action_are_counted_in_the_order_they_were_delegated(
     family: AnyFamily,
 ) -> None:
@@ -677,7 +673,6 @@ def test_subagents_of_one_action_are_counted_in_the_order_they_were_delegated(
     assert decided == build_audit(2)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("before", "after", "outcome"),
     [
@@ -730,7 +725,6 @@ def test_the_reset_applies_over_the_merged_order_of_the_records(
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagents_records_follow_the_records_at_the_position_of_the_action_that_delegated_it(
     family: AnyFamily,
 ) -> None:
@@ -779,7 +773,6 @@ def test_a_subagents_records_follow_the_records_at_the_position_of_the_action_th
     assert decided == build_audit(6)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
     family: AnyFamily,
     audited_run: Trajectory,
@@ -797,7 +790,6 @@ def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
     assert decided == REDECIDED
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_run_loaded_from_a_dump_counts_as_it_did_before_it_was_dumped(
     family: AnyFamily,
     audited_run: Trajectory,

@@ -49,6 +49,14 @@ minor version.
   `max_resamples` proposals without reading the request's `count` raises
   `ConfigurationError`, and `resume` can return another `Resample`.
   `resampling=Resampling.PARALLEL` keeps the requests of 0.3.0.
+- `BlockAndFeedBack` and `AsyncBlockAndFeedBack` count `blocks_in_total`
+  over the whole run: every record of the delegation tree, merged from its
+  root, so a subagent and its delegator count the same total. The trajectory
+  that `split_latest_step` returns for a subagent counts in the subagent's
+  place. The count in a row still reads the trajectory's own records. In
+  0.3.0 each trajectory counted only its own blocks, so an agent could stay
+  under the total by delegating. This is a breaking change for a run with
+  subagents, which can now reach `Audit` where 0.3.0 ran.
 
 ## [0.3.0] - 2026-10-27
 

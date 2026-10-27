@@ -649,16 +649,19 @@ Flag {"command": "cat q3.md"}
 `record` puts the reason in the history as the monitor's error for each of the action's tool calls,
 so the agent reads it as the answer to its call. After `blocks_in_a_row` blocks in a row, 3 by
 default, or `blocks_in_total` in total, 20 by default, the next proposal is `Audit` whatever its
-score. The protocol counts from its trajectory's own records:
+score. The protocol counts from the records:
 
 - a `Block` adds 1 to both counts;
 - a `Run`, a `Flag` or a `Replace` ends a run of blocks, and so does a person's approval after an
   audit, recorded as a `Run`;
 - the `Audit` that the total's own limit caused resets the total.
 
-A subagent's trajectory has its own records, so a subagent keeps its own counts. Here three blocks
-send the fourth proposal to a person, who approves it. The fifth proposal's rating gets no answer,
-so `on_unavailable`, `AUDIT` by default, holds it for the person too:
+The count in a row reads the trajectory's own records. The total reads every record in the run,
+its subagents' included, merged from the root of the delegation tree, so a subagent and its
+delegator count the same total
+([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
+Here three blocks send the fourth proposal to a person, who approves it. The fifth proposal's
+rating gets no answer, so `on_unavailable`, `AUDIT` by default, holds it for the person too:
 
 ```python
 from hyoshigi import BlockAndFeedBack

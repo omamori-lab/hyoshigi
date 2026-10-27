@@ -136,9 +136,23 @@ or a `Replace` ends a run of blocks, and the `Audit` that the total's own limit 
 total.
 The proposal that reaches a limit is blocked like any other, and its reason fed back to the agent;
 the agent's next proposal is `Audit`, whatever its score. A person's approval is a `Run` recorded
-after the `Audit`, so it ends the run of blocks too. The protocol replays the counts from its
-trajectory's records at each decision, since it holds no state between calls. A subagent's
-trajectory has its own records, so a subagent's blocks count towards its own limits.
+after the `Audit`, so it ends the run of blocks too. The protocol replays the counts from the
+records at each decision, since it holds no state between calls.
+
+The total counts every block in the run, its subagents' included. A total counted from each
+trajectory alone would let an agent stay under auto mode's 20 denials
+[@hughes2026automode, {Section} "Deny-and-continue"] by delegating: each subagent would start from
+zero, and its delegator would never count the subagent's blocks. The count in a row stays a run of
+one agent's attempts, read from its trajectory's own records.
+
+The total replays the records of the delegation tree from its root. A trajectory's records go in
+order, and each subagent's records, merged in the same way, follow the records whose position is at
+or before that of the action that delegated it. Subagents go in the order of those positions, and
+the subagents of one action in the order they were delegated. The reset applies over this merged
+order, so a subagent and its delegator count the same total. The order depends on the tree alone,
+which `Trajectory.dump` stores and `Trajectory.load` rebuilds. The earlier trajectory that
+`split_latest_step` returns for a subagent takes the subagent's place in the run, so the total
+leaves out the records of the step it drops.
 
 ## A failure without a verdict goes to a person by default
 

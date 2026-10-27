@@ -59,6 +59,15 @@ class Step(NamedTuple):
     action: Action
 
 
+class Delegation(NamedTuple):
+    """A subagent's place in its run: the trajectory that delegated it, and the delegating call's
+    id.
+    """
+
+    parent: Trajectory
+    call_id: str
+
+
 @dataclass(
     frozen=True,
     slots=True,
@@ -86,6 +95,7 @@ class Trajectory:
         self._ratings: list[Rating] = []
         self._subagents: dict[str, Trajectory] = {}
         self._records: list[ProtocolDecision] = []
+        self._delegation: Delegation | None = None
 
     @classmethod
     def from_run(
@@ -202,10 +212,10 @@ class Trajectory:
     def split_latest_step(self) -> Step:
         """Return the latest action, and a new trajectory of everything before it.
 
-        The new trajectory keeps the ratings and subagents of the earlier actions, and the
-        records whose position is before the latest action's; it shares the subagents'
-        trajectories, and this trajectory is unchanged. A trajectory whose latest entry is not
-        an action raises ConfigurationError.
+        The new trajectory keeps the ratings and subagents of the earlier actions, the records
+        whose position is before the latest action's, and this trajectory's place in its run; it
+        shares the subagents' trajectories, and this trajectory is unchanged. A trajectory whose
+        latest entry is not an action raises ConfigurationError.
         """
         match self._history:
             case [
@@ -228,6 +238,7 @@ class Trajectory:
                 earlier._records = [
                     record for record in self._records if record.position < len(earlier_history)
                 ]
+                earlier._delegation = self._delegation
                 return Step(
                     trajectory=earlier,
                     action=action,
@@ -390,6 +401,10 @@ class Trajectory:
                 author=Author.DELEGATOR,
                 parts=(TextPart(text=instruction),),
             ),
+        )
+        child._delegation = Delegation(
+            parent=self,
+            call_id=call_id,
         )
         self._subagents[call_id] = child
         return child
@@ -583,11 +598,21 @@ class Trajectory:
                     path=subagent_path,
                     expected=f"subagents nested at most {NESTING_LIMIT} deep",
                 )
-            self._subagents[call_id] = Trajectory._load(
+            subagent = Trajectory._load(
                 data,
                 path=subagent_path,
                 depth=depth + 1,
             )
+            subagent._delegation = Delegation(
+                parent=self,
+                call_id=call_id,
+            )
+            self._subagents[call_id] = subagent
+
+
+def find_delegation(trajectory: Trajectory) -> Delegation | None:
+    """The trajectory's place in its run, or None for a trajectory that no call delegated."""
+    return trajectory._delegation
 
 
 def build_feedback(
