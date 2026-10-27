@@ -6,8 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from hyoshigi.options import check_instance
 from hyoshigi.trajectory.json_data import JSON
-from hyoshigi.trajectory.parts import Author, Part
+from hyoshigi.trajectory.parts import Author, Part, check_parts
 
 
 def _create_action_id() -> str:
@@ -20,11 +21,31 @@ def _create_action_id() -> str:
     kw_only=True,
 )
 class ToolCall:
-    """A tool the agent asks to run, with its arguments as the JSON text the model emitted."""
+    """A tool the agent asks to run, with its arguments as the JSON text the model emitted.
+
+    The id, the name and the arguments are str; anything else raises ConfigurationError.
+    """
 
     id: str
     name: str
     arguments: str
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.id,
+            expected=str,
+            name="id",
+        )
+        check_instance(
+            self.name,
+            expected=str,
+            name="name",
+        )
+        check_instance(
+            self.arguments,
+            expected=str,
+            name="arguments",
+        )
 
 
 @dataclass(
@@ -36,13 +57,41 @@ class Action:
     """What the agent emits in one step: its thought, what it says and the tools it calls.
 
     A thought is an action in language space that changes nothing outside the agent
-    (Yao et al., "ReAct", ICLR 2023, section 2).
+    (Yao et al., "ReAct", ICLR 2023, section 2). The id is a str, the thought and the parts
+    are each a tuple of parts, and the tool calls a tuple of ToolCall; anything else raises
+    ConfigurationError.
     """
 
     id: str = field(default_factory=_create_action_id)
     thought: tuple[Part, ...] = ()
     parts: tuple[Part, ...] = ()
     tool_calls: tuple[ToolCall, ...] = ()
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.id,
+            expected=str,
+            name="id",
+        )
+        check_parts(
+            self.thought,
+            name="thought",
+        )
+        check_parts(
+            self.parts,
+            name="parts",
+        )
+        check_instance(
+            self.tool_calls,
+            expected=tuple,
+            name="tool_calls",
+        )
+        for index, call in enumerate(self.tool_calls):
+            check_instance(
+                call,
+                expected=ToolCall,
+                name=f"tool_calls[{index}]",
+            )
 
     @staticmethod
     def from_anthropic(message: JSON) -> Action:
@@ -93,11 +142,32 @@ class Action:
     kw_only=True,
 )
 class Observation:
-    """Content that reaches the agent, with who wrote it and where it came from."""
+    """Content that reaches the agent, with who wrote it and where it came from.
+
+    The author is an Author, the parts a tuple of parts and the source a str or None;
+    anything else raises ConfigurationError.
+    """
 
     author: Author
     parts: tuple[Part, ...]
     source: str | None = None
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.author,
+            expected=Author,
+            name="author",
+        )
+        check_parts(
+            self.parts,
+            name="parts",
+        )
+        if self.source is not None:
+            check_instance(
+                self.source,
+                expected=str,
+                name="source",
+            )
 
 
 @dataclass(
@@ -108,11 +178,28 @@ class Observation:
 class ToolObservation(Observation):
     """A result answering one of the agent's tool calls, written by the tool unless another
     author is given.
+
+    The author, the parts and the source are those of an Observation, the call id is a str
+    and is_error a bool; anything else raises ConfigurationError.
     """
 
     call_id: str
     is_error: bool = False
     author: Author = Author.TOOL
+
+    def __post_init__(self) -> None:
+        # A slotted dataclass is a new class, so super() without arguments fails on Python 3.12.
+        Observation.__post_init__(self)
+        check_instance(
+            self.call_id,
+            expected=str,
+            name="call_id",
+        )
+        check_instance(
+            self.is_error,
+            expected=bool,
+            name="is_error",
+        )
 
 
 # OpenHands calls actions and observations events (Wang et al., "OpenHands", ICLR 2025,

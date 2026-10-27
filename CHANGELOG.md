@@ -13,6 +13,24 @@ minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- `Action` and `Observation` raise `ConfigurationError` for a list given as
+  `thought`, `parts` or `tool_calls`, where 0.2.0 took one. This is a
+  breaking change: code that builds one from a list passes a tuple instead.
+
+### Fixed
+
+- An action, a tool call, an observation or a part built with a field of the
+  wrong type, such as `ToolObservation(author="monitor", ...)`, failed only
+  later. `Trajectory.dump` and a monitor's rendering raised `AttributeError`
+  or `TypeError`, `dump` raised an `AssertionError` that quoted a part of the
+  wrong type, or `Trajectory.load` refused the stored file. Each raises
+  `ConfigurationError` when built, naming the field and the value's type, and
+  `MediaPart` does so for a `media_type` that is not a string, where it raised
+  `TypeError`. `Trajectory.act` and `observe` raise it for an event of the
+  other kind.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added

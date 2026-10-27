@@ -78,7 +78,6 @@ def test_a_media_type_in_the_iana_grammar_is_accepted(media_type: str) -> None:
     assert part.media_type == media_type
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "fields", "message"),
     [
