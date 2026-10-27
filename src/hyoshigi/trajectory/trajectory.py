@@ -123,7 +123,7 @@ class Trajectory:
             request,
             authorship=authorship,
         ):
-            trajectory._record(
+            trajectory._add_event(
                 event,
                 path=path,
             )
@@ -147,7 +147,7 @@ class Trajectory:
             request,
             authorship=authorship,
         ):
-            trajectory._record(
+            trajectory._add_event(
                 event,
                 path=path,
             )
@@ -170,7 +170,7 @@ class Trajectory:
             request,
             authorship=authorship,
         ):
-            trajectory._record(
+            trajectory._add_event(
                 event,
                 path=path,
             )
@@ -475,7 +475,7 @@ class Trajectory:
     ) -> None:
         for index, data in enumerate(history):
             event_path = f"{path}[{index}]"
-            self._record(
+            self._add_event(
                 load_event(
                     data,
                     path=event_path,
@@ -518,7 +518,7 @@ class Trajectory:
                         expected="a rating with an action id and a score",
                     )
 
-    def _record(
+    def _add_event(
         self,
         event: Event,
         *,
