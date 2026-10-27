@@ -581,7 +581,6 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
                 ),
             ),
             id="run",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Replace(
@@ -603,7 +602,6 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
                 ),
             ),
             id="replace-with-a-resample",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Replace(
@@ -620,7 +618,6 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             ),
             (),
             id="replace-with-a-trusted-step",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Block(
@@ -653,7 +650,6 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             ),
             (),
             id="block-of-an-action-with-two-tool-calls",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Block(
@@ -678,14 +674,12 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             ),
             (),
             id="block-of-an-action-without-tool-calls",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             AUDIT_WRITE,
             (TASK_OBSERVATION,),
             (),
             id="audit",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Halt(
@@ -696,7 +690,6 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             (TASK_OBSERVATION,),
             (),
             id="halt",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -744,7 +737,6 @@ BLOCK_RECORDED_AGAIN = Block(
 STALE = "the decision's position is not the length of the history"
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("decision", "message"),
     [
@@ -781,7 +773,6 @@ def test_recording_a_decision_that_cannot_join_the_trajectory_raises_naming_why(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "decision",
     [
@@ -821,7 +812,6 @@ def test_a_refused_decision_leaves_the_trajectory_unchanged(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_persons_run_after_an_audit_is_recorded_at_the_same_position(
     trajectory: Trajectory,
 ) -> None:
@@ -844,7 +834,6 @@ def test_a_persons_run_after_an_audit_is_recorded_at_the_same_position(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_splitting_the_latest_step_keeps_only_the_records_of_earlier_steps(
     trajectory: Trajectory,
 ) -> None:

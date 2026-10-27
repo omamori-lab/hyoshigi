@@ -76,6 +76,24 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.Unavailable
 
+## Protocols
+
+::: hyoshigi.ProtocolDecision
+
+::: hyoshigi.Run
+
+::: hyoshigi.Replace
+
+::: hyoshigi.Block
+
+::: hyoshigi.Audit
+
+::: hyoshigi.Halt
+
+::: hyoshigi.Proposal
+
+::: hyoshigi.Policy
+
 ## Monitors
 
 ::: hyoshigi.Monitor

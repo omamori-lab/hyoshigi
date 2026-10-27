@@ -291,7 +291,7 @@ CAUSE_IDS = [
 # The stored format, written out by hand: base64 of the bytes 89 50 4E 47 is "iVBORw==".
 STORED: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 1,
+    "version": 2,
     "history": [
         {
             "kind": "observation",
@@ -335,6 +335,7 @@ STORED: dict[str, JSON] = {
             "kind": "tool_observation",
             "call_id": "call_1",
             "is_error": False,
+            "author": "tool",
             "source": None,
             "parts": [
                 {
@@ -362,12 +363,13 @@ STORED: dict[str, JSON] = {
         },
     ],
     "ratings": [],
+    "records": [],
     "subagents": {},
 }
 
 DELEGATING: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 1,
+    "version": 2,
     "history": [
         {
             "kind": "action",
@@ -386,6 +388,7 @@ DELEGATING: dict[str, JSON] = {
             "kind": "tool_observation",
             "call_id": "call_7",
             "is_error": True,
+            "author": "tool",
             "source": "subagent",
             "parts": [
                 {
@@ -405,10 +408,11 @@ DELEGATING: dict[str, JSON] = {
             "score": STORED_READS_THE_FILE,
         },
     ],
+    "records": [],
     "subagents": {
         "call_7": {
             "format": "hyoshigi.trajectory",
-            "version": 1,
+            "version": 2,
             "history": [
                 {
                     "kind": "observation",
@@ -443,6 +447,7 @@ DELEGATING: dict[str, JSON] = {
                     "score": STORED_COMBINED,
                 },
             ],
+            "records": [],
             "subagents": {},
         },
     },
@@ -450,13 +455,15 @@ DELEGATING: dict[str, JSON] = {
 
 ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 1,
+    "version": 2,
     "ratings": [],
+    "records": [],
     "subagents": {},
 }
 UNRATED_ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 1,
+    "version": 2,
+    "records": [],
     "subagents": {},
 }
 ACTION: dict[str, JSON] = {
@@ -476,6 +483,7 @@ TOOL_OBSERVATION: dict[str, JSON] = {
     "kind": "tool_observation",
     "call_id": "call_1",
     "is_error": False,
+    "author": "tool",
     "source": None,
     "parts": [],
 }
@@ -549,7 +557,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         (
             {
                 **ENVELOPE,
-                "version": 2,
+                "version": 3,
                 "history": [],
             },
             "$",
@@ -1149,25 +1157,6 @@ def test_loading_a_stored_rating_restores_the_score(
     )
 
 
-def test_labels_stored_without_samples_that_got_no_answer_load_with_none() -> None:
-    payload = build_evidence_payload(
-        {
-            "kind": "labels",
-            "model": "gpt-oss-safeguard-20b",
-            "labels": ["safe"],
-            "hidden_reasoning": [],
-        },
-    )
-
-    loaded = Trajectory.load(payload)
-
-    assert loaded.ratings[0].score.evidence == Labels(
-        model="gpt-oss-safeguard-20b",
-        labels=("safe",),
-        unavailable=(),
-    )
-
-
 EVIDENCE: dict[str, JSON] = {
     "kind": "rationale",
     "model": "trusted-1",
@@ -1478,6 +1467,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                 {
                     "kind": "labels",
                     "labels": [],
+                    "unavailable": [],
                     "hidden_reasoning": [],
                 },
             ),
@@ -1490,6 +1480,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "kind": "labels",
                     "model": "m",
                     "labels": "unsafe",
+                    "unavailable": [],
                     "hidden_reasoning": [],
                 },
             ),
@@ -1502,6 +1493,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "kind": "labels",
                     "model": "m",
                     "labels": ["unsafe", 5],
+                    "unavailable": [],
                     "hidden_reasoning": [],
                 },
             ),
@@ -1514,6 +1506,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "kind": "labels",
                     "model": "m",
                     "labels": ["unsafe", None],
+                    "unavailable": [],
                     "hidden_reasoning": [],
                 },
             ),
@@ -1526,6 +1519,7 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
                     "kind": "labels",
                     "model": "m",
                     "labels": [],
+                    "unavailable": [],
                     "hidden_reasoning": [5],
                 },
             ),
@@ -1547,7 +1541,6 @@ def build_cause_payload(cause: JSON) -> dict[str, JSON]:
             ),
             EVIDENCE_PATH,
             id="labels-unavailable-not-a-list",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_evidence_payload(
@@ -1733,6 +1726,7 @@ def test_loading_a_malformed_rating_raises_format_error_at_its_path(
                     "kind": "labels",
                     "model": "m",
                     "labels": [5],
+                    "unavailable": [],
                     "hidden_reasoning": [],
                 },
             ),
@@ -1953,7 +1947,6 @@ STORED_PROPOSED_SUMMARY: dict[str, JSON] = {
 REASON = "Deleting q3.csv is outside the task."
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("decision", "stored"),
     [
@@ -2071,14 +2064,12 @@ STORED_HALT: dict[str, JSON] = {
 }
 RECORD_PATH = "$.records[0]"
 PROPOSAL_PATH = "$.records[0].proposals[0]"
-EXPECTED_TO_FAIL = pytest.mark.xfail(strict=True)
 
 
 def build_record_payload(record: JSON) -> dict[str, JSON]:
     """A stored trajectory of one action, with the record."""
     return {
         **ENVELOPE,
-        "version": 2,
         "history": [ACTION],
         "records": [record],
     }
@@ -2112,7 +2103,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$",
             id="version-1",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             {
@@ -2137,7 +2127,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             build_record_payload("run"),
             RECORD_PATH,
             id="record-not-a-mapping",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2148,7 +2137,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="unknown-kind",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2160,7 +2148,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="kind-missing",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2172,7 +2159,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="position-missing",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2183,7 +2169,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="position-a-bool",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2194,7 +2179,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="position-text",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2205,7 +2189,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].position",
             id="position-below-zero",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2216,7 +2199,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].position",
             id="position-past-the-history",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2227,7 +2209,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="proposals-not-a-list",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2238,7 +2219,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="no-proposals",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2249,7 +2229,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             PROPOSAL_PATH,
             id="proposal-not-a-mapping",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2265,43 +2244,36 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             PROPOSAL_PATH,
             id="proposal-without-a-policy",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(policy="monitor"),
             PROPOSAL_PATH,
             id="unknown-policy",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(action=OBSERVATION),
             "$.records[0].proposals[0].action",
             id="action-an-observation",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(action={"kind": "action"}),
             "$.records[0].proposals[0].action",
             id="action-malformed",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(score={"value": 1.0}),
             "$.records[0].proposals[0].score",
             id="score-malformed",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(score=None),
             PROPOSAL_PATH,
             id="untrusted-proposal-without-a-score",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_proposal_payload(policy="trusted"),
             PROPOSAL_PATH,
             id="trusted-proposal-with-a-score",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2313,7 +2285,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].proposal",
             id="proposal-index-missing",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2324,7 +2295,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].proposal",
             id="proposal-index-past-the-proposals",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2335,7 +2305,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].proposal",
             id="proposal-index-below-zero",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2346,7 +2315,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             "$.records[0].proposal",
             id="proposal-index-a-bool",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2357,7 +2325,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="block-without-a-reason",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2369,7 +2336,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="block-with-an-empty-reason",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_record_payload(
@@ -2380,7 +2346,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="halt-reason-not-text",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             {
@@ -2406,7 +2371,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.subagents['call_7'].records[0].position",
             id="subagent-record-past-its-history",
-            marks=EXPECTED_TO_FAIL,
         ),
         pytest.param(
             build_evidence_payload(
@@ -2419,7 +2383,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             EVIDENCE_PATH,
             id="labels-without-unavailable",
-            marks=EXPECTED_TO_FAIL,
         ),
     ],
 )

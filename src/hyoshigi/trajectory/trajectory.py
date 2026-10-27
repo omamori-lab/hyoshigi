@@ -10,18 +10,27 @@ from typing import NamedTuple, Self, assert_never
 
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.monitors.score import SuspicionScore
-from hyoshigi.options import check_instance
-from hyoshigi.protocols.decisions import ProtocolDecision
+from hyoshigi.options import check_instance, describe_type
+from hyoshigi.protocols.decisions import (
+    Audit,
+    Block,
+    Halt,
+    Proposal,
+    ProtocolDecision,
+    Replace,
+    Run,
+)
 from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
-from hyoshigi.trajectory.history import Action, Event, Observation
+from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.storage.events import dump_event, load_event
+from hyoshigi.trajectory.storage.records import dump_record, load_record
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score, load_score
 
 FORMAT = "hyoshigi.trajectory"
-VERSION = 1
+VERSION = 2
 _NAME_ESCAPES = {
     **{code: f"\\u{code:04x}" for code in range(0x20)},
     **{code: f"\\u{code:04x}" for code in range(0xD800, 0xE000)},
@@ -184,15 +193,18 @@ class Trajectory:
 
     @property
     def records(self) -> tuple[ProtocolDecision, ...]:
-        """The control protocol's decisions, in the order they were recorded."""
+        """The control protocol's decisions on this trajectory's steps, in the order they were
+        recorded.
+        """
         return tuple(self._records)
 
     def split_latest_step(self) -> Step:
         """Return the latest action, and a new trajectory of everything before it.
 
-        The new trajectory keeps the ratings and subagents of the earlier actions, and shares
-        the subagents' trajectories; this trajectory is unchanged. A trajectory whose latest
-        entry is not an action raises ConfigurationError.
+        The new trajectory keeps the ratings and subagents of the earlier actions, and the
+        records whose position is before the latest action's; it shares the subagents'
+        trajectories, and this trajectory is unchanged. A trajectory whose latest entry is not
+        an action raises ConfigurationError.
         """
         match self._history:
             case [
@@ -212,6 +224,9 @@ class Trajectory:
                     for call_id, child in self._subagents.items()
                     if call_id not in call_ids
                 }
+                earlier._records = [
+                    record for record in self._records if record.position < len(earlier_history)
+                ]
                 return Step(
                     trajectory=earlier,
                     action=action,
@@ -254,13 +269,69 @@ class Trajectory:
         self,
         decision: ProtocolDecision,
     ) -> None:
-        """Record a control protocol's decision. A stub: it records nothing yet."""
+        """Record a control protocol's decision, and add to the history what it ran or blocked.
+
+        A Run or a Replace adds its action, as act does, and attaches the score of the first
+        proposal of that action, unless that proposal is a trusted step. A Block adds its
+        action, then the reason, written by the monitor: an error answering each of the action's
+        tool calls, in order, or one observation when it made none. An Audit or a Halt adds the
+        record only. A decision that is not one of the five, a position that is not the length
+        of the history, and an action act refuses raise ConfigurationError, and nothing is
+        recorded.
+        """
+        if not isinstance(
+            decision,
+            Run | Replace | Block | Audit | Halt,
+        ):
+            raise ConfigurationError(
+                "decision must be a Run, Replace, Block, Audit or Halt, "
+                f"got {describe_type(decision)}",
+            )
+        if decision.position != len(self._history):
+            raise ConfigurationError("the decision's position is not the length of the history")
+        match decision:
+            case Run(action=action) | Replace(action=action):
+                self._run(
+                    action,
+                    proposals=decision.proposals,
+                )
+            case Block(
+                action=action,
+                reason=reason,
+            ):
+                self.act(action)
+                self._history.extend(
+                    build_feedback(
+                        action,
+                        reason=reason,
+                    ),
+                )
+            case Audit() | Halt():
+                pass
+            case unreachable:
+                assert_never(unreachable)
+        self._records.append(decision)
+
+    def _run(
+        self,
+        action: Action,
+        *,
+        proposals: tuple[Proposal, ...],
+    ) -> None:
+        """Act the action, and attach the score of its first proposal, if that has one."""
+        self.act(action)
+        score = next(proposal.score for proposal in proposals if proposal.action == action)
+        if score is not None:
+            self.attach(
+                score,
+                to=action,
+            )
 
     def act(
         self,
         action: Action,
     ) -> None:
-        """Record an action the decision allowed.
+        """Record an action the agent took.
 
         The action's id and each of its tool calls' ids must be new to the
         trajectory; otherwise nothing is recorded.
@@ -309,7 +380,9 @@ class Trajectory:
         return child
 
     def dump(self) -> dict[str, JSON]:
-        """Return the trajectory, its ratings and its subagents' as JSON-compatible data."""
+        """Return the trajectory, its ratings, its records and its subagents' as JSON-compatible
+        data.
+        """
         subagents: dict[str, JSON] = {
             call_id: child.dump() for call_id, child in self._subagents.items()
         }
@@ -324,6 +397,7 @@ class Trajectory:
                 }
                 for rating in self._ratings
             ],
+            "records": [dump_record(decision) for decision in self._records],
             "subagents": subagents,
         }
 
@@ -358,6 +432,7 @@ class Trajectory:
                 "version": int(version),
                 "history": list(history),
                 "ratings": list(ratings),
+                "records": list(records),
                 "subagents": dict(subagents),
             } if version == VERSION and not isinstance(
                 version,
@@ -372,6 +447,14 @@ class Trajectory:
                     ratings,
                     path=f"{path}.ratings",
                 )
+                trajectory._records = [
+                    load_record(
+                        record,
+                        path=f"{path}.records[{index}]",
+                        length=len(trajectory._history),
+                    )
+                    for index, record in enumerate(records)
+                ]
                 trajectory._load_subagents(
                     subagents,
                     path=f"{path}.subagents",
@@ -493,6 +576,31 @@ class Trajectory:
                 path=subagent_path,
                 depth=depth + 1,
             )
+
+
+def build_feedback(
+    action: Action,
+    *,
+    reason: str,
+) -> list[Observation]:
+    """The monitor's reason for blocking an action: an error answering each of its tool calls, in
+    order, or one observation when it made none.
+    """
+    parts = (TextPart(text=reason),)
+    return [
+        ToolObservation(
+            call_id=call.id,
+            is_error=True,
+            author=Author.MONITOR,
+            parts=parts,
+        )
+        for call in action.tool_calls
+    ] or [
+        Observation(
+            author=Author.MONITOR,
+            parts=parts,
+        ),
+    ]
 
 
 def select_member(
