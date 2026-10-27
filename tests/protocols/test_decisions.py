@@ -30,7 +30,6 @@ PROPOSED_READ = Proposal(
 )
 REASON = "The write is outside the task."
 NOT_PROPOSED = "the action must be the action of one of the proposals"
-NO_REASON = "reason must be a non-empty string"
 SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted one None"
 
 
@@ -67,8 +66,9 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
                 "proposals": (),
                 "position": 0,
             },
-            "a decision weighs at least one proposal",
+            "proposals must hold at least one Proposal",
             id="no-proposals",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Run,
@@ -132,27 +132,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             id="audit-of-an-action-not-proposed",
         ),
         pytest.param(
-            Block,
-            {
-                "action": READ,
-                "reason": "",
-                "proposals": (PROPOSED_READ,),
-                "position": 0,
-            },
-            NO_REASON,
-            id="block-with-an-empty-reason",
-        ),
-        pytest.param(
-            Halt,
-            {
-                "reason": "",
-                "proposals": (PROPOSED_READ,),
-                "position": 0,
-            },
-            NO_REASON,
-            id="halt-with-an-empty-reason",
-        ),
-        pytest.param(
             Halt,
             {
                 "reason": 5,
@@ -171,6 +150,28 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             SCORED_BY_POLICY,
             id="untrusted-without-a-score",
+        ),
+        pytest.param(
+            Proposal,
+            {
+                "action": "a1",
+                "score": READS_THE_FILE,
+                "policy": Policy.UNTRUSTED,
+            },
+            "action must be an Action, got an instance of str",
+            id="action-an-id",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Proposal,
+            {
+                "action": READ,
+                "score": None,
+                "policy": "trusted",
+            },
+            "policy must be a Policy, got an instance of str",
+            id="policy-a-string",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Proposal,
@@ -203,3 +204,37 @@ def test_a_value_that_cannot_work_raises_naming_the_problem(
         kind(**fields)
 
     assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("kind", "fields"),
+    [
+        pytest.param(
+            Block,
+            {
+                "action": READ,
+                "reason": "",
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            id="block",
+        ),
+        pytest.param(
+            Halt,
+            {
+                "reason": "",
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            id="halt",
+        ),
+    ],
+)
+def test_a_decision_with_a_reason_may_give_an_empty_one(
+    kind: type,
+    fields: dict[str, object],
+) -> None:
+    decision = kind(**fields)
+
+    assert decision.reason == ""

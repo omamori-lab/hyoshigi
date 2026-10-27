@@ -2072,7 +2072,7 @@ STORED_RUN: dict[str, JSON] = {
     "kind": "run",
     "proposal": 0,
     "proposals": [STORED_PROPOSED_DELETE],
-    "position": 1,
+    "position": 0,
 }
 STORED_HALT: dict[str, JSON] = {
     "kind": "halt",
@@ -2085,10 +2085,10 @@ PROPOSAL_PATH = "$.records[0].proposals[0]"
 
 
 def build_record_payload(record: JSON) -> dict[str, JSON]:
-    """A stored trajectory of one action, with the record."""
+    """A stored trajectory of the action STORED_RUN runs, with the record."""
     return {
         **ENVELOPE,
-        "history": [ACTION],
+        "history": [STORED_DELETE_FILE],
         "records": [record],
     }
 
@@ -2357,15 +2357,43 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             id="block-without-a-reason",
         ),
         pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "history": [
+                    ACTION,
+                    STORED_DELETE_FILE,
+                ],
+            },
+            RECORD_PATH,
+            id="run-of-an-action-not-at-its-position",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
             build_record_payload(
                 {
                     **STORED_RUN,
-                    "kind": "block",
-                    "reason": "",
+                    "kind": "replace",
+                    "position": 1,
                 },
             ),
             RECORD_PATH,
-            id="block-with-an-empty-reason",
+            id="replace-with-no-entry-at-its-position",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **build_record_payload(
+                    {
+                        **STORED_RUN,
+                        "kind": "block",
+                        "reason": REASON,
+                    },
+                ),
+                "history": [ACTION],
+            },
+            RECORD_PATH,
+            id="block-of-an-action-not-at-its-position",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
