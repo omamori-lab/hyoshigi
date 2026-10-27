@@ -53,8 +53,8 @@ class DeferToResample:
     otherwise the step is a TrustedStep request. Bhatt et al. 2025, "Ctrl-Z", sec. 3.2.
 
     A TrustedStep answered with one action is Replace with it, unrated, and with none is Audit
-    of the most suspicious of the agent's proposals, the first of a tie. Every decision holds
-    the proposals weighed, in the order they were rated, and the length of the history.
+    of the most suspicious remaining proposal, the first of a tie. Every decision holds the
+    proposals weighed, in the order they were rated, and the length of the history.
 
     With `max_resamples` at 0 this is defer to trusted, and with equal thresholds as well,
     trusted monitoring (Greenblatt et al. 2023, "AI Control", sec. 3.3).
@@ -354,15 +354,18 @@ def decide_on_failure(
     """Decide about the agent's proposal when its score failed closed: what `on_unavailable` says
     when the monitor got no answer, and Audit for any other cause.
     """
-    match find_cause(score):
-        case Unavailable() if protocol.on_unavailable is FailureResponse.TRUSTED_STEP:
+    match find_cause(score), protocol.on_unavailable:
+        case Unavailable(), FailureResponse.TRUSTED_STEP:
             return TrustedStep(
                 proposals=(proposal,),
                 position=position,
             )
-        case Unavailable():
+        case (
+            Unavailable(),
+            FailureResponse.AUDIT | FailureResponse.BLOCK | FailureResponse.RUN as response,
+        ):
             return decide_on_unavailable(
-                protocol.on_unavailable,
+                response,
                 proposal=proposal,
                 reason=score.explanation,
                 position=position,
@@ -436,6 +439,24 @@ def list_untrusted(proposals: tuple[Proposal, ...]) -> list[RatedProposal]:
     ]
 
 
+def list_remaining(proposals: tuple[Proposal, ...]) -> list[RatedProposal]:
+    """The agent's proposals the step's score is taken over, in order: the first, the proposed
+    action, and each resample whose monitor got an answer.
+    """
+    proposed, *resamples = list_untrusted(proposals)
+    return [
+        proposed,
+        *(
+            rated
+            for rated in resamples
+            if not isinstance(
+                find_cause(rated.score),
+                Unavailable,
+            )
+        ),
+    ]
+
+
 def read_suspicion(rated: RatedProposal) -> float:
     """The suspicion of a rated proposal."""
     return rated.score.value
@@ -458,9 +479,8 @@ def weigh_step(
     first of a tie each time; otherwise the step is a TrustedStep request. Bhatt et al. 2025,
     "Ctrl-Z", sec. 3.2.
     """
-    untrusted = list_untrusted(proposals)
     failed = next(
-        (rated for rated in untrusted if has_failed_with_an_answer(rated.score)),
+        (rated for rated in list_untrusted(proposals) if has_failed_with_an_answer(rated.score)),
         None,
     )
     if failed is not None:
@@ -469,11 +489,7 @@ def weigh_step(
             proposals=proposals,
             position=position,
         )
-    proposed, *resamples = untrusted
-    remaining = [
-        proposed,
-        *(rated for rated in resamples if not rated.score.failed_closed),
-    ]
+    remaining = list_remaining(proposals)
     least = min(
         remaining,
         key=read_suspicion,
@@ -515,7 +531,7 @@ def decide_on_trusted_step(
     proposals: tuple[Action, ...],
 ) -> Replace | Audit:
     """Replace the proposed action with the trusted model's, which is not rated; with none, audit
-    the most suspicious of the agent's proposals, the first of a tie.
+    the most suspicious remaining proposal, the first of a tie.
     """
     match proposals:
         case (action,):
@@ -533,7 +549,7 @@ def decide_on_trusted_step(
             )
         case _:
             most = max(
-                list_untrusted(request.proposals),
+                list_remaining(request.proposals),
                 key=read_suspicion,
             )
             return Audit(

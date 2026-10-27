@@ -4,6 +4,7 @@ monitor got no answer.
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal, assert_never
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.options import read_count
@@ -14,7 +15,7 @@ class FailureResponse(StrEnum):
     """What a protocol decides about the agent's proposal when its monitor got no answer.
 
     AUDIT holds it for a person, BLOCK blocks it with the score's explanation as the reason,
-    TRUSTED_STEP asks for an action from the trusted model, and RUN runs it.
+    TRUSTED_STEP asks for an action from the trusted model, and RUN runs it unrated.
     """
 
     AUDIT = "audit"
@@ -97,17 +98,23 @@ def check_request(request: ProtocolRequest) -> None:
 
 
 def decide_on_unavailable(
-    response: FailureResponse,
+    response: Literal[FailureResponse.AUDIT, FailureResponse.BLOCK, FailureResponse.RUN],
     *,
     proposal: Proposal,
     reason: str,
     position: int,
 ) -> Run | Block | Audit:
-    """Decide about the agent's proposal when its monitor got no answer: Block with the reason for
-    BLOCK, Run for RUN, and Audit for any other response.
+    """Decide about the agent's proposal when its monitor got no answer: Audit for AUDIT, Block
+    with the reason for BLOCK, and Run for RUN.
     """
     proposals = (proposal,)
     match response:
+        case FailureResponse.AUDIT:
+            return Audit(
+                action=proposal.action,
+                proposals=proposals,
+                position=position,
+            )
         case FailureResponse.BLOCK:
             return Block(
                 action=proposal.action,
@@ -121,9 +128,5 @@ def decide_on_unavailable(
                 proposals=proposals,
                 position=position,
             )
-        case _:
-            return Audit(
-                action=proposal.action,
-                proposals=proposals,
-                position=position,
-            )
+        case unreachable:
+            assert_never(unreachable)

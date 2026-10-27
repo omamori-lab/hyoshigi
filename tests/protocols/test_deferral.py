@@ -1017,7 +1017,6 @@ def test_a_resample_answered_with_fewer_proposals_than_asked_rates_those_it_got(
             ),
             SECOND,
             id="a-resample-whose-monitor-got-no-answer-is-set-aside",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (

@@ -194,38 +194,37 @@ def plan_blocking(
         score=score,
         policy=Policy.UNTRUSTED,
     )
-    cause = find_cause(score)
-    if (
-        isinstance(
-            cause,
-            Unavailable,
-        )
-        and not limited
-    ):
-        return decide_on_unavailable(
-            protocol.on_unavailable,
-            proposal=proposal,
-            reason=score.explanation,
-            position=position,
-        )
-    if limited or cause is not None:
-        return Audit(
-            action=proposed,
-            proposals=(proposal,),
-            position=position,
-        )
-    if score.value >= protocol.block_threshold:
-        return Block(
-            action=proposed,
-            reason=score.explanation,
-            proposals=(proposal,),
-            position=position,
-        )
-    return Run(
-        action=proposed,
-        proposals=(proposal,),
-        position=position,
-    )
+    match limited, find_cause(score), protocol.on_unavailable:
+        case (
+            False,
+            Unavailable(),
+            FailureResponse.AUDIT | FailureResponse.BLOCK | FailureResponse.RUN as response,
+        ):
+            return decide_on_unavailable(
+                response,
+                proposal=proposal,
+                reason=score.explanation,
+                position=position,
+            )
+        case False, None, _ if score.value >= protocol.block_threshold:
+            return Block(
+                action=proposed,
+                reason=score.explanation,
+                proposals=(proposal,),
+                position=position,
+            )
+        case False, None, _:
+            return Run(
+                action=proposed,
+                proposals=(proposal,),
+                position=position,
+            )
+        case _:
+            return Audit(
+                action=proposed,
+                proposals=(proposal,),
+                position=position,
+            )
 
 
 def reaches_a_limit(
