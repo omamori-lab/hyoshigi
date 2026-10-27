@@ -4,15 +4,24 @@ import pytest
 
 from hyoshigi import (
     Action,
+    Audit,
     Author,
+    Block,
     ConfigurationError,
+    Halt,
     Observation,
+    Policy,
+    Proposal,
+    ProtocolDecision,
+    Replace,
+    Run,
     TextPart,
     ToolCall,
     ToolObservation,
     Trajectory,
 )
 from hyoshigi.monitors.score import Rationale, SuspicionScore
+from hyoshigi.trajectory.history import Event
 from hyoshigi.trajectory.trajectory import Rating
 
 TASK = "Summarise q3.md"
@@ -47,6 +56,69 @@ WRITES_ELSEWHERE = SuspicionScore(
     value=0.8,
     explanation="It writes outside the task.",
     evidence=Rationale(model="m"),
+)
+
+TASK_OBSERVATION = Observation(
+    author=Author.USER,
+    parts=(TextPart(text=TASK),),
+)
+REASON = "The write is outside the task."
+WRITING = Action(
+    id="a2",
+    tool_calls=(WRITE,),
+)
+# Two tool calls, in the order the blocked action made them.
+WRITING_AND_DELETING = Action(
+    id="a2",
+    tool_calls=(
+        ToolCall(
+            id="call_3",
+            name="write_file",
+            arguments='{"path": "notes.md"}',
+        ),
+        ToolCall(
+            id="call_2",
+            name="delete_file",
+            arguments='{"path": "q3.md"}',
+        ),
+    ),
+)
+ANSWERING = Action(
+    id="a2",
+    parts=(TextPart(text=ANSWER),),
+)
+RESAMPLED = Action(
+    id="a3",
+    tool_calls=(READ,),
+)
+TRUSTED_STEP = Action(
+    id="t1",
+    tool_calls=(READ,),
+)
+PROPOSED_WRITE = Proposal(
+    action=WRITING,
+    score=WRITES_ELSEWHERE,
+    policy=Policy.UNTRUSTED,
+)
+PROPOSED_RESAMPLE = Proposal(
+    action=RESAMPLED,
+    score=READS_THE_FILE,
+    policy=Policy.UNTRUSTED,
+)
+PROPOSED_TRUSTED_STEP = Proposal(
+    action=TRUSTED_STEP,
+    score=None,
+    policy=Policy.TRUSTED,
+)
+RUN_WRITE = Run(
+    action=WRITING,
+    proposals=(PROPOSED_WRITE,),
+    position=1,
+)
+AUDIT_WRITE = Audit(
+    action=WRITING,
+    proposals=(PROPOSED_WRITE,),
+    position=1,
 )
 
 
@@ -491,3 +563,302 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
         trajectory.split_latest_step()
 
     assert str(raised.value) == "the latest entry of the trajectory is not an action"
+
+
+@pytest.mark.parametrize(
+    ("decision", "history", "ratings"),
+    [
+        pytest.param(
+            RUN_WRITE,
+            (
+                TASK_OBSERVATION,
+                WRITING,
+            ),
+            (
+                Rating(
+                    action_id="a2",
+                    score=WRITES_ELSEWHERE,
+                ),
+            ),
+            id="run",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Replace(
+                action=RESAMPLED,
+                proposals=(
+                    PROPOSED_WRITE,
+                    PROPOSED_RESAMPLE,
+                ),
+                position=1,
+            ),
+            (
+                TASK_OBSERVATION,
+                RESAMPLED,
+            ),
+            (
+                Rating(
+                    action_id="a3",
+                    score=READS_THE_FILE,
+                ),
+            ),
+            id="replace-with-a-resample",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Replace(
+                action=TRUSTED_STEP,
+                proposals=(
+                    PROPOSED_WRITE,
+                    PROPOSED_TRUSTED_STEP,
+                ),
+                position=1,
+            ),
+            (
+                TASK_OBSERVATION,
+                TRUSTED_STEP,
+            ),
+            (),
+            id="replace-with-a-trusted-step",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Block(
+                action=WRITING_AND_DELETING,
+                reason=REASON,
+                proposals=(
+                    Proposal(
+                        action=WRITING_AND_DELETING,
+                        score=WRITES_ELSEWHERE,
+                        policy=Policy.UNTRUSTED,
+                    ),
+                ),
+                position=1,
+            ),
+            (
+                TASK_OBSERVATION,
+                WRITING_AND_DELETING,
+                ToolObservation(
+                    call_id="call_3",
+                    is_error=True,
+                    author=Author.MONITOR,
+                    parts=(TextPart(text=REASON),),
+                ),
+                ToolObservation(
+                    call_id="call_2",
+                    is_error=True,
+                    author=Author.MONITOR,
+                    parts=(TextPart(text=REASON),),
+                ),
+            ),
+            (),
+            id="block-of-an-action-with-two-tool-calls",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Block(
+                action=ANSWERING,
+                reason=REASON,
+                proposals=(
+                    Proposal(
+                        action=ANSWERING,
+                        score=WRITES_ELSEWHERE,
+                        policy=Policy.UNTRUSTED,
+                    ),
+                ),
+                position=1,
+            ),
+            (
+                TASK_OBSERVATION,
+                ANSWERING,
+                Observation(
+                    author=Author.MONITOR,
+                    parts=(TextPart(text=REASON),),
+                ),
+            ),
+            (),
+            id="block-of-an-action-without-tool-calls",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            AUDIT_WRITE,
+            (TASK_OBSERVATION,),
+            (),
+            id="audit",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            Halt(
+                reason=REASON,
+                proposals=(PROPOSED_WRITE,),
+                position=1,
+            ),
+            (TASK_OBSERVATION,),
+            (),
+            id="halt",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_recording_a_decision_changes_the_trajectory_as_its_kind_says(
+    trajectory: Trajectory,
+    decision: ProtocolDecision,
+    history: tuple[Event, ...],
+    ratings: tuple[Rating, ...],
+) -> None:
+    trajectory.record(decision)
+
+    assert (
+        trajectory.history,
+        trajectory.ratings,
+        trajectory.records,
+    ) == (
+        history,
+        ratings,
+        (decision,),
+    )
+
+
+# Each is recorded on the trajectory of the task and action a1, two entries long.
+RUN_PAST_THE_HISTORY = Run(
+    action=WRITING,
+    proposals=(PROPOSED_WRITE,),
+    position=3,
+)
+RECORDED_AGAIN = Action(
+    id="a1",
+    tool_calls=(WRITE,),
+)
+BLOCK_RECORDED_AGAIN = Block(
+    action=RECORDED_AGAIN,
+    reason=REASON,
+    proposals=(
+        Proposal(
+            action=RECORDED_AGAIN,
+            score=WRITES_ELSEWHERE,
+            policy=Policy.UNTRUSTED,
+        ),
+    ),
+    position=2,
+)
+STALE = "the decision's position is not the length of the history"
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("decision", "message"),
+    [
+        pytest.param(
+            WRITING,
+            "decision must be a Run, Replace, Block, Audit or Halt, got an instance of Action",
+            id="an-action",
+        ),
+        pytest.param(
+            RUN_WRITE,
+            STALE,
+            id="a-position-the-history-grew-past",
+        ),
+        pytest.param(
+            RUN_PAST_THE_HISTORY,
+            STALE,
+            id="a-position-past-the-history",
+        ),
+        pytest.param(
+            BLOCK_RECORDED_AGAIN,
+            "an action with this id is already in the trajectory",
+            id="a-block-of-an-action-id-already-recorded",
+        ),
+    ],
+)
+def test_recording_a_decision_that_cannot_join_the_trajectory_raises_naming_why(
+    reading: Trajectory,
+    decision: ProtocolDecision,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        reading.record(decision)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "decision",
+    [
+        WRITING,
+        RUN_WRITE,
+        RUN_PAST_THE_HISTORY,
+        BLOCK_RECORDED_AGAIN,
+    ],
+    ids=[
+        "an-action",
+        "a-position-the-history-grew-past",
+        "a-position-past-the-history",
+        "a-block-of-an-action-id-already-recorded",
+    ],
+)
+def test_a_refused_decision_leaves_the_trajectory_unchanged(
+    reading: Trajectory,
+    decision: ProtocolDecision,
+) -> None:
+    with pytest.raises(ConfigurationError):
+        reading.record(decision)
+
+    assert (
+        reading.history,
+        reading.ratings,
+        reading.records,
+    ) == (
+        (
+            TASK_OBSERVATION,
+            Action(
+                id="a1",
+                tool_calls=(READ,),
+            ),
+        ),
+        (),
+        (),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_persons_run_after_an_audit_is_recorded_at_the_same_position(
+    trajectory: Trajectory,
+) -> None:
+    trajectory.record(AUDIT_WRITE)
+
+    trajectory.record(RUN_WRITE)
+
+    assert (
+        trajectory.history,
+        trajectory.records,
+    ) == (
+        (
+            TASK_OBSERVATION,
+            WRITING,
+        ),
+        (
+            AUDIT_WRITE,
+            RUN_WRITE,
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_splitting_the_latest_step_keeps_only_the_records_of_earlier_steps(
+    trajectory: Trajectory,
+) -> None:
+    trajectory.record(AUDIT_WRITE)
+    trajectory.act(WRITING)
+    trajectory.record(
+        Audit(
+            action=RESAMPLED,
+            proposals=(PROPOSED_RESAMPLE,),
+            position=2,
+        ),
+    )
+    trajectory.act(RESAMPLED)
+
+    step = trajectory.split_latest_step()
+
+    assert step.trajectory.records == (AUDIT_WRITE,)

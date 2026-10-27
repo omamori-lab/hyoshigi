@@ -59,6 +59,16 @@ from hyoshigi.monitors.score import (
     Unreadable,
 )
 from hyoshigi.monitors.view import Channel, View
+from hyoshigi.protocols.decisions import (
+    Audit,
+    Block,
+    Halt,
+    Policy,
+    Proposal,
+    ProtocolDecision,
+    Replace,
+    Run,
+)
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role, marked
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
@@ -85,9 +95,11 @@ __all__ = [
     "AsyncMonitor",
     "AsyncRepeatedMonitor",
     "AsyncReportedMonitor",
+    "Audit",
     "Author",
     "Authorship",
     "BlackBoxRun",
+    "Block",
     "CalibratedMonitor",
     "CascadeMonitor",
     "Cause",
@@ -109,6 +121,7 @@ __all__ = [
     "GenerativeModel",
     "GuardLabels",
     "GuardMonitor",
+    "Halt",
     "HardLabelWarning",
     "LLMMonitor",
     "Labels",
@@ -121,15 +134,20 @@ __all__ = [
     "Observation",
     "OpaquePart",
     "Part",
+    "Policy",
     "Prompt",
     "PromptPart",
+    "Proposal",
+    "ProtocolDecision",
     "Question",
     "Rating",
     "Rationale",
     "Refused",
     "Rejected",
     "RepeatedMonitor",
+    "Replace",
     "ReportedMonitor",
+    "Run",
     "StatementDecision",
     "Step",
     "SuspicionScore",

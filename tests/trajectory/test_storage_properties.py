@@ -12,21 +12,29 @@ from hypothesis import strategies as st
 from hyoshigi import (
     JSON,
     Action,
+    Audit,
     Author,
+    Block,
     Composite,
     Decision,
     Decisions,
     Description,
     Event,
     FailedClosed,
+    Halt,
     Labels,
     MediaPart,
     Observation,
     OpaquePart,
+    Policy,
+    Proposal,
+    ProtocolDecision,
     Rating,
     Rationale,
     Refused,
     Rejected,
+    Replace,
+    Run,
     StatementDecision,
     SuspicionScore,
     TextPart,
@@ -201,6 +209,7 @@ TOOL_OBSERVATIONS = st.builds(
     ToolObservation,
     call_id=TEXT,
     is_error=st.booleans(),
+    author=AUTHORS,
     source=st.none() | TEXT,
     parts=PARTS,
 )
@@ -212,9 +221,15 @@ class Step(Enum):
     OBSERVE = auto()
     REPORT = auto()
     ACT = auto()
+    DECIDE = auto()
 
 
-type Snapshot = tuple[tuple[Event, ...], tuple[Rating, ...], dict[str, Snapshot]]
+type Snapshot = tuple[
+    tuple[Event, ...],
+    tuple[Rating, ...],
+    tuple[ProtocolDecision, ...],
+    dict[str, Snapshot],
+]
 
 
 def snapshot(trajectory: Trajectory) -> Snapshot:
@@ -222,6 +237,7 @@ def snapshot(trajectory: Trajectory) -> Snapshot:
     return (
         trajectory.history,
         trajectory.ratings,
+        trajectory.records,
         {call_id: snapshot(child) for call_id, child in trajectory.subagents.items()},
     )
 
@@ -296,6 +312,79 @@ def act_and_rate(
         )
 
 
+def build_proposals(used: set[str]) -> st.SearchStrategy[Proposal]:
+    """A proposal of an action whose ids are new, rated unless a trusted model wrote it."""
+    return st.one_of(
+        st.builds(
+            Proposal,
+            action=actions(used),
+            score=SCORES,
+            policy=st.just(Policy.UNTRUSTED),
+        ),
+        st.builds(
+            Proposal,
+            action=actions(used),
+            score=st.none(),
+            policy=st.just(Policy.TRUSTED),
+        ),
+    )
+
+
+def decide(
+    draw: st.DrawFn,
+    trajectory: Trajectory,
+    *,
+    used: set[str],
+) -> None:
+    """Record a decision of any kind on up to three proposals."""
+    weighed = tuple(
+        draw(
+            st.lists(
+                build_proposals(used),
+                min_size=1,
+                max_size=3,
+            ),
+        ),
+    )
+    action = draw(st.sampled_from(weighed)).action
+    reason = draw(TEXT)
+    position = len(trajectory.history)
+    trajectory.record(
+        draw(
+            st.sampled_from(
+                [
+                    Run(
+                        action=action,
+                        proposals=weighed,
+                        position=position,
+                    ),
+                    Replace(
+                        action=action,
+                        proposals=weighed,
+                        position=position,
+                    ),
+                    Block(
+                        action=action,
+                        reason=reason,
+                        proposals=weighed,
+                        position=position,
+                    ),
+                    Audit(
+                        action=action,
+                        proposals=weighed,
+                        position=position,
+                    ),
+                    Halt(
+                        reason=reason,
+                        proposals=weighed,
+                        position=position,
+                    ),
+                ],
+            ),
+        ),
+    )
+
+
 def fill(
     draw: st.DrawFn,
     trajectory: Trajectory,
@@ -317,11 +406,17 @@ def fill(
                     used=used,
                     depth=depth,
                 )
+            case Step.DECIDE:
+                decide(
+                    draw,
+                    trajectory,
+                    used=used,
+                )
 
 
 @st.composite
 def trajectories(draw: st.DrawFn) -> Trajectory:
-    """A trajectory with ratings and subagents two levels deep."""
+    """A trajectory with ratings, records and subagents two levels deep."""
     trajectory = Trajectory()
     fill(
         draw,
@@ -339,6 +434,7 @@ def pass_through_json_text(data: JSON) -> JSON:
     return json.loads(json.dumps(data))
 
 
+@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "transport",
     [

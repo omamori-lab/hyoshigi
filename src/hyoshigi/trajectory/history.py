@@ -106,14 +106,13 @@ class Observation:
     kw_only=True,
 )
 class ToolObservation(Observation):
-    """A tool's result, answering one of the agent's tool calls."""
+    """A result answering one of the agent's tool calls, written by the tool unless another
+    author is given.
+    """
 
     call_id: str
     is_error: bool = False
-    author: Author = field(
-        default=Author.TOOL,
-        init=False,
-    )
+    author: Author = Author.TOOL
 
 
 # OpenHands calls actions and observations events (Wang et al., "OpenHands", ICLR 2025,
