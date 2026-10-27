@@ -2652,6 +2652,130 @@ def test_loading_a_malformed_record_raises_format_error_at_its_path(
     assert raised.value.path == path
 
 
+def build_sequence_payload(*records: JSON) -> dict[str, JSON]:
+    """A stored trajectory, format version 3, of the action STORED_RUN runs, with the records."""
+    return {
+        **build_record_payload(STORED_RUN),
+        "version": 3,
+        "records": list(records),
+    }
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("payload", "path"),
+    [
+        pytest.param(
+            build_sequence_payload(
+                {
+                    "kind": "run",
+                    "proposal": 0,
+                    "proposals": [STORED_PROPOSED_DELETE],
+                    "position": 0,
+                },
+            ),
+            "$.records[0].sequence",
+            id="missing",
+        ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "sequence": -1,
+                },
+            ),
+            "$.records[0].sequence",
+            id="negative",
+        ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "sequence": True,
+                },
+            ),
+            "$.records[0].sequence",
+            id="a-bool",
+        ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "sequence": "0",
+                },
+            ),
+            "$.records[0].sequence",
+            id="text",
+        ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "audit",
+                    "sequence": 0,
+                },
+                {
+                    **STORED_RUN,
+                    "sequence": 0,
+                },
+            ),
+            "$.records[1].sequence",
+            id="repeated-in-one-trajectory",
+        ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "audit",
+                    "sequence": 1,
+                },
+                {
+                    **STORED_RUN,
+                    "sequence": 0,
+                },
+            ),
+            "$.records[1].sequence",
+            id="decreasing",
+        ),
+        pytest.param(
+            {
+                **build_sequence_payload(
+                    {
+                        **STORED_RUN,
+                        "sequence": 0,
+                    },
+                ),
+                "history": [
+                    STORED_DELETE_FILE,
+                    {
+                        **ACTION,
+                        "tool_calls": [TASK_CALL],
+                    },
+                ],
+                "subagents": {
+                    "call_7": build_sequence_payload(
+                        {
+                            **STORED_RUN,
+                            "sequence": 0,
+                        },
+                    ),
+                },
+            },
+            "$.subagents['call_7'].records[0].sequence",
+            id="repeated-in-a-subagent",
+        ),
+    ],
+)
+def test_loading_a_malformed_sequence_number_raises_format_error_at_its_path(
+    payload: JSON,
+    path: str,
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert raised.value.path == path
+
+
 RECORD_EXPECTED = (
     "$.records[0]: expected a run, flag, replace, block, audit or halt record, with its "
     "proposals and position"
@@ -2746,6 +2870,18 @@ PROPOSAL_EXPECTED = (
             "the history",
             id="a-run-recorded-twice",
         ),
+        pytest.param(
+            build_sequence_payload(
+                {
+                    **STORED_RUN,
+                    "sequence": -1,
+                },
+            ),
+            "$.records[0].sequence: expected a whole number of at least 0, greater than the one "
+            "before it, that no other record in the run has",
+            id="negative-sequence-number",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
 )
 def test_a_format_error_for_a_record_says_what_was_expected(
@@ -2758,19 +2894,40 @@ def test_a_format_error_for_a_record_says_what_was_expected(
     assert str(raised.value) == message
 
 
-def test_a_document_of_another_version_raises_naming_the_version_load_reads() -> None:
-    payload: JSON = {
-        "format": "hyoshigi.trajectory",
-        "version": 1,
-        "history": [],
-        "ratings": [],
-        "subagents": {},
-    }
-
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(
+            {
+                "format": "hyoshigi.trajectory",
+                "version": 1,
+                "history": [],
+                "ratings": [],
+                "subagents": {},
+            },
+            id="version-1",
+        ),
+        pytest.param(
+            {
+                "format": "hyoshigi.trajectory",
+                "version": 2,
+                "history": [],
+                "ratings": [],
+                "records": [],
+                "subagents": {},
+            },
+            id="version-2",
+        ),
+    ],
+)
+def test_a_document_of_another_version_raises_naming_the_version_load_reads(
+    payload: JSON,
+) -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
 
-    assert str(raised.value) == "$: expected a hyoshigi.trajectory, format version 2"
+    assert str(raised.value) == "$: expected a hyoshigi.trajectory, format version 3"
 
 
 def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
