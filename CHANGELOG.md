@@ -13,6 +13,8 @@ minor version.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-27
+
 ### Added
 
 - `LangSmithFeedback` takes an `executor`. With one, `send` submits the post
@@ -315,6 +317,7 @@ minor version.
   thinks before it answers, and at 1024 tokens a rating could be cut off and
   fail closed.
 
-[Unreleased]: https://github.com/omamori-lab/hyoshigi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/omamori-lab/hyoshigi/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/omamori-lab/hyoshigi/releases/tag/v0.1.0
