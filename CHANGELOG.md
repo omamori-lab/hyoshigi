@@ -49,6 +49,12 @@ minor version.
   `ToolObservation` takes an `author`, `TOOL` by default. A monitor reads
   another author in the element, as `<tool_error call_id="call-1"
   author="monitor">`.
+- `DeferToResample` and `BlockAndFeedBack`, the first control protocols, each
+  with an async twin, decide what becomes of the agent's proposal from their
+  monitor's score. `DeferToResample` can instead return a `Resample` or
+  `TrustedStep` request, which the program answers through `resume`; each
+  takes a `FailureResponse` as `on_unavailable`, `AUDIT` by default, for a
+  rating that got no answer.
 
 ### Changed
 
