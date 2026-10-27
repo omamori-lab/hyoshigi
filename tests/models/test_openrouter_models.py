@@ -1493,9 +1493,25 @@ def test_a_response_the_provider_blocks_is_refused(
 
 
 # The same page, "Responses API": a context overflow takes the code invalid_prompt and keeps
-# its error type at the top level of the failed reply.
-def test_a_response_whose_error_type_says_the_input_cannot_be_used_is_rejected(
+# its error type at the top level of the failed reply; an invalid_prompt with no error type can
+# stand for an overflow.
+@pytest.mark.parametrize(
+    "error_type",
+    [
+        pytest.param(
+            {"error_type": "context_length_exceeded"},
+            id="overflow-type",
+        ),
+        pytest.param(
+            {},
+            id="no-type",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_a_response_whose_error_says_the_input_cannot_be_used_is_rejected(
     generate: Callable[..., GenerationOutcome],
+    error_type: dict[str, JSON],
 ) -> None:
     client = Wire(
         build_reply(
@@ -1506,7 +1522,7 @@ def test_a_response_whose_error_type_says_the_input_cannot_be_used_is_rejected(
                     "code": "invalid_prompt",
                     "message": "Detailed error description",
                 },
-                error_type="context_length_exceeded",
+                **error_type,
             ),
         ),
     ).build_client()
