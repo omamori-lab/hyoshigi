@@ -13,8 +13,26 @@ minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `DeferToResample` and `AsyncDeferToResample` take `on_audit`, an
+  `AuditResponse`. `HOLD`, the default, returns `Audit` as in 0.3.0. `FLAG`
+  returns `Flag`, a new decision, wherever the protocol would return
+  `Audit`, with the same action and proposals: the action runs, and a person
+  audits the step afterwards, which is detection only. `FLAG` is allowed
+  only for trusted monitoring, with `max_resamples=0` and equal thresholds,
+  and any other settings raise `ConfigurationError` when the protocol is
+  built. `Trajectory.record` adds a `Flag`'s action and its score to the
+  history, as for `Run`, and a `Flag` ends a run of blocks. The stored
+  records gain the kind `flag`, with the format version still 2; 0.3.0
+  cannot read a file that holds a flag.
+
 ### Changed
 
+- `Flag` joins `ProtocolDecision`, and `Trajectory.record` names it in the
+  `ConfigurationError` for a decision of another type. This is a breaking
+  change: an exhaustive `match` over a `ProtocolDecision` that ends in
+  `assert_never` fails under a type checker until it handles `Flag`.
 - `DeferToResample` and `AsyncDeferToResample` take `resampling`, a
   `Resampling`. With `SEQUENTIAL`, the default, `decide` asks for one
   resample, and `resume` asks for one more until a resample is below

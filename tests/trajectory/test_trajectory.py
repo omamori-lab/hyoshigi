@@ -809,7 +809,6 @@ STALE = "the decision's position is not the length of the history"
             "decision must be a Run, Flag, Replace, Block, Audit or Halt, "
             "got an instance of Action",
             id="an-action",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             RUN_WRITE,

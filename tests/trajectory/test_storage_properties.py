@@ -448,7 +448,6 @@ def pass_through_json_text(data: JSON) -> JSON:
     ],
     ids=["as dumped", "through JSON text"],
 )
-@pytest.mark.xfail(strict=True)
 @given(trajectory=trajectories())
 def test_a_trajectory_loads_back_as_it_was_dumped(
     transport: Callable[[JSON], JSON],

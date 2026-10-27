@@ -274,7 +274,6 @@ def test_a_proposal_at_or_above_the_block_threshold_is_blocked_with_the_scores_e
             {},
             build_run(10),
             id="a-flag-ends-the-run-of-blocks",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             (

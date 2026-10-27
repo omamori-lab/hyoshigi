@@ -14,6 +14,7 @@ from hyoshigi.monitors.score import SuspicionScore, find_cause
 from hyoshigi.options import check_instance, describe_type, read_count, read_threshold
 from hyoshigi.protocols.decisions import (
     Audit,
+    Flag,
     Policy,
     Proposal,
     ProtocolDecision,
@@ -45,7 +46,13 @@ class Resampling(StrEnum):
 
 
 class AuditResponse(StrEnum):
-    """What a protocol returns where it audits."""
+    """What a protocol returns where it audits.
+
+    HOLD returns Audit, which holds the action for a person. FLAG returns Flag, which runs the
+    action and leaves the step to a person afterwards.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
+    """
 
     HOLD = "hold"
     FLAG = "flag"
@@ -74,6 +81,10 @@ class DeferToResample:
     far. A resample whose monitor got no answer counts as drawn. With PARALLEL, a Resample asks
     for `max_resamples` proposals at once, and `resume` decides the step.
 
+    With `on_audit` HOLD, the default, an Audit is returned as it is. With FLAG, every Audit
+    the protocol would return is a Flag with the same action, proposals and position. FLAG needs
+    `max_resamples` at 0 and `defer_threshold` equal to `audit_threshold`.
+
     The step's decision, over the agent's proposals in order: the first whose score failed
     closed with a cause other than Unavailable is Audit. Otherwise the resamples whose monitor
     got no answer are set aside, and the step's score is the least suspicious remaining value.
@@ -87,12 +98,13 @@ class DeferToResample:
 
     With `max_resamples` at 0 this is defer to trusted, and with equal thresholds as well,
     trusted monitoring (Greenblatt et al. 2023, "AI Control", secs. 3.3, 3.2), except at an
-    audit: where the paper also runs an action at an audited step, this decides Audit alone.
+    audit: where the paper also runs an action at an audited step, this decides Audit alone,
+    or Flag under FLAG.
 
     The thresholds are numbers from 0 to 1, `defer_threshold` at most `audit_threshold`, kept
     as floats; `max_resamples` is a whole number of at least 0, kept as an int; `monitor` is a
-    Monitor, `on_unavailable` a FailureResponse and `resampling` a Resampling. Anything else
-    raises ConfigurationError when the protocol is built.
+    Monitor, `on_unavailable` a FailureResponse, `resampling` a Resampling and `on_audit` an
+    AuditResponse. Anything else raises ConfigurationError when the protocol is built.
 
     <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """
@@ -123,7 +135,7 @@ class DeferToResample:
         """Rate the proposed action, which is not yet in the trajectory, and decide about it or
         ask for more proposals.
         """
-        return drive(
+        outcome = drive(
             plan_decision(
                 self,
                 proposed=proposed,
@@ -133,6 +145,10 @@ class DeferToResample:
                 action,
                 trajectory=trajectory,
             ),
+        )
+        return respond_to_audit(
+            self,
+            outcome=outcome,
         )
 
     def resume(
@@ -155,7 +171,7 @@ class DeferToResample:
             proposals=proposals,
             trajectory=trajectory,
         )
-        return drive(
+        outcome = drive(
             plan_resumption(
                 self,
                 request=request,
@@ -165,6 +181,10 @@ class DeferToResample:
                 action,
                 trajectory=trajectory,
             ),
+        )
+        return respond_to_audit(
+            self,
+            outcome=outcome,
         )
 
 
@@ -206,7 +226,7 @@ class AsyncDeferToResample:
         """Rate the proposed action, which is not yet in the trajectory, and decide about it or
         ask for more proposals.
         """
-        return await drive_concurrently(
+        outcome = await drive_concurrently(
             plan_decision(
                 self,
                 proposed=proposed,
@@ -216,6 +236,10 @@ class AsyncDeferToResample:
                 action,
                 trajectory=trajectory,
             ),
+        )
+        return respond_to_audit(
+            self,
+            outcome=outcome,
         )
 
     async def resume(
@@ -238,7 +262,7 @@ class AsyncDeferToResample:
             proposals=proposals,
             trajectory=trajectory,
         )
-        return await drive_concurrently(
+        outcome = await drive_concurrently(
             plan_resumption(
                 self,
                 request=request,
@@ -248,6 +272,10 @@ class AsyncDeferToResample:
                 action,
                 trajectory=trajectory,
             ),
+        )
+        return respond_to_audit(
+            self,
+            outcome=outcome,
         )
 
 
@@ -283,6 +311,17 @@ def _check_options(protocol: DeferToResample | AsyncDeferToResample) -> None:
         expected=Resampling,
         name="resampling",
     )
+    check_instance(
+        protocol.on_audit,
+        expected=AuditResponse,
+        name="on_audit",
+    )
+    if protocol.on_audit is AuditResponse.FLAG:
+        _check_trusted_monitoring(
+            max_resamples=max_resamples,
+            defer_threshold=defer_threshold,
+            audit_threshold=audit_threshold,
+        )
     # The dataclass is frozen, so the values are set past its guard.
     object.__setattr__(
         protocol,
@@ -299,6 +338,24 @@ def _check_options(protocol: DeferToResample | AsyncDeferToResample) -> None:
         "max_resamples",
         max_resamples,
     )
+
+
+def _check_trusted_monitoring(
+    *,
+    max_resamples: int,
+    defer_threshold: float,
+    audit_threshold: float,
+) -> None:
+    """Raise ConfigurationError unless the settings are trusted monitoring: `max_resamples` at 0
+    and equal thresholds.
+    """
+    if max_resamples != 0:
+        raise ConfigurationError(f"on_audit FLAG needs max_resamples 0, got {max_resamples}")
+    if defer_threshold != audit_threshold:
+        raise ConfigurationError(
+            f"on_audit FLAG needs defer_threshold ({defer_threshold}) equal to "
+            f"audit_threshold ({audit_threshold})",
+        )
 
 
 def check_answer(
@@ -406,6 +463,31 @@ def choose_resample_count(protocol: DeferToResample | AsyncDeferToResample) -> i
             return 1
         case Resampling.PARALLEL:
             return protocol.max_resamples
+        case unreachable:
+            assert_never(unreachable)
+
+
+def respond_to_audit(
+    protocol: DeferToResample | AsyncDeferToResample,
+    *,
+    outcome: ProtocolDecision | ProtocolRequest,
+) -> ProtocolDecision | ProtocolRequest:
+    """Return the outcome, or, for FLAG, a Flag in place of an Audit, with its action, proposals
+    and position.
+    """
+    match protocol.on_audit, outcome:
+        case AuditResponse.FLAG, Audit(
+            action=action,
+            proposals=proposals,
+            position=position,
+        ):
+            return Flag(
+                action=action,
+                proposals=proposals,
+                position=position,
+            )
+        case AuditResponse.HOLD | AuditResponse.FLAG, _:
+            return outcome
         case unreachable:
             assert_never(unreachable)
 

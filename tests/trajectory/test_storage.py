@@ -1996,7 +1996,6 @@ REASON = "Deleting q3.csv is outside the task."
                 "position": 4,
             },
             id="flag",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Replace(
@@ -2108,7 +2107,6 @@ def test_a_persons_run_after_an_audit_loads_back_at_the_same_position(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_flag_loads_back_at_its_position(trajectory: Trajectory) -> None:
     flag = Flag(
         action=DELETE_FILE,
@@ -2433,7 +2431,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             RECORD_PATH,
             id="flag-of-an-action-not-at-its-position",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2653,7 +2650,6 @@ PROPOSAL_EXPECTED = (
             build_record_payload("run"),
             RECORD_EXPECTED,
             id="record-not-a-mapping",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2664,7 +2660,6 @@ PROPOSAL_EXPECTED = (
             ),
             RECORD_EXPECTED,
             id="unknown-kind",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2675,7 +2670,6 @@ PROPOSAL_EXPECTED = (
             ),
             RECORD_EXPECTED,
             id="no-proposals",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2720,7 +2714,6 @@ PROPOSAL_EXPECTED = (
             "$.records[0]: expected a run, flag, replace or block of the action at its position "
             "in the history",
             id="run-of-an-action-not-at-its-position",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {

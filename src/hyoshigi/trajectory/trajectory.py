@@ -272,11 +272,11 @@ class Trajectory:
     ) -> None:
         """Record a control protocol's decision, and add to the history what it ran or blocked.
 
-        A Run or a Replace adds its action, as act does, and attaches the score of the first
-        proposal of that action, unless that proposal is a trusted step. A Block adds its
+        A Run, a Flag or a Replace adds its action, as act does, and attaches the score of the
+        first proposal of that action, unless that proposal is a trusted step. A Block adds its
         action, then the reason, written by the monitor: an error answering each of the action's
         tool calls, in order, or one observation when it made none. An Audit or a Halt adds the
-        record only. A decision that is not one of the five, a position that is not the length
+        record only. A decision that is not one of the six, a position that is not the length
         of the history, and an action act refuses raise ConfigurationError, and nothing is
         recorded.
 
@@ -287,7 +287,7 @@ class Trajectory:
             Run | Flag | Replace | Block | Audit | Halt,
         ):
             raise ConfigurationError(
-                "decision must be a Run, Replace, Block, Audit or Halt, "
+                "decision must be a Run, Flag, Replace, Block, Audit or Halt, "
                 f"got {describe_type(decision)}",
             )
         if decision.position != len(self._history):

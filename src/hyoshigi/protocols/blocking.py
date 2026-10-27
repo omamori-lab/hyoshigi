@@ -13,6 +13,7 @@ from hyoshigi.options import check_instance, read_count, read_threshold
 from hyoshigi.protocols.decisions import (
     Audit,
     Block,
+    Flag,
     Policy,
     Proposal,
     ProtocolDecision,
@@ -36,10 +37,10 @@ class BlockAndFeedBack:
     The monitor rates every proposal. The proposal is Audit when the trajectory's own records,
     replayed in order, hold at least `blocks_in_a_row` blocks in a row or at least
     `blocks_in_total` in total.
-    A Block adds 1 to both counts; a Run or a Replace sets the count in a row to 0; an Audit
-    recorded while the total is at or above its limit sets the total to 0; an Audit or a Halt
-    otherwise changes neither. This follows Claude Code's permission-modes page, "When auto mode
-    falls back".
+    A Block adds 1 to both counts; a Run, a Flag or a Replace sets the count in a row to 0; an
+    Audit recorded while the total is at or above its limit sets the total to 0; an Audit or a
+    Halt otherwise changes neither. This follows Claude Code's permission-modes page, "When auto
+    mode falls back".
 
     Below both limits, a score that failed closed is Audit, or, when the monitor got no answer,
     what `on_unavailable` says: Audit, Block with the score's explanation as the reason, or Run.
@@ -250,9 +251,9 @@ def reaches_a_limit(
 
 
 def count_blocks_in_a_row(records: tuple[ProtocolDecision, ...]) -> int:
-    """Count the blocks in a row: a Block adds 1, a Run or a Replace sets the count to 0, and an
-    Audit or a Halt changes nothing. Claude Code's permission-modes page, "When auto mode falls
-    back".
+    """Count the blocks in a row: a Block adds 1, a Run, a Flag or a Replace sets the count to 0,
+    and an Audit or a Halt changes nothing. Claude Code's permission-modes page, "When auto mode
+    falls back".
     """
     in_a_row = 0
     for record in records:
@@ -263,7 +264,7 @@ def count_blocks_in_a_row(records: tuple[ProtocolDecision, ...]) -> int:
             in_a_row += 1
         elif isinstance(
             record,
-            Run | Replace,
+            Run | Flag | Replace,
         ):
             in_a_row = 0
     return in_a_row
