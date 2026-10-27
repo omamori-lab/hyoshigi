@@ -34,8 +34,8 @@ from hyoshigi.trajectory.trajectory import Trajectory
 class Resampling(StrEnum):
     """How a protocol draws the resamples of a suspicious step.
 
-    SEQUENTIAL asks for one resample at a time, and stops drawing at the first below the defer
-    threshold. PARALLEL asks for all `max_resamples` at once.
+    SEQUENTIAL asks for one resample at a time, and stops drawing once the step is decided.
+    PARALLEL asks for all `max_resamples` at once.
 
     <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """

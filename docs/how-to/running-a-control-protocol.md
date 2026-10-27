@@ -195,7 +195,7 @@ Replace {"command": "summarise q3.md > summary.md"}
 ```
 
 `resampling` sets how the protocol draws the resamples. `Resampling.SEQUENTIAL`, the default, asks
-for one at a time and stops at the first below `defer_threshold`, so a step costs only the ratings
+for one at a time and stops drawing once `resume` decides the step, so a step costs only the ratings
 it needs. `Resampling.PARALLEL` asks for all `max_resamples` in one request, as 0.3.0 did, and rates
 them all. When the first resample is acceptable, `SEQUENTIAL` rates two proposals where `PARALLEL`
 rates three:

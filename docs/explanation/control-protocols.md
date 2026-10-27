@@ -49,7 +49,7 @@ that fails closed with a cause other than `Unavailable` ends the drawing too, si
 `Audit` whatever later resamples score. A resample whose rating got no answer counts as drawn and is
 set aside. A program with no more samples to give answers with fewer proposals than the request asks
 for, and the protocol decides the step from the proposals it has. `Resampling.PARALLEL` asks for all
-`max_resamples` at once and runs the least suspicious of them.
+`max_resamples` at once and decides the step from them.
 
 At an audited step, `DeferToResample` differs from both papers, which run T's action there and audit
 as a further decision. Ctrl-Z implements T's action whenever every sample is above the deferral
