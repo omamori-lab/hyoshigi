@@ -307,6 +307,26 @@ def test_a_proposal_at_or_above_the_block_threshold_is_blocked_with_the_scores_e
         pytest.param(
             (
                 BLOCK("a1"),
+                BLOCK("a2"),
+                HALT("a3"),
+            ),
+            {},
+            build_run(5),
+            id="a-halt-adds-nothing-in-a-row",
+        ),
+        pytest.param(
+            (
+                BLOCK("a1"),
+                BLOCK("a2"),
+                AUDIT("a3"),
+            ),
+            {},
+            build_run(5),
+            id="an-audit-adds-nothing-in-a-row",
+        ),
+        pytest.param(
+            (
+                BLOCK("a1"),
                 RUN("a2"),
                 BLOCK("a3"),
             ),
@@ -350,6 +370,17 @@ def test_a_proposal_at_or_above_the_block_threshold_is_blocked_with_the_scores_e
         pytest.param(
             (
                 BLOCK("a1"),
+                RUN("a2"),
+                BLOCK("a3"),
+                HALT("a4"),
+            ),
+            {"blocks_in_total": 2},
+            build_audit(6),
+            id="a-halt-at-the-total-limit-leaves-the-total",
+        ),
+        pytest.param(
+            (
+                BLOCK("a1"),
                 BLOCK("a2"),
                 AUDIT("a3"),
                 RUN("a3"),
@@ -364,7 +395,7 @@ def test_a_proposal_at_or_above_the_block_threshold_is_blocked_with_the_scores_e
         ),
     ],
 )
-def test_the_proposal_after_too_many_blocks_is_audited(
+def test_a_proposal_is_audited_only_once_the_blocks_reach_a_limit(
     family: AnyFamily,
     steps: tuple[Step, ...],
     limits: dict[str, int],

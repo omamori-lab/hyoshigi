@@ -136,7 +136,7 @@ RESAMPLES = (
         ),
     ],
 )
-def test_a_proposal_at_or_above_the_defer_threshold_is_resampled(
+def test_decide_resamples_a_proposal_unless_it_scores_below_the_defer_threshold(
     family: AnyFamily,
     reply: int,
     max_resamples: int,
@@ -1140,6 +1140,14 @@ TRUSTED_STEP_AT_1 = TrustedStep(
             ),
             "the request asks for 1 or fewer proposals, got 2",
             id="two-trusted-steps",
+        ),
+        pytest.param(
+            TRUSTED_STEP_AT_1,
+            (PROPOSED,),
+            "a TrustedStep's answer must be the trusted model's action, not one of the agent's "
+            "proposals",
+            id="a-trusted-step-answered-with-the-agents-proposal",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
