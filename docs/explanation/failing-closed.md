@@ -71,15 +71,16 @@ hyoshigi raises when it is given arguments that cannot work, or a payload
 that is not in its format, and returns a score for every other failure.
 
 - `ConfigurationError` comes from building a monitor, a wrapper, a view, a
-  model or a score with options that cannot work, from a wrapper given a
-  monitor of the other family, sync or async, and from a provider constructor
-  given a client of the other family. `rate` raises it when a model function
-  of the caller's returns a value outside its outcome union, and names the
-  value's type only. A provider adapter raises it
-  for a request no retry can fix, such as one with a bad key or an unknown
-  model. That is an HTTP 4xx other than 408, 409 and 429 that is neither a
-  refusal nor a rejection of what the prompt holds. `Trajectory.act`, `attach` and
-  `delegate` raise it for arguments that cannot work.
+  model or a score with options that cannot work, from building an action, a
+  tool call, an observation or a part with a field of the wrong type, from a
+  wrapper given a monitor of the other family, sync or async, and from a
+  provider constructor given a client of the other family. `rate` raises it
+  when a model function of the caller's returns a value outside its outcome
+  union, and names the value's type only. A provider adapter raises it for a
+  request no retry can fix, such as one with a bad key or an unknown model.
+  That is an HTTP 4xx other than 408, 409 and 429 that is neither a refusal
+  nor a rejection of what the prompt holds. `Trajectory.act`, `observe`,
+  `attach` and `delegate` raise it for arguments that cannot work.
 - `FormatError` comes only from the readers of a payload:
   `Trajectory.from_anthropic`, `from_openai_chat` and `from_open_responses`,
   their `Action.from_*` twins, and `Trajectory.load`. It names where in the

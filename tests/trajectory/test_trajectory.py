@@ -271,7 +271,6 @@ def test_a_refused_action_leaves_the_history_unchanged(reading: Trajectory) -> N
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_acting_an_observation_raises_naming_it(reading: Trajectory) -> None:
     with pytest.raises(ConfigurationError) as raised:
         reading.act(
@@ -284,7 +283,6 @@ def test_acting_an_observation_raises_naming_it(reading: Trajectory) -> None:
     assert str(raised.value) == "action must be an Action, got an instance of Observation"
 
 
-@pytest.mark.xfail(strict=True)
 def test_observing_an_action_raises_naming_it(reading: Trajectory) -> None:
     with pytest.raises(ConfigurationError) as raised:
         reading.observe(Action(id="a2"))  # ty: ignore[invalid-argument-type]

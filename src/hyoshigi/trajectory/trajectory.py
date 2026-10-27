@@ -335,9 +335,14 @@ class Trajectory:
     ) -> None:
         """Record an action the agent took.
 
-        The action's id and each of its tool calls' ids must be new to the
-        trajectory; otherwise nothing is recorded.
+        The action must be an Action, and its id and each of its tool calls' ids new to the
+        trajectory; otherwise ConfigurationError is raised and nothing is recorded.
         """
+        check_instance(
+            action,
+            expected=Action,
+            name="action",
+        )
         call_ids = [call.id for call in action.tool_calls]
         if action.id in self._action_ids:
             raise ConfigurationError("an action with this id is already in the trajectory")
@@ -353,7 +358,14 @@ class Trajectory:
         self,
         observation: Observation,
     ) -> None:
-        """Record an observation that reached the agent."""
+        """Record an observation that reached the agent; anything but an Observation raises
+        ConfigurationError.
+        """
+        check_instance(
+            observation,
+            expected=Observation,
+            name="observation",
+        )
         self._history.append(observation)
 
     def delegate(

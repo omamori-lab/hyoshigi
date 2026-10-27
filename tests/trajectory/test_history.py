@@ -37,7 +37,6 @@ def test_actions_built_without_an_id_get_distinct_ids() -> None:
     assert first.id != second.id
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("kind", "fields", "message"),
     [

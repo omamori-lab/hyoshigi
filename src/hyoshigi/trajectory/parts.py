@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from hyoshigi.errors import ConfigurationError
+from hyoshigi.options import check_instance, describe_type
 
 # RFC 6838, section 4.2: a type and a subtype, each a letter or digit followed by up
 # to 126 letters, digits or any of ! # $ & - ^ _ . + ; and RFC 9110, section 12.5.1:
@@ -35,9 +36,16 @@ class Author(StrEnum):
     kw_only=True,
 )
 class TextPart:
-    """A piece of text."""
+    """A piece of text, a str; anything else raises ConfigurationError."""
 
     text: str
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.text,
+            expected=str,
+            name="text",
+        )
 
 
 @dataclass(
@@ -46,10 +54,25 @@ class TextPart:
     kw_only=True,
 )
 class Description:
-    """A text account of a media part, and who wrote it."""
+    """A text account of a media part, and who wrote it.
+
+    The text is a str and the author an Author; anything else raises ConfigurationError.
+    """
 
     text: str
     author: Author
+
+    def __post_init__(self) -> None:
+        check_instance(
+            self.text,
+            expected=str,
+            name="text",
+        )
+        check_instance(
+            self.author,
+            expected=Author,
+            name="author",
+        )
 
 
 @dataclass(
@@ -61,6 +84,9 @@ class MediaPart:
     """An image, audio, video or file, by URL or as bytes, with its IANA media type.
 
     The media type may be a range such as image/* when only the top-level type is known.
+    The media type is a str, the url a str, the data bytes and the description a Description
+    or None, and exactly one of url and data is given; anything else raises
+    ConfigurationError.
     """
 
     media_type: str
@@ -69,6 +95,29 @@ class MediaPart:
     description: Description | None = None
 
     def __post_init__(self) -> None:
+        check_instance(
+            self.media_type,
+            expected=str,
+            name="media_type",
+        )
+        if self.url is not None:
+            check_instance(
+                self.url,
+                expected=str,
+                name="url",
+            )
+        if self.data is not None:
+            check_instance(
+                self.data,
+                expected=bytes,
+                name="data",
+            )
+        if self.description is not None:
+            check_instance(
+                self.description,
+                expected=Description,
+                name="description",
+            )
         if MEDIA_TYPE.fullmatch(self.media_type) is None:
             raise ConfigurationError("media_type must be an IANA media type, such as image/png")
         if (self.url is None) == (self.data is None):
@@ -84,10 +133,41 @@ class OpaquePart:
     """Content recorded but not read, named by its kind in the provider's format.
 
     A monitor sees a placeholder for it in the history; in the action it rates, the
-    score fails closed.
+    score fails closed. The kind is a str; anything else raises ConfigurationError.
     """
 
     kind: str
 
+    def __post_init__(self) -> None:
+        check_instance(
+            self.kind,
+            expected=str,
+            name="kind",
+        )
+
 
 type Part = TextPart | MediaPart | OpaquePart
+
+
+def check_parts(
+    parts: tuple[Part, ...],
+    *,
+    name: str,
+) -> None:
+    """Raise ConfigurationError, naming the field, unless the parts are a tuple of TextPart,
+    MediaPart and OpaquePart.
+    """
+    check_instance(
+        parts,
+        expected=tuple,
+        name=name,
+    )
+    for index, part in enumerate(parts):
+        if not isinstance(
+            part,
+            TextPart | MediaPart | OpaquePart,
+        ):
+            raise ConfigurationError(
+                f"{name}[{index}] must be a TextPart, MediaPart or OpaquePart, "
+                f"got {describe_type(part)}",
+            )
