@@ -366,7 +366,7 @@ print(f"{sent['value']} {sent['metadata']}")
 1.0 {'failed_closed': True, 'cause': 'Unavailable', 'model': 'trusted-1'}
 ```
 
-## Langfuse queues the score, and the LangSmith report waits without a worker
+## Langfuse queues the score and the LangSmith report waits
 
 `LangfuseScores` hands the score to Langfuse's client, which queues it and sends it in the
 background (`Langfuse.create_score`). A rating returns without waiting for the network, and the
@@ -431,9 +431,10 @@ report [logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
 
 ## With a worker, a rating returns before LangSmith answers
 
-`LangSmithFeedback` takes an `executor`, any `concurrent.futures.Executor`. Its `send` then submits
-the post to the executor and returns at once, so the rating returns its score while the executor
-runs the post. `executor.shutdown(wait=True)` returns once every post submitted has finished
+`LangSmithFeedback` takes an `executor`, a `concurrent.futures.Executor` that runs each call in
+this process, such as a `ThreadPoolExecutor`. Its `send` then submits the post to the executor and
+returns at once, so the rating returns its score while the executor runs the post.
+`executor.shutdown(wait=True)` returns once every post submitted has finished
 [@python2026concurrentfutures, {Section} "Executor Objects"]:
 
 ```python
@@ -518,13 +519,17 @@ the posts still waiting to start [@python2026concurrentfutures, {Section} "Execu
 a task group cancels its tasks when the code inside it raises
 [@python2026tasks, {Section} "Task Groups"].
 
+A `ProcessPoolExecutor` runs only calls it can pickle
+[@python2026concurrentfutures, {Section} "ProcessPoolExecutor"], and LangSmith's `Client` raises
+`PicklingError` when pickled (langsmith 0.14.11), so each post on one fails and is logged.
+
 A worker moves the wait from the rating to `executor.shutdown(wait=True)` or to leaving the group. A
 `ThreadPoolExecutor` also holds the program's exit, since the interpreter joins its threads before
-it exits [@python2026concurrentfutures, {Section} "ThreadPoolExecutor"]. A post that is still
-retrying holds either: up to 511 seconds for a run LangSmith never ingests, at the default 10
-attempts, and over 4 hours for the synchronous client's retries of a 429. A low
-`stop_after_attempt` bounds that wait. An executor that runs each post on a daemon thread lets the
-program exit at once, and a post still running then is lost without a log record.
+it exits [@python2026concurrentfutures, {Section} "ThreadPoolExecutor"]. A post that LangSmith
+answers with 404 holds either for up to 511 seconds at the default 10 attempts, and the synchronous
+client's retries of a 429 for over 4 hours. A low `stop_after_attempt` bounds that wait. An executor
+that runs each post on a daemon thread lets the program exit at once, and a post still running then
+is lost without a log record.
 
 ## The monitor's place in a stack decides which score is reported
 
