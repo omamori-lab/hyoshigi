@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import count
+from operator import itemgetter
 from types import MappingProxyType
 from typing import NamedTuple, Self, assert_never
 
@@ -27,11 +29,11 @@ from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservat
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.storage.events import dump_event, load_event
-from hyoshigi.trajectory.storage.records import dump_record, load_records
+from hyoshigi.trajectory.storage.records import dump_record, load_records, read_sequence_numbers
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score, load_score
 
 FORMAT = "hyoshigi.trajectory"
-VERSION = 2
+VERSION = 3
 _NAME_ESCAPES = {
     **{code: f"\\u{code:04x}" for code in range(0x20)},
     **{code: f"\\u{code:04x}" for code in range(0xD800, 0xE000)},
@@ -95,6 +97,9 @@ class Trajectory:
         self._ratings: list[Rating] = []
         self._subagents: dict[str, Trajectory] = {}
         self._records: list[ProtocolDecision] = []
+        self._sequence_numbers: list[int] = []
+        # Every trajectory of a run shares it, so each record takes a number no other record has.
+        self._sequence = count()
         self._delegation: Delegation | None = None
 
     @classmethod
@@ -238,6 +243,9 @@ class Trajectory:
                 earlier._records = [
                     record for record in self._records if record.position < len(earlier_history)
                 ]
+                # The records kept come first, since their positions never decrease.
+                earlier._sequence_numbers = self._sequence_numbers[: len(earlier._records)]
+                earlier._sequence = self._sequence
                 earlier._delegation = self._delegation
                 return Step(
                     trajectory=earlier,
@@ -325,6 +333,7 @@ class Trajectory:
             case unreachable:
                 assert_never(unreachable)
         self._records.append(decision)
+        self._sequence_numbers.append(next(self._sequence))
 
     def _run(
         self,
@@ -388,13 +397,16 @@ class Trajectory:
     ) -> Trajectory:
         """Start a subagent's trajectory, held under the tool call that delegated it.
 
-        The call must be one an action in this trajectory made. The subagent's task
-        is the instruction, authored by the delegator.
+        The call must be one an action in this trajectory made, and the subagent at most 32
+        levels below the root of the delegation tree; otherwise ConfigurationError is raised.
+        The subagent's task is the instruction, authored by the delegator.
         """
         if call_id not in self._call_ids:
             raise ConfigurationError("delegate takes the id of a tool call in this trajectory")
         if call_id in self._subagents:
             raise ConfigurationError("a subagent is already delegated by this call")
+        if len(trace_path(self)) > NESTING_LIMIT:
+            raise ConfigurationError(f"subagents are nested at most {NESTING_LIMIT} deep")
         child = Trajectory()
         child.observe(
             Observation(
@@ -402,6 +414,7 @@ class Trajectory:
                 parts=(TextPart(text=instruction),),
             ),
         )
+        child._sequence = self._sequence
         child._delegation = Delegation(
             parent=self,
             call_id=call_id,
@@ -410,8 +423,8 @@ class Trajectory:
         return child
 
     def dump(self) -> dict[str, JSON]:
-        """Return the trajectory, its ratings, its records and its subagents' as JSON-compatible
-        data.
+        """Return the trajectory, its ratings, its records with their sequence numbers, and its
+        subagents' as JSON-compatible data.
         """
         subagents: dict[str, JSON] = {
             call_id: child.dump() for call_id, child in self._subagents.items()
@@ -427,7 +440,17 @@ class Trajectory:
                 }
                 for rating in self._ratings
             ],
-            "records": [dump_record(decision) for decision in self._records],
+            "records": [
+                {
+                    **dump_record(decision),
+                    "sequence": number,
+                }
+                for decision, number in zip(
+                    self._records,
+                    self._sequence_numbers,
+                    strict=True,
+                )
+            ],
             "subagents": subagents,
         }
 
@@ -439,14 +462,29 @@ class Trajectory:
         """Rebuild a trajectory from what dump returned.
 
         Raises FormatError, naming the JSONPath of the first problem, on data that
-        lacks what dump writes or holds it in another shape, and on composite scores or
-        subagents nested more than 32 levels deep. Keys dump does not write are ignored.
+        lacks what dump writes or holds it in another shape, on composite scores or
+        subagents nested more than 32 levels deep, and on a record's sequence number that
+        is not a whole number of at least 0, greater than the one before it, that no other
+        record in the run has. Keys dump does not write are ignored. Records recorded after
+        loading take numbers past the largest loaded.
         """
-        return cls._load(
+        seen: set[int] = set()
+        trajectory = cls._load(
             data,
             path="$",
             depth=0,
+            seen=seen,
         )
+        sequence = count(
+            max(
+                seen,
+                default=-1,
+            )
+            + 1,
+        )
+        for member in list_run(trajectory):
+            member._sequence = sequence
+        return trajectory
 
     @classmethod
     def _load(
@@ -455,6 +493,7 @@ class Trajectory:
         *,
         path: str,
         depth: int,
+        seen: set[int],
     ) -> Self:
         match data:
             case {
@@ -482,10 +521,16 @@ class Trajectory:
                     path=f"{path}.records",
                     history=trajectory._history,
                 )
+                trajectory._sequence_numbers = read_sequence_numbers(
+                    records,
+                    path=f"{path}.records",
+                    seen=seen,
+                )
                 trajectory._load_subagents(
                     subagents,
                     path=f"{path}.subagents",
                     depth=depth,
+                    seen=seen,
                 )
                 return trajectory
             case _:
@@ -572,9 +617,10 @@ class Trajectory:
         *,
         path: str,
         depth: int,
+        seen: set[int],
     ) -> None:
-        """Load the subagents of a trajectory `depth` levels deep. A subagent deeper than
-        NESTING_LIMIT raises FormatError.
+        """Load the subagents of a trajectory `depth` levels deep, adding their records'
+        sequence numbers to `seen`. A subagent deeper than NESTING_LIMIT raises FormatError.
         """
         for call_id, data in subagents.items():
             match call_id:
@@ -602,6 +648,7 @@ class Trajectory:
                 data,
                 path=subagent_path,
                 depth=depth + 1,
+                seen=seen,
             )
             subagent._delegation = Delegation(
                 parent=self,
@@ -610,9 +657,56 @@ class Trajectory:
             self._subagents[call_id] = subagent
 
 
-def find_delegation(trajectory: Trajectory) -> Delegation | None:
-    """The trajectory's place in its run, or None for a trajectory that no call delegated."""
-    return trajectory._delegation
+def trace_path(trajectory: Trajectory) -> list[Trajectory]:
+    """The trajectory and those that delegated it, up to the root of its delegation tree."""
+    path = [trajectory]
+    while (delegation := path[-1]._delegation) is not None:
+        path.append(delegation.parent)
+    return path
+
+
+def list_run(trajectory: Trajectory) -> list[Trajectory]:
+    """The trajectories of the run the trajectory is in, from the root of its delegation tree.
+
+    Each trajectory on the path from the root to this one stands in for the subagent held under
+    the call that delegated it.
+    """
+    path = trace_path(trajectory)
+    # A trajectory compares and hashes by identity, so a delegation names one place in the tree.
+    placed = {member._delegation: member for member in path[:-1]}
+    run: list[Trajectory] = []
+    unvisited = [path[-1]]
+    while unvisited:
+        visited = unvisited.pop()
+        run.append(visited)
+        unvisited.extend(
+            placed.get(
+                Delegation(
+                    parent=visited,
+                    call_id=call_id,
+                ),
+                subagent,
+            )
+            for call_id, subagent in visited._subagents.items()
+        )
+    return run
+
+
+def list_run_records(trajectory: Trajectory) -> tuple[ProtocolDecision, ...]:
+    """The records of the trajectories list_run returns, in the order they were recorded."""
+    numbered = sorted(
+        (
+            pair
+            for member in list_run(trajectory)
+            for pair in zip(
+                member._sequence_numbers,
+                member._records,
+                strict=True,
+            )
+        ),
+        key=itemgetter(0),
+    )
+    return tuple(record for _, record in numbered)
 
 
 def build_feedback(

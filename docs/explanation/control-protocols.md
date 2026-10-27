@@ -145,14 +145,20 @@ trajectory alone would let an agent stay under auto mode's 20 denials
 zero, and its delegator would never count the subagent's blocks. The count in a row stays a run of
 one agent's attempts, read from its trajectory's own records.
 
-The total replays the records of the delegation tree from its root. A trajectory's records go in
-order, and each subagent's records, merged in the same way, follow the records whose position is at
-or before that of the action that delegated it. Subagents go in the order of those positions, and
-the subagents of one action in the order they were delegated. The reset applies over this merged
-order, so a subagent and its delegator count the same total. The order depends on the tree alone,
-which `Trajectory.dump` stores and `Trajectory.load` rebuilds. The earlier trajectory that
-`split_latest_step` returns for a subagent takes the subagent's place in the run, so the total
-leaves out the records of the step it drops.
+The total replays the run's records in the order they were recorded, whichever trajectory holds
+them. `record` gives each record the next number of a sequence that every trajectory in the
+delegation tree shares, and the total replays the records of the whole tree in that order, so a
+subagent and its delegator count the same total. The reset depends on that order: an `Audit` below
+the limit leaves the total, and the `Audit` that the limit caused resets the blocks recorded before
+it, in the delegator and in every subagent. `Trajectory.dump` stores each record's number, and
+`Trajectory.load` restores it. The earlier trajectory that `split_latest_step` returns for a
+subagent takes the subagent's place in the run, so the total leaves out the records of the step it
+drops.
+
+When agents run at once, the count can miss a block. The protocol counts the records when `decide`
+runs, and the program records the decision afterwards, so a `Block` that another trajectory records
+in between is missing from that count. With the run's total at 19, two subagents that decide at
+once can both be blocked, and the total reaches 21 before the next proposal is `Audit`.
 
 ## A failure without a verdict goes to a person by default
 

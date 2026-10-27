@@ -624,7 +624,6 @@ def test_the_total_counts_the_blocks_of_subagents_nested_two_levels_deep(
     assert decided == build_audit(position)
 
 
-@pytest.mark.xfail(strict=True)
 def test_subagents_of_one_action_are_counted_in_the_order_their_records_were_recorded(
     family: AnyFamily,
 ) -> None:
@@ -678,7 +677,6 @@ def test_subagents_of_one_action_are_counted_in_the_order_their_records_were_rec
     assert decided == build_run(3)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("delegators", "subagents", "outcome"),
     [
@@ -794,7 +792,6 @@ def test_a_subagent_delegated_by_a_split_copy_counts_its_own_blocks(family: AnyF
     assert decided == build_audit(5)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_split_copys_new_records_follow_the_runs(family: AnyFamily) -> None:
     trajectory = build_trajectory()
     subagent = start_subagent(trajectory)
@@ -826,7 +823,6 @@ def test_a_split_copys_new_records_follow_the_runs(family: AnyFamily) -> None:
     assert decided == build_run(2)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_run_loaded_from_a_dump_replays_its_records_in_the_order_they_were_recorded(
     family: AnyFamily,
 ) -> None:
@@ -867,7 +863,6 @@ def test_a_run_loaded_from_a_dump_replays_its_records_in_the_order_they_were_rec
     assert decided == build_audit(7)
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("before", "after"),
     [

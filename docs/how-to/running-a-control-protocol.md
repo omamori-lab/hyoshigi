@@ -657,8 +657,8 @@ score. The protocol counts from the records:
 - the `Audit` that the total's own limit caused resets the total.
 
 The count in a row reads the trajectory's own records. The total reads every record in the run,
-its subagents' included, merged from the root of the delegation tree, so a subagent and its
-delegator count the same total
+its subagents' included, in the order they were recorded, so a subagent and its delegator count the
+same total
 ([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
 Here three blocks send the fourth proposal to a person, who approves it. The fifth proposal's
 rating gets no answer, so `on_unavailable`, `AUDIT` by default, holds it for the person too:
