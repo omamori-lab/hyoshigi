@@ -269,7 +269,8 @@ JSON escape, and the reply is read as any other.
 
 A reply's body is read as OpenAI Responses reads it. A `failed` reply is also `Refused()` when its
 top-level `error_type` is `refusal` or contains `policy`, and `Rejected()` when it is one of the
-input rejections in the table below; OpenRouter puts its typed error code there in a failed reply
+input rejections in the table below, as is a code `invalid_prompt` with no error type; OpenRouter
+puts its typed error code there in a failed reply
 [@openrouter2026errors, {Section} "Typed error codes"]. The client returns a
 parsed reply, which the adapter reads with each value the client did not recognise put back as
 sent. A success status with a body the client cannot read is `Unavailable()` with no status, since
@@ -369,7 +370,7 @@ of another type raises `ConfigurationError` naming it.
 | a `noul` answer under `statement` whose value is from 0 to 1 | `Decision` of that value |
 | an answer of another type or under another name, a value outside 0 to 1, or a body the client cannot read | `Unavailable()` |
 | 400 with `detail.error_type` `max_tokens_exceeded` | `Rejected(status=400)` |
-| a 400 for a state that holds an image | `Rejected(status=400)` |
+| a 400 with no error type, for a state that holds an image | `Rejected(status=400)` |
 | 413 | `Rejected(status=413)` |
 | 408, 409, 429, a 5xx such as 529, or a 1xx or 3xx status | `Unavailable` with the status |
 | any other 4xx: a 400 for a text-only state, 401, 403, 404, 415 or 422 | `ConfigurationError` naming the status |
@@ -379,7 +380,8 @@ A 400 with `max_tokens_exceeded` means that the request is longer than the model
 A 415 means an unsupported `Content-Encoding` or more than one compression layer, which the client
 sets [@typesafe2026errors, {Section} "Errors"]. TypeSafe answers an image it rejects with a 400
 [@typesafe2026images, {Section} "Errors"], such as an image with a side under 280 pixels
-[@typesafe2026images, {Section} "Limits"], and the page gives no body for it. So a 400 for a state
-that holds an image is `Rejected(status=400)`, and a 400 for a text-only state breaks one of the
-request rules, which the client and the adapter keep, and raises. The TypeSafe adapter has no
+[@typesafe2026images, {Section} "Limits"], and the page gives no body for it. So a 400 with no
+error type, for a state that holds an image, is `Rejected(status=400)`; a 400 that names another
+error type, or one for a text-only state, breaks one of the request rules, which the client and
+the adapter keep, and raises. The TypeSafe adapter has no
 `Refused` outcome.

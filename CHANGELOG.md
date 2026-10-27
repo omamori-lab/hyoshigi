@@ -82,21 +82,22 @@ minor version.
 
 ### Fixed
 
-- Four provider rejections that the agent's content can cause raised
-  `ConfigurationError`, so the agent's content could crash a rating, and a
-  scaffold that reads an exception as allow would let the action pass. They
-  now fail closed:
-  - OpenAI's `invalid_prompt` is `Rejected`.
-  - Every OpenRouter 403 is `Refused`, a guardrail's block among them. A
-    spent budget, a missing permission or the wrong data region, which
-    OpenRouter also answers with a 403, now scores every action 1.0.
-  - OpenRouter's `invalid_prompt` with no error type is
-    `Rejected(status=400)`.
-  - A 400 that names no reason, for a prompt that carries media, is
-    `Rejected(status=400)` on Anthropic, TypeSafe and OpenRouter Decisions,
-    each of which answers an image it cannot use that way. With media in the
-    prompt, a 400 for misuse, such as Anthropic's spend limit, fails closed
-    too; for a text-only prompt it still raises.
+- OpenAI's `invalid_prompt` raised `ConfigurationError`, so the agent's
+  content could crash a rating, and a scaffold that reads an exception as
+  allow would let the action pass. It is `Rejected`.
+- An OpenRouter 403, such as a guardrail's block, raised `ConfigurationError`
+  unless it named a refusal or a policy. Every 403 is `Refused`, so a spent
+  budget, a missing permission or the wrong data region, which OpenRouter
+  also answers with a 403, now scores every action 1.0.
+- OpenRouter's `invalid_prompt` with no error type, which can stand for a
+  context overflow, raised `ConfigurationError` at a 400 and was
+  `Unavailable` in a failed reply. It is `Rejected`.
+- A 400 that names no reason, for a prompt that carries media, raised
+  `ConfigurationError` on Anthropic, TypeSafe and OpenRouter Decisions, each
+  of which answers an image it cannot use that way. It is
+  `Rejected(status=400)`, so with media in the prompt a 400 for misuse, such
+  as Anthropic's spend limit, fails closed too; for a text-only prompt it
+  still raises.
 - The OpenAI adapter's docstring said OpenAI retains none of the monitored
   agent's content. `store: false` stops the Responses API storing the
   response; OpenAI's abuse-monitoring logs, which can hold prompts, are

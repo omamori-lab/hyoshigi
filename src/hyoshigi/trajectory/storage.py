@@ -34,11 +34,6 @@ _SCORE = "a score with a value from 0 to 1, an explanation and evidence"
 _EVIDENCE = "rationale, decisions, labels, composite or failed-closed evidence"
 _DECISION = "a decision with a probability from 0 to 1 and a confidence from 0 to 1, or null"
 _CAUSE = "a cause: unreadable, unperceivable, truncated, refused, rejected or unavailable"
-# The kind of each cause stored with its HTTP status.
-_STATUS_KINDS: dict[type[Rejected | Unavailable], str] = {
-    Rejected: "rejected",
-    Unavailable: "unavailable",
-}
 _NAME_ESCAPES = {
     **{code: f"\\u{code:04x}" for code in range(0x20)},
     **{code: f"\\u{code:04x}" for code in range(0xD800, 0xE000)},
@@ -434,11 +429,20 @@ def dump_cause(cause: Cause) -> JSON:
             }
         case Rejected() | Unavailable():
             return {
-                "kind": _STATUS_KINDS[type(cause)],
+                "kind": name_status_kind(cause),
                 "status": cause.status,
             }
         case unreachable:
             assert_never(unreachable)
+
+
+def name_status_kind(cause: Rejected | Unavailable) -> str:
+    """The kind a cause stored with its HTTP status is stored as; a subclass takes its base's."""
+    match cause:
+        case Rejected():
+            return "rejected"
+        case Unavailable():
+            return "unavailable"
 
 
 def load_score(

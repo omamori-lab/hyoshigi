@@ -238,7 +238,10 @@ def is_rejection(
     """Whether a status and its error codes say the provider cannot use the input: a 413, a code
     of input it rejects, or invalid_prompt with no error type to say which failure it stands for.
     """
-    return status == 413 or not REJECTED_INPUT.isdisjoint(codes) or codes == ("invalid_prompt",)
+    return status == 413 or responses.is_input_rejection(
+        codes,
+        rejections=REJECTED_INPUT,
+    )
 
 
 def read_decision_error(

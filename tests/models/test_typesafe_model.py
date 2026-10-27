@@ -668,7 +668,6 @@ def test_a_request_typesafe_cannot_use_returns_rejected_with_its_status(
 
 # A constructed body: a 400 whose error type names a cause other than the context length
 # names its reason, so an image in the state does not make it the image's.
-@pytest.mark.xfail(strict=True)
 @BUILDERS
 def test_a_400_that_names_its_error_type_raises_for_a_state_that_holds_an_image(
     build_model: ModelBuilder,
