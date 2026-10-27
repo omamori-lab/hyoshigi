@@ -11,6 +11,7 @@ from hyoshigi import (
     Author,
     Block,
     Description,
+    Flag,
     FormatError,
     Halt,
     MediaPart,
@@ -1983,6 +1984,21 @@ REASON = "Deleting q3.csv is outside the task."
             id="run",
         ),
         pytest.param(
+            Flag(
+                action=DELETE_FILE,
+                proposals=(PROPOSED_DELETE,),
+                position=4,
+            ),
+            {
+                "kind": "flag",
+                "proposal": 0,
+                "proposals": [STORED_PROPOSED_DELETE],
+                "position": 4,
+            },
+            id="flag",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
             Replace(
                 action=SUMMARISE,
                 proposals=(
@@ -2090,6 +2106,20 @@ def test_a_persons_run_after_an_audit_loads_back_at_the_same_position(
         audit,
         run,
     )
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_flag_loads_back_at_its_position(trajectory: Trajectory) -> None:
+    flag = Flag(
+        action=DELETE_FILE,
+        proposals=(PROPOSED_DELETE,),
+        position=4,
+    )
+    trajectory.record(flag)
+
+    loaded = Trajectory.load(trajectory.dump())
+
+    assert loaded.records == (flag,)
 
 
 STORED_RUN: dict[str, JSON] = {
@@ -2392,6 +2422,20 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             id="run-of-an-action-not-at-its-position",
         ),
         pytest.param(
+            {
+                **build_record_payload(
+                    {
+                        **STORED_RUN,
+                        "kind": "flag",
+                    },
+                ),
+                "history": [ACTION],
+            },
+            RECORD_PATH,
+            id="flag-of-an-action-not-at-its-position",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
             build_record_payload(
                 {
                     **STORED_RUN,
@@ -2429,6 +2473,23 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             "$.records[1]",
             id="audit-at-the-position-of-a-run-before-it",
+        ),
+        pytest.param(
+            {
+                **build_record_payload(STORED_RUN),
+                "records": [
+                    {
+                        **STORED_RUN,
+                        "kind": "flag",
+                    },
+                    {
+                        **STORED_RUN,
+                        "kind": "audit",
+                    },
+                ],
+            },
+            "$.records[1]",
+            id="audit-at-the-position-of-a-flag-before-it",
         ),
         pytest.param(
             {
@@ -2576,8 +2637,8 @@ def test_loading_a_malformed_record_raises_format_error_at_its_path(
 
 
 RECORD_EXPECTED = (
-    "$.records[0]: expected a run, replace, block, audit or halt record, with its proposals and "
-    "position"
+    "$.records[0]: expected a run, flag, replace, block, audit or halt record, with its "
+    "proposals and position"
 )
 PROPOSAL_EXPECTED = (
     "$.records[0].proposals[0]: expected a proposal with an action, a score, null for a trusted "
@@ -2592,6 +2653,7 @@ PROPOSAL_EXPECTED = (
             build_record_payload("run"),
             RECORD_EXPECTED,
             id="record-not-a-mapping",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2602,6 +2664,7 @@ PROPOSAL_EXPECTED = (
             ),
             RECORD_EXPECTED,
             id="unknown-kind",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2612,6 +2675,7 @@ PROPOSAL_EXPECTED = (
             ),
             RECORD_EXPECTED,
             id="no-proposals",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2653,9 +2717,10 @@ PROPOSAL_EXPECTED = (
                 **build_record_payload(STORED_RUN),
                 "history": [ACTION],
             },
-            "$.records[0]: expected a run, replace or block of the action at its position in the "
-            "history",
+            "$.records[0]: expected a run, flag, replace or block of the action at its position "
+            "in the history",
             id="run-of-an-action-not-at-its-position",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {

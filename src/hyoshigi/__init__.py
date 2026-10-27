@@ -63,6 +63,7 @@ from hyoshigi.protocols.blocking import AsyncBlockAndFeedBack, BlockAndFeedBack
 from hyoshigi.protocols.decisions import (
     Audit,
     Block,
+    Flag,
     Halt,
     Policy,
     Proposal,
@@ -70,7 +71,12 @@ from hyoshigi.protocols.decisions import (
     Replace,
     Run,
 )
-from hyoshigi.protocols.deferral import AsyncDeferToResample, DeferToResample, Resampling
+from hyoshigi.protocols.deferral import (
+    AsyncDeferToResample,
+    AuditResponse,
+    DeferToResample,
+    Resampling,
+)
 from hyoshigi.protocols.requests import FailureResponse, ProtocolRequest, Resample, TrustedStep
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role, marked
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
@@ -101,6 +107,7 @@ __all__ = [
     "AsyncRepeatedMonitor",
     "AsyncReportedMonitor",
     "Audit",
+    "AuditResponse",
     "Author",
     "Authorship",
     "BlackBoxRun",
@@ -123,6 +130,7 @@ __all__ = [
     "Evidence",
     "FailedClosed",
     "FailureResponse",
+    "Flag",
     "FormatError",
     "Generation",
     "GenerationOutcome",

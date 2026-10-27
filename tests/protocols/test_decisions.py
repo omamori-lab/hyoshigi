@@ -7,6 +7,7 @@ from hyoshigi import (
     Audit,
     Block,
     ConfigurationError,
+    Flag,
     Halt,
     Policy,
     Proposal,
@@ -110,6 +111,17 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             NOT_PROPOSED,
             id="replace-with-an-action-not-proposed",
+        ),
+        pytest.param(
+            Flag,
+            {
+                "action": WRITE,
+                "proposals": (PROPOSED_READ,),
+                "position": 0,
+            },
+            NOT_PROPOSED,
+            id="flag-of-an-action-not-proposed",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Block,

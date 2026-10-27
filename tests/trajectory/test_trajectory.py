@@ -8,6 +8,7 @@ from hyoshigi import (
     Author,
     Block,
     ConfigurationError,
+    Flag,
     Halt,
     Observation,
     Policy,
@@ -111,6 +112,11 @@ PROPOSED_TRUSTED_STEP = Proposal(
     policy=Policy.TRUSTED,
 )
 RUN_WRITE = Run(
+    action=WRITING,
+    proposals=(PROPOSED_WRITE,),
+    position=1,
+)
+FLAG_WRITE = Flag(
     action=WRITING,
     proposals=(PROPOSED_WRITE,),
     position=1,
@@ -627,6 +633,20 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             id="run-of-an-action-proposed-twice",
         ),
         pytest.param(
+            FLAG_WRITE,
+            (
+                TASK_OBSERVATION,
+                WRITING,
+            ),
+            (
+                Rating(
+                    action_id="a2",
+                    score=WRITES_ELSEWHERE,
+                ),
+            ),
+            id="flag",
+        ),
+        pytest.param(
             Replace(
                 action=RESAMPLED,
                 proposals=(
@@ -786,8 +806,10 @@ STALE = "the decision's position is not the length of the history"
     [
         pytest.param(
             WRITING,
-            "decision must be a Run, Replace, Block, Audit or Halt, got an instance of Action",
+            "decision must be a Run, Flag, Replace, Block, Audit or Halt, "
+            "got an instance of Action",
             id="an-action",
+            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             RUN_WRITE,
