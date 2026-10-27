@@ -46,7 +46,8 @@ the ratings, so a later rating's prompt is the same with or without them.
 A transcript that already ends in the agent's reply holds the action to rate
 as its latest entry. `split_latest_step` returns that action and a new
 trajectory of everything before it, with the earlier actions' ratings and
-subagents. The trajectory it splits keeps every entry and rating it had.
+subagents and the records whose position is before the action's. The
+trajectory it splits keeps every entry, rating and record it had.
 `rate_latest_step` rates a transcript in this way, and
 [Keeping a trajectory](../how-to/keeping-a-trajectory.md) gives each method.
 
