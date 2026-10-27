@@ -1,6 +1,7 @@
 """Reports of a rating to Langfuse and LangSmith: the request on the wire, and when none is sent."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import subprocess
@@ -8,6 +9,7 @@ import sys
 import threading
 import uuid
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -71,6 +73,23 @@ CALM_METADATA = {
     "cause": None,
     "model": MODEL_NAME,
 }
+# The body of POST /feedback (langsmith.schemas, FeedbackCreate, without its None fields) for a
+# calm rating; the id and the times differ in every run.
+CALM_FEEDBACK = {
+    "id": ANY,
+    "created_at": ANY,
+    "modified_at": ANY,
+    "run_id": RUN_ID,
+    "key": "suspicion",
+    "score": 0.3,
+    "comment": "calm",
+    "feedback_source": {
+        "type": "model",
+        "metadata": CALM_METADATA,
+    },
+    "session_id": PROJECT_ID,
+    "extend_trace_retention": False,
+}
 CALM_ATTRIBUTES = {
     "gen_ai.evaluation.name": "suspicion",
     "gen_ai.evaluation.score.value": 0.3,
@@ -87,6 +106,10 @@ UNSAMPLED_PARENT = NonRecordingSpan(
     ),
 )
 UNUSED_URL = "http://127.0.0.1:9"
+# How long the stand-in LangSmith server holds an answer that is not released: less than the
+# clients' read timeouts, 10 s for AsyncClient and 60 s for Client, so a rating that waits for the
+# answer gets it.
+ANSWER_HOLD_SECONDS = 5
 
 
 class Script:
@@ -189,6 +212,9 @@ def langfuse(langfuse_stand_in: LangfuseStandIn) -> LangfuseStandIn:
 class LangSmithServer(ThreadingHTTPServer):
     """LangSmith's end of the connection, on 127.0.0.1: records each request's path and JSON
     body, and answers with an empty JSON object and the next of `first_statuses`, then `status`.
+
+    An answer waits until `release` is set, for at most ANSWER_HOLD_SECONDS, and its status goes
+    into `answered` before it is sent.
     """
 
     def __init__(self) -> None:
@@ -199,6 +225,8 @@ class LangSmithServer(ThreadingHTTPServer):
         self.received: list[tuple[str, JSON]] = []
         self.first_statuses: list[int] = []
         self.status = 200
+        self.release = threading.Event()
+        self.answered: list[int] = []
 
     @property
     def url(self) -> str:
@@ -220,7 +248,9 @@ class FeedbackHandler(BaseHTTPRequestHandler):
                 json.loads(body),
             ),
         )
+        server.release.wait(ANSWER_HOLD_SECONDS)
         status = server.first_statuses.pop(0) if server.first_statuses else server.status
+        server.answered.append(status)
         self.send_response(status)
         self.send_header(
             "Content-Type",
@@ -257,10 +287,12 @@ def langsmith_server() -> Iterator[LangSmithServer]:
 
 @pytest.fixture
 def langsmith(langsmith_server: LangSmithServer) -> LangSmithServer:
-    """The stand-in server, with no request received yet, answering 200."""
+    """The stand-in server, with no request received or answered yet, answering 200 at once."""
     langsmith_server.received.clear()
     langsmith_server.first_statuses.clear()
     langsmith_server.status = 200
+    langsmith_server.release.set()
+    langsmith_server.answered.clear()
     return langsmith_server
 
 
@@ -327,8 +359,22 @@ def rate(monitor: Monitor | AsyncMonitor) -> SuspicionScore:
     slots=True,
     kw_only=True,
 )
+class WorkerRating:
+    """A rating whose LangSmith report sent on a worker: its score, and the statuses LangSmith had
+    answered when it returned.
+    """
+
+    score: SuspicionScore
+    answered: list[int]
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Family[Rater]:
-    """The monitors and the LangSmith report of one family."""
+    """The monitors and the LangSmith report of one family, and its ratings with a worker."""
 
     llm: Callable[..., Rater]
     repeated: Callable[..., Rater]
@@ -336,6 +382,8 @@ class Family[Rater]:
     cascade: Callable[..., Rater]
     reported: Callable[..., Rater]
     feedback: Callable[[str], LangSmithFeedback | AsyncLangSmithFeedback]
+    rate_with_a_worker: Callable[[LangSmithServer], WorkerRating]
+    rate_and_cancel_the_send: Callable[[LangSmithServer], None]
 
 
 def build_synchronous_llm(
@@ -364,6 +412,116 @@ def build_asynchronous_llm(
     )
 
 
+def rate_on_an_executor(langsmith: LangSmithServer) -> WorkerRating:
+    """Rate calmly with the LangSmith report posting on an executor, release LangSmith's answers
+    once the rating returns, then shut the executor down.
+    """
+    with ThreadPoolExecutor() as executor:
+        monitor = ReportedMonitor(
+            monitor=build_synchronous_llm(Script(build_reply(3))),
+            reports=(
+                replace(
+                    build_feedback(langsmith.url),
+                    executor=executor,
+                ),
+            ),
+        )
+        score = rate(monitor)
+        answered = list(langsmith.answered)
+        langsmith.release.set()
+    return WorkerRating(
+        score=score,
+        answered=answered,
+    )
+
+
+def rate_in_a_task_group(langsmith: LangSmithServer) -> WorkerRating:
+    """Rate calmly with the LangSmith report posting in a task group, release LangSmith's answers
+    once the rating returns, then leave the group.
+    """
+
+    async def rate_in_the_group() -> WorkerRating:
+        async with asyncio.TaskGroup() as group:
+            score = await AsyncReportedMonitor(
+                monitor=build_asynchronous_llm(Script(build_reply(3))),
+                reports=(
+                    replace(
+                        build_async_feedback(langsmith.url),
+                        task_group=group,
+                    ),
+                ),
+            ).rate(
+                ACTION,
+                trajectory=build_trajectory(),
+            )
+            answered = list(langsmith.answered)
+            langsmith.release.set()
+        return WorkerRating(
+            score=score,
+            answered=answered,
+        )
+
+    return asyncio.run(rate_in_the_group())
+
+
+def rate_and_cancel_on_an_executor(langsmith: LangSmithServer) -> None:
+    """Rate calmly with the LangSmith report posting on an executor whose one thread is busy, then
+    shut the executor down, cancelling the post before it starts.
+    """
+    busy = threading.Event()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(
+            busy.wait,
+            ANSWER_HOLD_SECONDS,
+        )
+        rate(
+            ReportedMonitor(
+                monitor=build_synchronous_llm(Script(build_reply(3))),
+                reports=(
+                    replace(
+                        build_feedback(langsmith.url),
+                        executor=executor,
+                    ),
+                ),
+            ),
+        )
+        executor.shutdown(
+            wait=False,
+            cancel_futures=True,
+        )
+        busy.set()
+
+
+class CallerError(Exception):
+    """An error in the caller's own code inside its task group, which cancels the group's tasks."""
+
+
+def rate_and_cancel_in_a_task_group(langsmith: LangSmithServer) -> None:
+    """Rate calmly with the LangSmith report posting in a task group whose body then raises
+    CallerError, which cancels the post.
+    """
+
+    async def rate_then_raise() -> None:
+        async with asyncio.TaskGroup() as group:
+            await AsyncReportedMonitor(
+                monitor=build_asynchronous_llm(Script(build_reply(3))),
+                reports=(
+                    replace(
+                        build_async_feedback(langsmith.url),
+                        task_group=group,
+                    ),
+                ),
+            ).rate(
+                ACTION,
+                trajectory=build_trajectory(),
+            )
+            raise CallerError
+
+    # The group raises an exception group of the CallerError alone, which suppress takes.
+    with contextlib.suppress(CallerError):
+        asyncio.run(rate_then_raise())
+
+
 SYNCHRONOUS = Family(
     llm=build_synchronous_llm,
     repeated=RepeatedMonitor,
@@ -371,6 +529,8 @@ SYNCHRONOUS = Family(
     cascade=CascadeMonitor,
     reported=ReportedMonitor,
     feedback=build_feedback,
+    rate_with_a_worker=rate_on_an_executor,
+    rate_and_cancel_the_send=rate_and_cancel_on_an_executor,
 )
 ASYNCHRONOUS = Family(
     llm=build_asynchronous_llm,
@@ -379,6 +539,8 @@ ASYNCHRONOUS = Family(
     cascade=AsyncCascadeMonitor,
     reported=AsyncReportedMonitor,
     feedback=build_async_feedback,
+    rate_with_a_worker=rate_in_a_task_group,
+    rate_and_cancel_the_send=rate_and_cancel_in_a_task_group,
 )
 
 
@@ -492,26 +654,10 @@ def test_langsmith_receives_the_score_as_model_feedback_on_the_run_of_the_rating
 
     rate(monitor)
 
-    # The body of POST /feedback (langsmith.schemas, FeedbackCreate, without its None fields);
-    # the id and the times differ in every run.
     assert langsmith.received == [
         (
             "/feedback",
-            {
-                "id": ANY,
-                "created_at": ANY,
-                "modified_at": ANY,
-                "run_id": RUN_ID,
-                "key": "suspicion",
-                "score": 0.3,
-                "comment": "calm",
-                "feedback_source": {
-                    "type": "model",
-                    "metadata": CALM_METADATA,
-                },
-                "session_id": PROJECT_ID,
-                "extend_trace_retention": False,
-            },
+            CALM_FEEDBACK,
         ),
     ]
 
@@ -810,6 +956,118 @@ def test_a_score_lost_to_a_run_not_found_after_one_attempt_is_logged_by_its_clas
             "hyoshigi.monitors.reporting",
             logging.WARNING,
             f"{report} did not send the score: LangSmithNotFoundError.",
+        ),
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "status",
+    [
+        200,
+        401,
+    ],
+    ids=["accepted", "rejected"],
+)
+def test_a_report_with_a_worker_returns_the_score_before_langsmith_answers(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    status: int,
+) -> None:
+    langsmith.status = status
+    langsmith.release.clear()
+
+    rating = family.rate_with_a_worker(langsmith)
+
+    assert rating == WorkerRating(
+        score=SuspicionScore(
+            value=0.3,
+            explanation="calm",
+            evidence=Rationale(model=MODEL_NAME),
+        ),
+        answered=[],
+    )
+
+
+def test_langsmith_receives_the_feedback_a_worker_sends_once_the_worker_finishes(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    family.rate_with_a_worker(langsmith)
+
+    assert langsmith.received == [
+        (
+            "/feedback",
+            CALM_FEEDBACK,
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("family", "report"),
+    [
+        (
+            SYNCHRONOUS,
+            "LangSmithFeedback",
+        ),
+        (
+            ASYNCHRONOUS,
+            "AsyncLangSmithFeedback",
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_a_send_that_fails_on_a_worker_is_logged_by_the_reports_class_and_error_type(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    caplog: pytest.LogCaptureFixture,
+    report: str,
+) -> None:
+    langsmith.status = 401
+
+    family.rate_with_a_worker(langsmith)
+
+    assert [record for record in caplog.record_tuples if record[0].startswith("hyoshigi")] == [
+        (
+            "hyoshigi.monitors.reporting",
+            logging.WARNING,
+            f"{report} did not send the score: LangSmithAuthError.",
+        ),
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("family", "report"),
+    [
+        (
+            SYNCHRONOUS,
+            "LangSmithFeedback",
+        ),
+        (
+            ASYNCHRONOUS,
+            "AsyncLangSmithFeedback",
+        ),
+    ],
+    ids=["sync", "async"],
+)
+def test_a_send_cancelled_on_its_worker_is_logged_as_cancelled(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    caplog: pytest.LogCaptureFixture,
+    report: str,
+) -> None:
+    family.rate_and_cancel_the_send(langsmith)
+
+    assert [record for record in caplog.record_tuples if record[0].startswith("hyoshigi")] == [
+        (
+            "hyoshigi.monitors.reporting",
+            logging.WARNING,
+            f"{report} did not send the score: CancelledError.",
         ),
     ]
 
@@ -1152,10 +1410,38 @@ def test_reports_that_are_not_a_tuple_of_the_familys_reports_are_refused(
             object,
             "client must be a Langfuse, got an instance of object",
         ),
+        pytest.param(
+            partial(
+                LangSmithFeedback,
+                project_id=PROJECT_ID,
+                executor=asyncio.TaskGroup(),
+            ),
+            build_client,
+            "executor must be an Executor, got an instance of asyncio.taskgroups.TaskGroup. "
+            "Use AsyncLangSmithFeedback for a TaskGroup.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(
+                AsyncLangSmithFeedback,
+                project_id=PROJECT_ID,
+                task_group=ThreadPoolExecutor(),
+            ),
+            build_async_client,
+            "task_group must be a TaskGroup, got an instance of "
+            "concurrent.futures.thread.ThreadPoolExecutor. Use LangSmithFeedback for an Executor.",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
-    ids=["async-client-in-sync", "sync-client-in-async", "not-a-langfuse-client"],
+    ids=[
+        "async-client-in-sync",
+        "sync-client-in-async",
+        "not-a-langfuse-client",
+        "task-group-in-sync",
+        "executor-in-async",
+    ],
 )
-def test_a_client_that_is_not_the_reports_sdk_client_is_refused_naming_the_twin(
+def test_a_client_or_worker_of_the_wrong_kind_is_refused_naming_the_twin(
     report: Callable[..., object],
     build_client: Callable[[], object],
     message: str,

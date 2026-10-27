@@ -8,7 +8,9 @@ backend knows the scored step by; ReportedMonitor gives it the ids of its rating
 # The SDKs' clients are imported only to type, since each SDK is an optional extra.
 from __future__ import annotations
 
+import asyncio
 import uuid
+from concurrent.futures import Executor
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, assert_never
 
@@ -104,6 +106,7 @@ class LangSmithFeedback:
     project_id: str
     name: str = EVALUATION_NAME
     stop_after_attempt: int = 10
+    executor: Executor | None = None
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].
@@ -161,6 +164,7 @@ class AsyncLangSmithFeedback:
     project_id: str
     name: str = EVALUATION_NAME
     stop_after_attempt: int = 10
+    task_group: asyncio.TaskGroup | None = None
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].
