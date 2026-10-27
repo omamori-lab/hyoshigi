@@ -5,7 +5,7 @@ from urllib.parse import unquote_to_bytes
 
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.trajectory.parts import MediaPart
-from hyoshigi.trajectory.storage import decode_data
+from hyoshigi.trajectory.storage.events import decode_data
 
 # RFC 2397, section 3: data:[<mediatype>][;base64],<data>, where the media type, with its
 # parameters, defaults to text/plain. Parameter names are case-insensitive (RFC 2045, section
