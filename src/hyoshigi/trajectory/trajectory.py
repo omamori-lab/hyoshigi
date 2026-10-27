@@ -451,7 +451,7 @@ class Trajectory:
                     load_record(
                         record,
                         path=f"{path}.records[{index}]",
-                        length=len(trajectory._history),
+                        history=trajectory._history,
                     )
                     for index, record in enumerate(records)
                 ]

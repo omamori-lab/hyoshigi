@@ -15,7 +15,7 @@ from hyoshigi.protocols.decisions import (
     Replace,
     Run,
 )
-from hyoshigi.trajectory.history import Action
+from hyoshigi.trajectory.history import Action, Event
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.storage.events import dump_event, load_event
 from hyoshigi.trajectory.storage.scores import dump_score, load_score
@@ -102,16 +102,19 @@ def load_record(
     data: JSON,
     *,
     path: str,
-    length: int,
+    history: list[Event],
 ) -> ProtocolDecision:
-    """Read a decision that dump_record wrote, on a history `length` entries long."""
+    """Read a decision that dump_record wrote, on the history it was recorded on.
+
+    A run, a replace or a block names the action at its position in the history.
+    """
     match data:
         case {
             "kind": str(),
             "proposals": list(proposals),
             "position": int(position),
         }:
-            if not 0 <= position <= length:
+            if not 0 <= position <= len(history):
                 raise FormatError(
                     path=f"{path}.position",
                     expected="a position from 0 to the length of the history",
@@ -124,7 +127,7 @@ def load_record(
                 for index, proposal in enumerate(proposals)
             )
             try:
-                return build_decision(
+                decision = build_decision(
                     data,
                     proposals=loaded,
                     position=position,
@@ -135,11 +138,37 @@ def load_record(
                     path=path,
                     expected=_RECORD,
                 ) from None
+            check_history(
+                decision,
+                history=history,
+                path=path,
+            )
+            return decision
         case _:
             raise FormatError(
                 path=path,
                 expected=_RECORD,
             )
+
+
+def check_history(
+    decision: ProtocolDecision,
+    *,
+    history: list[Event],
+    path: str,
+) -> None:
+    """Raise FormatError unless a run, a replace or a block names the action at its position in
+    the history.
+    """
+    # The slice is empty when the position is the length of the history.
+    if isinstance(
+        decision,
+        Run | Replace | Block,
+    ) and history[decision.position : decision.position + 1] != [decision.action]:
+        raise FormatError(
+            path=path,
+            expected="a run, replace or block of the action at its position in the history",
+        )
 
 
 def build_decision(

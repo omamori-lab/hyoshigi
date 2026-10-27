@@ -2366,7 +2366,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             RECORD_PATH,
             id="run-of-an-action-not-at-its-position",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
@@ -2378,7 +2377,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             ),
             RECORD_PATH,
             id="replace-with-no-entry-at-its-position",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2393,7 +2391,6 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
             },
             RECORD_PATH,
             id="block-of-an-action-not-at-its-position",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_record_payload(
