@@ -665,6 +665,18 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 **ENVELOPE,
                 "history": [
                     {
+                        **TOOL_OBSERVATION,
+                        "author": "admin",
+                    },
+                ],
+            },
+            "$.history[0].author",
+        ),
+        (
+            {
+                **ENVELOPE,
+                "history": [
+                    {
                         **OBSERVATION,
                         "parts": [
                             TEXT,
@@ -886,6 +898,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "malformed-action-part",
         "tool-call-without-arguments",
         "unknown-author",
+        "unknown-tool-observation-author",
         "malformed-observation-part",
         "malformed-tool-observation-part",
         "data-not-base64",
@@ -1773,8 +1786,8 @@ def test_a_format_error_for_a_rating_never_quotes_the_payload() -> None:
     assert "s3cret-0f3c" not in str(raised.value)
 
 
-def nest_composites(depth: int) -> dict[str, JSON]:
-    """A stored trajectory whose one rating nests composite scores that many levels deep."""
+def nest_score(depth: int) -> JSON:
+    """A stored score that nests composite scores that many levels deep."""
     score: JSON = STORED_READS_THE_FILE
     for _ in range(depth):
         score = {
@@ -1785,10 +1798,15 @@ def nest_composites(depth: int) -> dict[str, JSON]:
                 "parts": [score],
             },
         }
+    return score
+
+
+def nest_composites(depth: int) -> dict[str, JSON]:
+    """A stored trajectory whose one rating nests composite scores that many levels deep."""
     return build_rating_payload(
         {
             "action_id": "a1",
-            "score": score,
+            "score": nest_score(depth),
         },
     )
 
@@ -2321,6 +2339,18 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
                 {
                     **STORED_RUN,
                     "kind": "block",
+                    "proposal": 1,
+                    "reason": REASON,
+                },
+            ),
+            "$.records[0].proposal",
+            id="block-proposal-index-past-the-proposals",
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "block",
                 },
             ),
             RECORD_PATH,
@@ -2394,3 +2424,96 @@ def test_loading_a_malformed_record_raises_format_error_at_its_path(
         Trajectory.load(payload)
 
     assert raised.value.path == path
+
+
+RECORD_EXPECTED = (
+    "$.records[0]: expected a run, replace, block, audit or halt record, with its proposals and "
+    "position"
+)
+PROPOSAL_EXPECTED = (
+    "$.records[0].proposals[0]: expected a proposal with an action, a score, null for a trusted "
+    "one, and a policy"
+)
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        pytest.param(
+            build_record_payload("run"),
+            RECORD_EXPECTED,
+            id="record-not-a-mapping",
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "kind": "allow",
+                },
+            ),
+            RECORD_EXPECTED,
+            id="unknown-kind",
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_HALT,
+                    "proposals": [],
+                },
+            ),
+            RECORD_EXPECTED,
+            id="no-proposals",
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "position": 2,
+                },
+            ),
+            "$.records[0].position: expected a position from 0 to the length of the history",
+            id="position-past-the-history",
+        ),
+        pytest.param(
+            build_record_payload(
+                {
+                    **STORED_RUN,
+                    "proposal": 1,
+                },
+            ),
+            "$.records[0].proposal: expected the index of one of the record's proposals",
+            id="proposal-index-past-the-proposals",
+        ),
+        pytest.param(
+            build_proposal_payload(policy="monitor"),
+            PROPOSAL_EXPECTED,
+            id="unknown-policy",
+        ),
+        pytest.param(
+            build_proposal_payload(score=None),
+            PROPOSAL_EXPECTED,
+            id="untrusted-proposal-without-a-score",
+        ),
+        pytest.param(
+            build_proposal_payload(action=OBSERVATION),
+            "$.records[0].proposals[0].action: expected an action",
+            id="action-an-observation",
+        ),
+    ],
+)
+def test_a_format_error_for_a_record_says_what_was_expected(
+    payload: JSON,
+    message: str,
+) -> None:
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert str(raised.value) == message
+
+
+def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:
+    payload = build_proposal_payload(score=nest_score(32))
+
+    loaded = Trajectory.load(payload)
+
+    assert loaded.dump() == payload
