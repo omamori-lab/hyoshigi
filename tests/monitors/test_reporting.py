@@ -960,7 +960,6 @@ def test_a_score_lost_to_a_run_not_found_after_one_attempt_is_logged_by_its_clas
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "status",
     [
@@ -1039,7 +1038,6 @@ def test_a_send_that_fails_on_a_worker_is_logged_by_the_reports_class_and_error_
     ]
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("family", "report"),
     [
@@ -1410,7 +1408,7 @@ def test_reports_that_are_not_a_tuple_of_the_familys_reports_are_refused(
             object,
             "client must be a Langfuse, got an instance of object",
         ),
-        pytest.param(
+        (
             partial(
                 LangSmithFeedback,
                 project_id=PROJECT_ID,
@@ -1419,9 +1417,8 @@ def test_reports_that_are_not_a_tuple_of_the_familys_reports_are_refused(
             build_client,
             "executor must be an Executor, got an instance of asyncio.taskgroups.TaskGroup. "
             "Use AsyncLangSmithFeedback for a TaskGroup.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             partial(
                 AsyncLangSmithFeedback,
                 project_id=PROJECT_ID,
@@ -1430,7 +1427,6 @@ def test_reports_that_are_not_a_tuple_of_the_familys_reports_are_refused(
             build_async_client,
             "task_group must be a TaskGroup, got an instance of "
             "concurrent.futures.thread.ThreadPoolExecutor. Use LangSmithFeedback for an Executor.",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[

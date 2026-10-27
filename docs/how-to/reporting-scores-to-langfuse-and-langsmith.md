@@ -285,8 +285,8 @@ reports[0] must be a LangfuseScores or a LangSmithFeedback, got an instance of A
 
 `ConfigurationError` is also raised:
 
-- when a report is built, for a `client` of another class, a blank `name` and a `project_id` that is
-  not a UUID string;
+- when a report is built, for a `client`, an `executor` or a `task_group` of another class, a blank
+  `name` and a `project_id` that is not a UUID string;
 - when the monitor is built, for a `monitor` that is not a `Monitor` and for `reports` that are not a
   non-empty tuple;
 - when the monitor is built in a process without `opentelemetry-api`, with a message that names the
@@ -366,31 +366,40 @@ print(f"{sent['value']} {sent['metadata']}")
 1.0 {'failed_closed': True, 'cause': 'Unavailable', 'model': 'trusted-1'}
 ```
 
-## Langfuse queues the score and LangSmith waits for its answer
+## Langfuse queues the score, and the LangSmith report waits without a worker
 
 `LangfuseScores` hands the score to Langfuse's client, which queues it and sends it in the
 background (`Langfuse.create_score`). A rating returns without waiting for the network, and the
 client logs a failed request without raising it. `Langfuse.flush()` sends what is queued, so the
 stand-in holds the score by the time an example reads it.
 
-`LangSmithFeedback` posts the feedback at once and returns after LangSmith answers, so an error from
-the client is raised. LangSmith's client sends feedback in the background only when it is given a
-trace id [@langsmith2026feedback, {Section} "Use create_feedback() / createFeedback"], and the
-report gives it the run's id alone. The report also passes `extend_trace_retention=False`, where the
-client's default is true (langsmith 0.14.11). Feedback that passes true upgrades the trace to the
-extended retention tier, which raises its cost
+`LangSmithFeedback` without a worker posts the feedback at once and returns after LangSmith answers,
+so an error from the client is raised. In langsmith 0.14.11, `Client.create_feedback` queues
+feedback for a background thread only when all of these hold:
+
+- the call gives a trace id
+  [@langsmith2026feedback, {Section} "Use create_feedback() / createFeedback"];
+- the call passes `extend_trace_retention=True`;
+- the client has no OpenTelemetry exporter;
+- the client batches its traces in the background, as `auto_batch_tracing=True` sets;
+- the server is version 0.8.10 or later and takes the multipart ingestion endpoint.
+
+`AsyncClient.create_feedback` awaits the post in every case. The report gives the client the run's
+id alone and passes `extend_trace_retention=False`, where the client's default is true. Feedback
+that passes true upgrades the trace to the extended retention tier, which raises its cost
 [@langsmith2026retention, {Section} "Data retention auto-upgrades"], and the report leaves the tier
 as it is. The client rounds the score to 4 decimal places, so 0.123456 is sent as 0.1235.
 
-The client tries again before it raises, and the rating waits (langsmith 0.14.11). After a 404 it
-makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about 8.5 minutes in
-all. It retries a 404 because the run may not be ingested yet ([why a score may arrive before its
-span](../explanation/observability.md)). It retries a connection error and a 408 or 500 answer too,
-and the asynchronous client a 425, 502, 503 or 504 answer as well. The synchronous client also
-retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it has none, and
-double, which can hold a rating for over 4 hours. Within each attempt, the synchronous client's HTTP
-session sends up to 3 more requests after a connection error or a 408, 425, 429, 500, 502, 503 or
-504 answer, waiting the answer's `Retry-After` seconds when it has them. A 401 is raised at once.
+The client tries again before it raises, and a rating without a worker waits (langsmith 0.14.11).
+After a 404 it makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about
+8.5 minutes in all. It retries a 404 because the run may not be ingested yet ([why a score may
+arrive before its span](../explanation/observability.md)). It retries a connection error and a 408
+or 500 answer too, and the asynchronous client a 425, 502, 503 or 504 answer as well. The
+synchronous client also retries a 429, with waits that start at the answer's `Retry-After` seconds,
+30 when it has none, and double, which can hold a rating for over 4 hours. Within each attempt, the
+synchronous client's HTTP session sends up to 3 more requests after a connection error or a 408,
+425, 429, 500, 502, 503 or 504 answer, waiting the answer's `Retry-After` seconds when it has them.
+A 401 is raised at once.
 
 `stop_after_attempt` caps the attempts, a positive integer that is 10 by default, as in the client's
 `create_feedback`, and the synchronous client's `retry_config` sets its session's retries. A control
@@ -419,6 +428,103 @@ report [logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
 
 `project_id` is the id of the run's project, which LangSmith asks of feedback on a run
 [@langsmith2026feedbackformat]. The client sends it as `session_id`.
+
+## With a worker, a rating returns before LangSmith answers
+
+`LangSmithFeedback` takes an `executor`, any `concurrent.futures.Executor`. Its `send` then submits
+the post to the executor and returns at once, so the rating returns its score while the executor
+runs the post. `executor.shutdown(wait=True)` returns once every post submitted has finished
+[@python2026concurrentfutures, {Section} "Executor Objects"]:
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+langsmith_received.clear()
+executor = ThreadPoolExecutor()
+monitor = ReportedMonitor(
+    monitor=LLMMonitor(model=script(Generation(text=CALM))),
+    reports=(
+        LangSmithFeedback(
+            client=Client(
+                api_url=langsmith_url,
+                api_key="lsv2-offline",
+                info={},
+                auto_batch_tracing=False,
+            ),
+            project_id=PROJECT_ID,
+            executor=executor,
+        ),
+    ),
+)
+score = monitor.rate(
+    answer,
+    trajectory=trajectory,
+)
+executor.shutdown(wait=True)
+print(f"score {score.value}, {len(langsmith_received)} feedback")
+```
+
+```text
+score 0.3, 1 feedback
+```
+
+`AsyncLangSmithFeedback` takes a `task_group`, an `asyncio.TaskGroup`. Its `send` creates a task
+for the post in the group and returns at once. Leaving the group waits for every task in it
+[@python2026tasks, {Section} "Task Groups"]:
+
+```python
+from hyoshigi import SuspicionScore
+
+
+async def rate_in_a_group() -> SuspicionScore:
+    async with asyncio.TaskGroup() as group:
+        reported = AsyncReportedMonitor(
+            monitor=AsyncLLMMonitor(
+                model=AsyncGenerativeModel(
+                    name="trusted-1",
+                    generate=generate_calmly,
+                ),
+            ),
+            reports=(
+                AsyncLangSmithFeedback(
+                    client=AsyncClient(
+                        api_url=langsmith_url,
+                        api_key="lsv2-offline",
+                    ),
+                    project_id=PROJECT_ID,
+                    task_group=group,
+                ),
+            ),
+        )
+        return await reported.rate(
+            answer,
+            trajectory=trajectory,
+        )
+
+
+langsmith_received.clear()
+score = asyncio.run(rate_in_a_group())
+print(f"score {score.value}, {len(langsmith_received)} feedback")
+```
+
+```text
+score 0.3, 1 feedback
+```
+
+A post on a worker that fails is logged by the report's class and the error's type and never
+raised, as [a failed report](#a-failed-report-is-logged-and-the-score-is-returned) is. A cancelled
+post is logged the same way, as `CancelledError`. `executor.shutdown(cancel_futures=True)` cancels
+the posts still waiting to start [@python2026concurrentfutures, {Section} "Executor Objects"], and
+a task group cancels its tasks when the code inside it raises
+[@python2026tasks, {Section} "Task Groups"].
+
+A worker moves the wait from the rating to `executor.shutdown(wait=True)` or to leaving the group. A
+`ThreadPoolExecutor` also holds the program's exit, since the interpreter joins its threads before
+it exits [@python2026concurrentfutures, {Section} "ThreadPoolExecutor"]. A post that is still
+retrying holds either: up to 511 seconds for a run LangSmith never ingests, at the default 10
+attempts, and over 4 hours for the synchronous client's retries of a 429. A low
+`stop_after_attempt` bounds that wait. An executor that runs each post on a daemon thread lets the
+program exit at once, and a post still running then is lost without a log record.
 
 ## The monitor's place in a stack decides which score is reported
 
@@ -601,4 +707,38 @@ print(f"LangSmith rejected {len(rejected)}, Langfuse received {len(langfuse_rece
 WARNING hyoshigi.monitors.reporting: LangSmithFeedback did not send the score: LangSmithAuthError.
 True
 LangSmith rejected 1, Langfuse received 1
+```
+
+On a worker, the same rejection is logged when the worker runs the post, and the rating returns the
+wrapped monitor's score:
+
+```python
+rejected.clear()
+executor = ThreadPoolExecutor()
+monitor = ReportedMonitor(
+    monitor=LLMMonitor(model=script(Generation(text=CALM))),
+    reports=(
+        LangSmithFeedback(
+            client=Client(
+                api_url=rejecting_url,
+                api_key="lsv2-offline",
+                info={},
+                auto_batch_tracing=False,
+            ),
+            project_id=PROJECT_ID,
+            executor=executor,
+        ),
+    ),
+)
+score = monitor.rate(
+    answer,
+    trajectory=trajectory,
+)
+executor.shutdown(wait=True)
+print(f"score {score.value}, LangSmith rejected {len(rejected)}")
+```
+
+```text
+WARNING hyoshigi.monitors.reporting: LangSmithFeedback did not send the score: LangSmithAuthError.
+score 0.3, LangSmith rejected 1
 ```

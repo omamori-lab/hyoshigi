@@ -21,7 +21,12 @@ from typing import TYPE_CHECKING, assert_never
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
-from hyoshigi.monitors.reports import AsyncLangSmithFeedback, LangfuseScores, LangSmithFeedback
+from hyoshigi.monitors.reports import (
+    AsyncLangSmithFeedback,
+    LangfuseScores,
+    LangSmithFeedback,
+    log_failure,
+)
 from hyoshigi.monitors.score import SuspicionScore
 from hyoshigi.monitors.tracing import find_tracer, record_rating, trace_rating
 from hyoshigi.options import check_instance, describe_type, name_class
@@ -105,7 +110,7 @@ class ReportedMonitor(Monitor):
     kw_only=True,
 )
 class AsyncReportedMonitor(AsyncMonitor):
-    """Rates and reports as ReportedMonitor does, with the monitor and LangSmith awaited.
+    """Rates and reports as ReportedMonitor does, with the monitor and the LangSmith report awaited.
 
     `reports` is a non-empty tuple of LangfuseScores and AsyncLangSmithFeedback, sent in turn.
     """
@@ -263,8 +268,8 @@ async def await_reports(
     context: SpanContext,
     reports: tuple[LangfuseScores | AsyncLangSmithFeedback, ...],
 ) -> None:
-    """Send the score to each report in turn for the span, awaiting LangSmith; a report that
-    raises is logged.
+    """Send the score to each report in turn for the span, awaiting the LangSmith report; a
+    report that raises is logged.
     """
     for report in reports:
         # Any error: reporting never loses the score or the reports after it.
@@ -316,19 +321,3 @@ def derive_run_id(context: SpanContext) -> str:
     from langsmith.integrations.otel import langsmith_run_id_from_otel_span_id
 
     return str(langsmith_run_id_from_otel_span_id(context.span_id))
-
-
-def log_failure(
-    report: object,
-    *,
-    error: Exception,
-) -> None:
-    """Log that a report did not send the score, by the report's class and the error's type.
-
-    <https://omamori-lab.github.io/hyoshigi/explanation/observability/>
-    """
-    logger.warning(
-        "%s did not send the score: %s.",
-        type(report).__name__,
-        type(error).__name__,
-    )
