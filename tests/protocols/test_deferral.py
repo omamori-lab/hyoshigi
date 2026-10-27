@@ -29,10 +29,12 @@ from hyoshigi import (
     AsyncGenerativeModel,
     AsyncLLMMonitor,
     Audit,
+    AuditResponse,
     Block,
     ConfigurationError,
     DeferToResample,
     FailureResponse,
+    Flag,
     GenerationOutcome,
     Policy,
     Prompt,
@@ -66,6 +68,20 @@ PROPOSED_UNAVAILABLE = build_proposal(
     PROPOSED,
     UNAVAILABLE_SCORE,
 )
+PROPOSED_AT_0_7 = build_proposal(
+    PROPOSED,
+    build_score(0.7),
+)
+PROPOSED_REFUSED = build_proposal(
+    PROPOSED,
+    FAILURES_WITH_AN_ANSWER[0][1],
+)
+# Trusted monitoring: no resamples, and no score between the thresholds.
+TRUSTED_MONITORING = {
+    "defer_threshold": 0.7,
+    "audit_threshold": 0.7,
+    "max_resamples": 0,
+}
 FIRST_AT_0_7 = build_proposal(
     FIRST,
     build_score(0.7),
@@ -1847,6 +1863,149 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
 
 
 @pytest.mark.parametrize(
+    ("model_outcome", "on_audit", "outcome"),
+    [
+        pytest.param(
+            build_reply(7),
+            AuditResponse.HOLD,
+            Audit(
+                action=PROPOSED,
+                proposals=(PROPOSED_AT_0_7,),
+                position=1,
+            ),
+            id="a-score-at-the-threshold-is-held",
+        ),
+        pytest.param(
+            build_reply(7),
+            AuditResponse.FLAG,
+            Flag(
+                action=PROPOSED,
+                proposals=(PROPOSED_AT_0_7,),
+                position=1,
+            ),
+            id="a-score-at-the-threshold-is-flagged",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            FAILURES_WITH_AN_ANSWER[0][0],
+            AuditResponse.HOLD,
+            Audit(
+                action=PROPOSED,
+                proposals=(PROPOSED_REFUSED,),
+                position=1,
+            ),
+            id="a-failed-rating-is-held",
+        ),
+        pytest.param(
+            FAILURES_WITH_AN_ANSWER[0][0],
+            AuditResponse.FLAG,
+            Flag(
+                action=PROPOSED,
+                proposals=(PROPOSED_REFUSED,),
+                position=1,
+            ),
+            id="a-failed-rating-is-flagged",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            UNAVAILABLE,
+            AuditResponse.HOLD,
+            Audit(
+                action=PROPOSED,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="a-rating-with-no-answer-is-held",
+        ),
+        pytest.param(
+            UNAVAILABLE,
+            AuditResponse.FLAG,
+            Flag(
+                action=PROPOSED,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="a-rating-with-no-answer-is-flagged",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_reply(6),
+            AuditResponse.FLAG,
+            Run(
+                action=PROPOSED,
+                proposals=(PROPOSED_AT_0_6,),
+                position=1,
+            ),
+            id="a-score-below-the-threshold-runs-under-flag",
+        ),
+    ],
+)
+def test_on_audit_decides_what_an_audited_proposal_becomes(
+    family: AnyFamily,
+    model_outcome: GenerationOutcome,
+    on_audit: AuditResponse,
+    outcome: ProtocolDecision,
+) -> None:
+    script = Script(model_outcome)
+
+    decided = family.decide_deferral(
+        script,
+        proposed=PROPOSED,
+        trajectory=build_trajectory(),
+        on_audit=on_audit,
+        **TRUSTED_MONITORING,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.parametrize(
+    ("on_audit", "outcome"),
+    [
+        pytest.param(
+            AuditResponse.HOLD,
+            Audit(
+                action=PROPOSED,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="held",
+        ),
+        pytest.param(
+            AuditResponse.FLAG,
+            Flag(
+                action=PROPOSED,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="flagged",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
+    family: AnyFamily,
+    on_audit: AuditResponse,
+    outcome: ProtocolDecision,
+) -> None:
+    request = TrustedStep(
+        proposals=(PROPOSED_UNAVAILABLE,),
+        position=1,
+    )
+
+    resumed = family.resume_deferral(
+        Script(),
+        request=request,
+        proposals=(),
+        trajectory=build_trajectory(),
+        on_audit=on_audit,
+        **TRUSTED_MONITORING,
+    )
+
+    assert resumed == outcome
+
+
+@pytest.mark.parametrize(
     ("options", "message"),
     [
         pytest.param(
@@ -1886,6 +2045,38 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
             {"resampling": "sequential"},
             "resampling must be a Resampling, got an instance of str",
             id="resampling-a-string",
+        ),
+        pytest.param(
+            {"on_audit": "flag"},
+            "on_audit must be an AuditResponse, got an instance of str",
+            id="on-audit-a-string",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {"on_audit": AuditResponse.FLAG},
+            "on_audit FLAG needs max_resamples 0, got 2",
+            id="flag-with-resamples",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                "on_audit": AuditResponse.FLAG,
+                "max_resamples": 1,
+                "defer_threshold": 0.7,
+                "audit_threshold": 0.7,
+            },
+            "on_audit FLAG needs max_resamples 0, got 1",
+            id="flag-with-one-resample",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                "on_audit": AuditResponse.FLAG,
+                "max_resamples": 0,
+            },
+            "on_audit FLAG needs defer_threshold (0.5) equal to audit_threshold (0.9)",
+            id="flag-with-different-thresholds",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

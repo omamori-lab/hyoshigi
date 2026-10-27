@@ -14,6 +14,7 @@ from hyoshigi.options import check_instance, describe_type
 from hyoshigi.protocols.decisions import (
     Audit,
     Block,
+    Flag,
     Halt,
     Proposal,
     ProtocolDecision,
@@ -283,7 +284,7 @@ class Trajectory:
         """
         if not isinstance(
             decision,
-            Run | Replace | Block | Audit | Halt,
+            Run | Flag | Replace | Block | Audit | Halt,
         ):
             raise ConfigurationError(
                 "decision must be a Run, Replace, Block, Audit or Halt, "
@@ -292,7 +293,7 @@ class Trajectory:
         if decision.position != len(self._history):
             raise ConfigurationError("the decision's position is not the length of the history")
         match decision:
-            case Run(action=action) | Replace(action=action):
+            case Run(action=action) | Flag(action=action) | Replace(action=action):
                 self._run(
                     action,
                     proposals=decision.proposals,

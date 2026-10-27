@@ -8,6 +8,7 @@ from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.protocols.decisions import (
     Audit,
     Block,
+    Flag,
     Halt,
     Policy,
     Proposal,
@@ -25,6 +26,7 @@ _PROPOSAL = "a proposal with an action, a score, null for a trusted one, and a p
 # The decisions on an action that hold nothing else.
 _ACTION_KINDS = {
     "run": Run,
+    "flag": Flag,
     "replace": Replace,
     "audit": Audit,
 }
@@ -36,7 +38,7 @@ def dump_record(decision: ProtocolDecision) -> JSON:
     The decision's action is written as the index of the first proposal of that action.
     """
     match decision:
-        case Run() | Replace() | Audit():
+        case Run() | Flag() | Replace() | Audit():
             fields: dict[str, JSON] = {
                 "proposal": index_proposal(
                     decision.action,
@@ -66,7 +68,7 @@ def dump_record(decision: ProtocolDecision) -> JSON:
 def name_kind(decision: ProtocolDecision) -> str:
     """The kind a decision is stored as; a subclass takes its base's."""
     match decision:
-        case Run():
+        case Run() | Flag():
             return "run"
         case Replace():
             return "replace"
@@ -134,7 +136,7 @@ def count_added(decision: ProtocolDecision) -> int:
     are none; nothing for an audit or a halt.
     """
     match decision:
-        case Run() | Replace():
+        case Run() | Flag() | Replace():
             return 1
         case Block(action=action):
             return 1 + max(

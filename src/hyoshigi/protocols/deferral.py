@@ -44,6 +44,13 @@ class Resampling(StrEnum):
     PARALLEL = "parallel"
 
 
+class AuditResponse(StrEnum):
+    """What a protocol returns where it audits."""
+
+    HOLD = "hold"
+    FLAG = "flag"
+
+
 @dataclass(
     frozen=True,
     slots=True,
@@ -96,6 +103,7 @@ class DeferToResample:
     max_resamples: int
     on_unavailable: FailureResponse = FailureResponse.AUDIT
     resampling: Resampling = Resampling.SEQUENTIAL
+    on_audit: AuditResponse = AuditResponse.HOLD
 
     def __post_init__(self) -> None:
         check_instance(
@@ -178,6 +186,7 @@ class AsyncDeferToResample:
     max_resamples: int
     on_unavailable: FailureResponse = FailureResponse.AUDIT
     resampling: Resampling = Resampling.SEQUENTIAL
+    on_audit: AuditResponse = AuditResponse.HOLD
 
     def __post_init__(self) -> None:
         check_instance(

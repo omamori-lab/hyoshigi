@@ -89,6 +89,19 @@ class Run:
     slots=True,
     kw_only=True,
 )
+class Flag:
+    """The action runs, and a person audits the step afterwards."""
+
+    action: Action
+    proposals: tuple[Proposal, ...]
+    position: int
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Replace:
     """A resample or a trusted step runs in place of the proposed action.
 
@@ -169,7 +182,7 @@ class Halt:
         check_decision(self)
 
 
-type ProtocolDecision = Run | Replace | Block | Audit | Halt
+type ProtocolDecision = Run | Flag | Replace | Block | Audit | Halt
 
 
 def check_decision(decision: ProtocolDecision) -> None:
@@ -189,7 +202,9 @@ def check_decision(decision: ProtocolDecision) -> None:
         ),
     )
     match decision:
-        case Run(action=action) | Replace(action=action) | Audit(action=action):
+        case (
+            Run(action=action) | Flag(action=action) | Replace(action=action) | Audit(action=action)
+        ):
             check_proposed(
                 action,
                 proposals=decision.proposals,
