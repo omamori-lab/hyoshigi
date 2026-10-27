@@ -177,7 +177,6 @@ def test_parallel_decide_asks_for_every_resample_unless_the_proposal_is_below_th
     assert decided == outcome
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "max_resamples",
     [
@@ -229,7 +228,6 @@ def test_decide_asks_for_one_resample_by_default_whatever_max_resamples_is(
                 position=1,
             ),
             id="asks-again-after-a-first-resample-at-the-defer-threshold",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_request_for_one(
@@ -251,7 +249,6 @@ def test_decide_asks_for_one_resample_by_default_whatever_max_resamples_is(
                 position=1,
             ),
             id="asks-again-after-a-second-resample-above-it",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_request_for_one(PROPOSED_AT_0_6),
@@ -449,7 +446,6 @@ def test_sequential_resume_audits_a_resample_that_failed_closed_with_an_answer_a
                 position=1,
             ),
             id="is-not-an-acceptable-resample",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_request_for_one(
@@ -1603,7 +1599,6 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
             {"resampling": "sequential"},
             "resampling must be a Resampling, got an instance of str",
             id="resampling-a-string",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -1694,7 +1689,6 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_protocol_it_belongs
                 (TRUSTED,),
             ),
             id="sequential",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

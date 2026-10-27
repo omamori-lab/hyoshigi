@@ -32,7 +32,13 @@ from hyoshigi.trajectory.trajectory import Trajectory
 
 
 class Resampling(StrEnum):
-    """How a protocol draws the resamples of a suspicious step."""
+    """How a protocol draws the resamples of a suspicious step.
+
+    SEQUENTIAL asks for one resample at a time, and stops drawing at the first below the defer
+    threshold. PARALLEL asks for all `max_resamples` at once.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
+    """
 
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
@@ -53,6 +59,14 @@ class DeferToResample:
     a Resample request, or with `max_resamples` at 0 the step's decision. `resume` rates the
     proposals that answer a Resample, and decides the step from the proposals so far and them.
 
+    With `resampling` SEQUENTIAL, the default, a Resample asks for one proposal. After each
+    answer, `resume` decides the step once a remaining proposal's score is below
+    `defer_threshold`, once a resample failed closed with a cause other than Unavailable, once
+    `max_resamples` resamples are drawn, or once the answer holds fewer proposals than the
+    request asked for; otherwise it returns a Resample for one more, holding every proposal so
+    far. A resample whose monitor got no answer counts as drawn. With PARALLEL, a Resample asks
+    for `max_resamples` proposals at once, and `resume` decides the step.
+
     The step's decision, over the agent's proposals in order: the first whose score failed
     closed with a cause other than Unavailable is Audit. Otherwise the resamples whose monitor
     got no answer are set aside, and the step's score is the least suspicious remaining value.
@@ -70,8 +84,8 @@ class DeferToResample:
 
     The thresholds are numbers from 0 to 1, `defer_threshold` at most `audit_threshold`, kept
     as floats; `max_resamples` is a whole number of at least 0, kept as an int; `monitor` is a
-    Monitor and `on_unavailable` a FailureResponse. Anything else raises ConfigurationError
-    when the protocol is built.
+    Monitor, `on_unavailable` a FailureResponse and `resampling` a Resampling. Anything else
+    raises ConfigurationError when the protocol is built.
 
     <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """
@@ -120,8 +134,8 @@ class DeferToResample:
         proposals: tuple[Action, ...],
         trajectory: Trajectory,
     ) -> ProtocolDecision | ProtocolRequest:
-        """Rate each of the proposals that answer the request, in turn, and decide the step or ask
-        for a trusted step.
+        """Rate each of the proposals that answer the request, in turn, and decide the step, or
+        ask for one more resample or for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
         longer the request's position long, proposals that are not a tuple of Action, more
@@ -152,7 +166,8 @@ class DeferToResample:
     kw_only=True,
 )
 class AsyncDeferToResample:
-    """Decides as DeferToResample does, with the monitor awaited and the resamples rated at once.
+    """Decides as DeferToResample does, with the monitor awaited and the proposals of one answer
+    rated at once.
 
     One failed rating cancels the others and its error is raised as it is.
     """
@@ -201,8 +216,8 @@ class AsyncDeferToResample:
         proposals: tuple[Action, ...],
         trajectory: Trajectory,
     ) -> ProtocolDecision | ProtocolRequest:
-        """Rate the proposals that answer the request, all at once, and decide the step or ask
-        for a trusted step.
+        """Rate the proposals that answer the request, all at once, and decide the step, or ask
+        for one more resample or for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
         longer the request's position long, proposals that are not a tuple of Action, more
@@ -253,6 +268,11 @@ def _check_options(protocol: DeferToResample | AsyncDeferToResample) -> None:
         protocol.on_unavailable,
         expected=FailureResponse,
         name="on_unavailable",
+    )
+    check_instance(
+        protocol.resampling,
+        expected=Resampling,
+        name="resampling",
     )
     # The dataclass is frozen, so the values are set past its guard.
     object.__setattr__(
@@ -356,7 +376,7 @@ def plan_decision(
         )
     if protocol.max_resamples > 0:
         return Resample(
-            count=protocol.max_resamples,
+            count=choose_resample_count(protocol),
             proposals=(proposal,),
             position=position,
         )
@@ -366,6 +386,19 @@ def plan_decision(
         audit_threshold=protocol.audit_threshold,
         position=position,
     )
+
+
+def choose_resample_count(protocol: DeferToResample | AsyncDeferToResample) -> int:
+    """The number of proposals the first Resample asks for: 1 for SEQUENTIAL, and `max_resamples`
+    for PARALLEL.
+    """
+    match protocol.resampling:
+        case Resampling.SEQUENTIAL:
+            return 1
+        case Resampling.PARALLEL:
+            return protocol.max_resamples
+        case unreachable:
+            assert_never(unreachable)
 
 
 def decide_on_failure(
@@ -429,11 +462,10 @@ def plan_resumption(
                     )
                 ),
             )
-            return weigh_step(
-                weighed,
-                defer_threshold=protocol.defer_threshold,
-                audit_threshold=protocol.audit_threshold,
-                position=request.position,
+            return decide_after_resamples(
+                protocol,
+                request=request,
+                weighed=weighed,
             )
         case TrustedStep():
             return decide_on_trusted_step(
@@ -442,6 +474,63 @@ def plan_resumption(
             )
         case unreachable:
             assert_never(unreachable)
+
+
+def decide_after_resamples(
+    protocol: DeferToResample | AsyncDeferToResample,
+    *,
+    request: Resample,
+    weighed: tuple[Proposal, ...],
+) -> Replace | Audit | TrustedStep | Resample:
+    """Decide the step from the proposals the request and its answer weigh, or, for SEQUENTIAL
+    while it is undecided, ask for one more resample holding all of them.
+    """
+    match protocol.resampling:
+        case Resampling.SEQUENTIAL if is_undecided(
+            protocol,
+            request=request,
+            weighed=weighed,
+        ):
+            return Resample(
+                count=1,
+                proposals=weighed,
+                position=request.position,
+            )
+        case Resampling.SEQUENTIAL | Resampling.PARALLEL:
+            return weigh_step(
+                weighed,
+                defer_threshold=protocol.defer_threshold,
+                audit_threshold=protocol.audit_threshold,
+                position=request.position,
+            )
+        case unreachable:
+            assert_never(unreachable)
+
+
+def is_undecided(
+    protocol: DeferToResample | AsyncDeferToResample,
+    *,
+    request: Resample,
+    weighed: tuple[Proposal, ...],
+) -> bool:
+    """Whether a sequential protocol draws one more resample: the answer holds as many proposals
+    as the request asked for, fewer than `max_resamples` resamples are drawn, none failed closed
+    with an answer, and no proposal is below `defer_threshold`.
+    """
+    rated = list_untrusted(weighed)
+    is_full = len(weighed) - len(request.proposals) == request.count
+    is_short_of_max = len(weighed) - 1 < protocol.max_resamples
+    has_failed = any(has_failed_with_an_answer(each.score) for each in rated)
+    least = min(
+        rated,
+        key=read_suspicion,
+    )
+    return (
+        is_full
+        and is_short_of_max
+        and not has_failed
+        and least.score.value >= protocol.defer_threshold
+    )
 
 
 class RatedProposal(NamedTuple):
