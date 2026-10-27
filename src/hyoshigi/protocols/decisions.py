@@ -90,11 +90,21 @@ class Run:
     kw_only=True,
 )
 class Flag:
-    """The action runs, and a person audits the step afterwards."""
+    """The action runs, and a person audits the step afterwards.
+
+    The action is one of the proposals the protocol weighed, at least one, and the position is
+    the length of the history when it decided, a whole number of at least 0; anything else
+    raises ConfigurationError.
+
+    <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
+    """
 
     action: Action
     proposals: tuple[Proposal, ...]
     position: int
+
+    def __post_init__(self) -> None:
+        check_decision(self)
 
 
 @dataclass(

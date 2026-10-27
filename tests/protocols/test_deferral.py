@@ -1884,7 +1884,6 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
                 position=1,
             ),
             id="a-score-at-the-threshold-is-flagged",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             FAILURES_WITH_AN_ANSWER[0][0],
@@ -1905,7 +1904,6 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
                 position=1,
             ),
             id="a-failed-rating-is-flagged",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             UNAVAILABLE,
@@ -1926,7 +1924,6 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
                 position=1,
             ),
             id="a-rating-with-no-answer-is-flagged",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             build_reply(6),
@@ -1979,7 +1976,6 @@ def test_on_audit_decides_what_an_audited_proposal_becomes(
                 position=1,
             ),
             id="flagged",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -2050,13 +2046,11 @@ def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
             {"on_audit": "flag"},
             "on_audit must be an AuditResponse, got an instance of str",
             id="on-audit-a-string",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {"on_audit": AuditResponse.FLAG},
             "on_audit FLAG needs max_resamples 0, got 2",
             id="flag-with-resamples",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2067,7 +2061,6 @@ def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
             },
             "on_audit FLAG needs max_resamples 0, got 1",
             id="flag-with-one-resample",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2076,7 +2069,6 @@ def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
             },
             "on_audit FLAG needs defer_threshold (0.5) equal to audit_threshold (0.9)",
             id="flag-with-different-thresholds",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

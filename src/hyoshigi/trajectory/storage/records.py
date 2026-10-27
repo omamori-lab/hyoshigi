@@ -21,7 +21,7 @@ from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.storage.events import dump_event, load_event
 from hyoshigi.trajectory.storage.scores import dump_score, load_score
 
-_RECORD = "a run, replace, block, audit or halt record, with its proposals and position"
+_RECORD = "a run, flag, replace, block, audit or halt record, with its proposals and position"
 _PROPOSAL = "a proposal with an action, a score, null for a trusted one, and a policy"
 # The decisions on an action that hold nothing else.
 _ACTION_KINDS = {
@@ -68,14 +68,17 @@ def dump_record(decision: ProtocolDecision) -> JSON:
 def name_kind(decision: ProtocolDecision) -> str:
     """The kind a decision is stored as; a subclass takes its base's."""
     match decision:
-        case Run() | Flag():
-            return "run"
-        case Replace():
-            return "replace"
+        case Run() | Flag() | Replace() | Audit():
+            return next(
+                kind
+                for kind, decision_type in _ACTION_KINDS.items()
+                if isinstance(
+                    decision,
+                    decision_type,
+                )
+            )
         case Block():
             return "block"
-        case Audit():
-            return "audit"
         case Halt():
             return "halt"
         case unreachable:
@@ -131,9 +134,9 @@ def load_records(
 
 
 def count_added(decision: ProtocolDecision) -> int:
-    """The number of entries record adds to the history for a decision: a run's or a replace's
-    action; a block's action and its feedback, one entry for each tool call or one when there
-    are none; nothing for an audit or a halt.
+    """The number of entries record adds to the history for a decision: a run's, a flag's or a
+    replace's action; a block's action and its feedback, one entry for each tool call or one
+    when there are none; nothing for an audit or a halt.
     """
     match decision:
         case Run() | Flag() | Replace():
@@ -157,7 +160,7 @@ def load_record(
 ) -> ProtocolDecision:
     """Read a decision that dump_record wrote, on the history it was recorded on.
 
-    A run, a replace or a block names the action at its position in the history.
+    A run, a flag, a replace or a block names the action at its position in the history.
     """
     match data:
         case {
@@ -208,17 +211,17 @@ def check_history(
     history: list[Event],
     path: str,
 ) -> None:
-    """Raise FormatError unless a run, a replace or a block names the action at its position in
-    the history.
+    """Raise FormatError unless a run, a flag, a replace or a block names the action at its
+    position in the history.
     """
     # The slice is empty when the position is the length of the history.
     if isinstance(
         decision,
-        Run | Replace | Block,
+        Run | Flag | Replace | Block,
     ) and history[decision.position : decision.position + 1] != [decision.action]:
         raise FormatError(
             path=path,
-            expected="a run, replace or block of the action at its position in the history",
+            expected="a run, flag, replace or block of the action at its position in the history",
         )
 
 

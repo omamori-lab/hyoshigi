@@ -121,7 +121,6 @@ SCORED_BY_POLICY = "an untrusted proposal has a SuspicionScore, and a trusted on
             },
             NOT_PROPOSED,
             id="flag-of-an-action-not-proposed",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Block,

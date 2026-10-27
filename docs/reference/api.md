@@ -90,6 +90,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.Resampling
 
+::: hyoshigi.AuditResponse
+
 ::: hyoshigi.ProtocolRequest
 
 ::: hyoshigi.Resample
@@ -99,6 +101,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 ::: hyoshigi.ProtocolDecision
 
 ::: hyoshigi.Run
+
+::: hyoshigi.Flag
 
 ::: hyoshigi.Replace
 

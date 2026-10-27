@@ -1,9 +1,9 @@
 # Control protocols
 
 A control protocol decides what becomes of an action the untrusted model U proposes, from the
-suspicion score its monitor gives the action. Each step ends in one of five decisions: `Run`,
-`Replace`, `Block`, `Audit` or `Halt`. hyoshigi's protocols return the first four, and a person or
-the program records a `Halt`. `DeferToResample` follows the defer to resample protocol of Ctrl-Z
+suspicion score its monitor gives the action. Each step ends in one of six decisions: `Run`,
+`Flag`, `Replace`, `Block`, `Audit` or `Halt`. hyoshigi's protocols return the first five, and a
+person or the program records a `Halt`. `DeferToResample` follows the defer to resample protocol of Ctrl-Z
 [@bhatt2025ctrlz, sec. 3.2], and with no resamples it follows the defer to trusted or the trusted
 monitoring protocol of Greenblatt et al. [@greenblatt2023aicontrol, secs. 3.2, 3.3], except at an
 audit.
@@ -91,7 +91,27 @@ threshold, and code that scores above it is replaced by code T writes
 |---|---|---|
 | Defer to resample | `max_resamples` of 1 or more | is resampled, and the step is decided from all its samples |
 | Defer to trusted | `max_resamples=0` | is `Audit` at or above `audit_threshold`, where the paper also runs T's action, and is otherwise replaced by T's action |
-| Trusted monitoring | `max_resamples=0`, and `defer_threshold` equal to `audit_threshold` | is `Audit` |
+| Trusted monitoring | `max_resamples=0`, and `defer_threshold` equal to `audit_threshold` | is `Audit`, or `Flag` with `on_audit=AuditResponse.FLAG` |
+
+## Detection only runs the action and flags it
+
+An intrusion detection system alerts on a possible incident, and an intrusion prevention system can
+also attempt to stop it [@scarfone2007idps, sec. 2]. Trusted monitoring that alerts without holding
+the action is detection only. With `on_audit=AuditResponse.FLAG`, `DeferToResample` returns `Flag`
+wherever it would return `Audit`, with the same action and proposals. The action runs, and a person
+audits the step afterwards.
+
+`FLAG` is allowed only for trusted monitoring, with `max_resamples=0` and equal thresholds. Under
+defer to trusted and defer to resample, `Audit` names the agent's most suspicious proposal. Take
+`defer_threshold=0.5`, `audit_threshold=0.8` and no resamples. A proposal scored 0.6 is a
+`TrustedStep`, so T's action runs in its place. A proposal scored 0.9 is `Audit` of the agent's own
+proposal, and under `FLAG` that proposal would run. The more suspicious band would then be protected
+less than the band below it. With equal thresholds no score falls between them, so a `Flag` never
+stands in for a deferral to T. `BlockAndFeedBack` has no `on_audit`, since a `Flag` at its limit
+would let the agent through the limit.
+
+Under `FLAG`, every audited action runs. That includes an attack, an action whose rating failed and
+an action whose monitor got no answer, and each reaches a person only after it has run.
 
 ## Block and feed back follows Claude Code's auto mode
 
@@ -107,8 +127,9 @@ only when its own limit triggers the fallback
 [@claudecode2026permissionmodes, {Section} "Repeated-block thresholds"].
 
 `BlockAndFeedBack` keeps these limits as its defaults, `blocks_in_a_row=3` and
-`blocks_in_total=20`, and counts in the same way. A `Block` adds 1 to both counts, a `Run` or a
-`Replace` ends a run of blocks, and the `Audit` that the total's own limit caused resets the total.
+`blocks_in_total=20`, and counts in the same way. A `Block` adds 1 to both counts, a `Run`, a `Flag`
+or a `Replace` ends a run of blocks, and the `Audit` that the total's own limit caused resets the
+total.
 The proposal that reaches a limit is blocked like any other, and its reason fed back to the agent;
 the agent's next proposal is `Audit`, whatever its score. A person's approval is a `Run` recorded
 after the `Audit`, so it ends the run of blocks too. The protocol replays the counts from its
@@ -125,7 +146,8 @@ its value.
   rejected reply can come from what the agent wrote, since the agent shapes the trajectory its
   monitor reads. So can `Unperceivable`, content in the agent's action that the monitor's model
   cannot perceive. Each is `Audit`, whatever `on_unavailable` says, so an agent that provokes a
-  refusal reaches a person under every setting.
+  refusal reaches a person under every `on_unavailable` setting. Under
+  `on_audit=AuditResponse.FLAG` it reaches the person after the action has run.
 - **A rating with no answer gets `on_unavailable`.** `Unavailable` says nothing about the action: a
   rate limit outlasted the client's retries, or the provider was down. `on_unavailable` chooses the
   decision, `AUDIT` by default, so a proposal without a verdict reaches a person, as a failed rating
