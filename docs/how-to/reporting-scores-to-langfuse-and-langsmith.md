@@ -386,30 +386,36 @@ The client tries again before it raises, and the rating waits (langsmith 0.14.11
 makes up to 10 attempts, waiting 1, 2, 4 and on up to 256 seconds between them, about 8.5 minutes in
 all. It retries a 404 because the run may not be ingested yet ([why a score may arrive before its
 span](../explanation/observability.md)). It retries a connection error and a 408, 500, 502, 503 or
-504 answer too, and the synchronous client's HTTP session retries some of them within each attempt. The synchronous
-client also retries a 429, with waits that start at the answer's `Retry-After` seconds, 30 when it
-has none, and double, which can hold a rating for over 4 hours. A 401 is raised at once.
+504 answer too. The synchronous client also retries a 429, with waits that start at the answer's
+`Retry-After` seconds, 30 when it has none, and double, which can hold a rating for over 4 hours.
+Within each attempt, the synchronous client's HTTP session sends up to 3 more requests after a
+connection error or a 408, 425, 429, 500, 502, 503 or 504 answer, waiting the answer's `Retry-After`
+seconds when it has them. A 401 is raised at once.
 
 `stop_after_attempt` caps the attempts, a positive integer that is 10 by default, as in the client's
-`create_feedback`. A control loop that cannot wait sets a low value, such as 2:
+`create_feedback`, and the synchronous client's `retry_config` sets its session's retries. A control
+loop that cannot wait sets a low value, such as 2, and turns the session's retries off:
 
 ```python
+from urllib3.util import Retry
+
 feedback = LangSmithFeedback(
     client=Client(
         api_url=langsmith_url,
         api_key="lsv2-offline",
         info={},
         auto_batch_tracing=False,
+        retry_config=Retry(total=0),
     ),
     project_id=PROJECT_ID,
     stop_after_attempt=2,
 )
 ```
 
-With 2, the client retries a 404 once, after about a second, and the synchronous client retries a
-429 once, after the answer's `Retry-After` seconds, 30 when it has none. A score whose last attempt
-gets an error, such as a run not yet ingested, is lost, and the report
-[logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
+The report then sends at most 2 requests. The client retries a 404 once, after about a second, and
+the synchronous client retries a 429 once, after the answer's `Retry-After` seconds, 30 when it has
+none. A score whose last attempt gets an error, such as a run not yet ingested, is lost, and the
+report [logs](#a-failed-report-is-logged-and-the-score-is-returned) it.
 
 `project_id` is the id of the run's project, which LangSmith asks of feedback on a run
 [@langsmith2026feedbackformat]. The client sends it as `session_id`.
