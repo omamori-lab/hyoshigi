@@ -70,7 +70,7 @@ from hyoshigi.protocols.decisions import (
     Replace,
     Run,
 )
-from hyoshigi.protocols.deferral import AsyncDeferToResample, DeferToResample
+from hyoshigi.protocols.deferral import AsyncDeferToResample, DeferToResample, Resampling
 from hyoshigi.protocols.requests import FailureResponse, ProtocolRequest, Resample, TrustedStep
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role, marked
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
@@ -157,6 +157,7 @@ __all__ = [
     "Replace",
     "ReportedMonitor",
     "Resample",
+    "Resampling",
     "Run",
     "StatementDecision",
     "Step",

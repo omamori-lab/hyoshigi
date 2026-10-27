@@ -41,6 +41,7 @@ from hyoshigi import (
     ProtocolRequest,
     Replace,
     Resample,
+    Resampling,
     Run,
     SuspicionScore,
     TrustedStep,
@@ -65,6 +66,18 @@ PROPOSED_UNAVAILABLE = build_proposal(
     PROPOSED,
     UNAVAILABLE_SCORE,
 )
+FIRST_AT_0_7 = build_proposal(
+    FIRST,
+    build_score(0.7),
+)
+FIRST_AT_1_0 = build_proposal(
+    FIRST,
+    build_score(1.0),
+)
+FIRST_UNAVAILABLE = build_proposal(
+    FIRST,
+    UNAVAILABLE_SCORE,
+)
 TRUSTED_PROPOSAL = Proposal(
     action=TRUSTED,
     score=None,
@@ -74,6 +87,15 @@ RESAMPLES = (
     FIRST,
     SECOND,
 )
+
+
+def build_request_for_one(*proposals: Proposal) -> Resample:
+    """The request for one more resample that a sequential protocol makes after the proposals."""
+    return Resample(
+        count=1,
+        proposals=proposals,
+        position=1,
+    )
 
 
 @pytest.mark.parametrize(
@@ -136,7 +158,7 @@ RESAMPLES = (
         ),
     ],
 )
-def test_decide_resamples_a_proposal_unless_it_scores_below_the_defer_threshold(
+def test_parallel_decide_asks_for_every_resample_unless_the_proposal_is_below_the_defer_threshold(
     family: AnyFamily,
     reply: int,
     max_resamples: int,
@@ -149,6 +171,378 @@ def test_decide_resamples_a_proposal_unless_it_scores_below_the_defer_threshold(
         proposed=PROPOSED,
         trajectory=build_trajectory(),
         max_resamples=max_resamples,
+        resampling=Resampling.PARALLEL,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "max_resamples",
+    [
+        2,
+        3,
+    ],
+)
+def test_decide_asks_for_one_resample_by_default_whatever_max_resamples_is(
+    family: AnyFamily,
+    max_resamples: int,
+) -> None:
+    script = Script(build_reply(5))
+
+    decided = family.decide_deferral(
+        script,
+        proposed=PROPOSED,
+        trajectory=build_trajectory(),
+        max_resamples=max_resamples,
+    )
+
+    assert decided == Resample(
+        count=1,
+        proposals=(
+            build_proposal(
+                PROPOSED,
+                build_score(0.5),
+            ),
+        ),
+        position=1,
+    )
+
+
+@pytest.mark.parametrize(
+    ("request_", "answer", "reply", "outcome"),
+    [
+        pytest.param(
+            build_request_for_one(PROPOSED_AT_0_6),
+            FIRST,
+            5,
+            Resample(
+                count=1,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    build_proposal(
+                        FIRST,
+                        build_score(0.5),
+                    ),
+                ),
+                position=1,
+            ),
+            id="asks-again-after-a-first-resample-at-the-defer-threshold",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_request_for_one(
+                PROPOSED_AT_0_6,
+                FIRST_AT_0_7,
+            ),
+            SECOND,
+            8,
+            Resample(
+                count=1,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_AT_0_7,
+                    build_proposal(
+                        SECOND,
+                        build_score(0.8),
+                    ),
+                ),
+                position=1,
+            ),
+            id="asks-again-after-a-second-resample-above-it",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_request_for_one(PROPOSED_AT_0_6),
+            FIRST,
+            4,
+            Replace(
+                action=FIRST,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    build_proposal(
+                        FIRST,
+                        build_score(0.4),
+                    ),
+                ),
+                position=1,
+            ),
+            id="replaces-with-a-first-resample-below-it",
+        ),
+        pytest.param(
+            build_request_for_one(
+                PROPOSED_AT_0_6,
+                FIRST_AT_0_7,
+            ),
+            SECOND,
+            3,
+            Replace(
+                action=SECOND,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_AT_0_7,
+                    build_proposal(
+                        SECOND,
+                        build_score(0.3),
+                    ),
+                ),
+                position=1,
+            ),
+            id="replaces-with-a-second-resample-below-it",
+        ),
+    ],
+)
+def test_sequential_resume_draws_one_resample_at_a_time_until_one_is_below_the_defer_threshold(
+    family: AnyFamily,
+    request_: Resample,
+    answer: Action,
+    reply: int,
+    outcome: ProtocolDecision | ProtocolRequest,
+) -> None:
+    script = Script(build_reply(reply))
+
+    decided = family.resume_deferral(
+        script,
+        request=request_,
+        proposals=(answer,),
+        trajectory=build_trajectory(),
+        max_resamples=3,
+    )
+
+    assert decided == outcome
+
+
+def test_parallel_resume_decides_the_step_from_the_proposals_it_got(family: AnyFamily) -> None:
+    script = Script(build_reply(6))
+
+    decided = family.resume_deferral(
+        script,
+        request=build_request_for_one(PROPOSED_AT_0_6),
+        proposals=(FIRST,),
+        trajectory=build_trajectory(),
+        max_resamples=3,
+        resampling=Resampling.PARALLEL,
+    )
+
+    assert decided == TrustedStep(
+        proposals=(
+            PROPOSED_AT_0_6,
+            build_proposal(
+                FIRST,
+                build_score(0.6),
+            ),
+        ),
+        position=1,
+    )
+
+
+@pytest.mark.parametrize(
+    ("request_", "reply", "outcome"),
+    [
+        pytest.param(
+            build_request_for_one(
+                PROPOSED_AT_0_6,
+                FIRST_AT_0_7,
+            ),
+            8,
+            TrustedStep(
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_AT_0_7,
+                    build_proposal(
+                        SECOND,
+                        build_score(0.8),
+                    ),
+                ),
+                position=1,
+            ),
+            id="between-the-thresholds-asks-for-a-trusted-step",
+        ),
+        pytest.param(
+            build_request_for_one(
+                PROPOSED_AT_0_9,
+                FIRST_AT_1_0,
+            ),
+            9,
+            Audit(
+                action=FIRST,
+                proposals=(
+                    PROPOSED_AT_0_9,
+                    FIRST_AT_1_0,
+                    build_proposal(
+                        SECOND,
+                        build_score(0.9),
+                    ),
+                ),
+                position=1,
+            ),
+            id="at-the-audit-threshold-audits-the-most-suspicious",
+        ),
+    ],
+)
+def test_sequential_resume_decides_the_step_once_max_resamples_are_drawn(
+    family: AnyFamily,
+    request_: Resample,
+    reply: int,
+    outcome: ProtocolDecision | ProtocolRequest,
+) -> None:
+    script = Script(build_reply(reply))
+
+    decided = family.resume_deferral(
+        script,
+        request=request_,
+        proposals=(SECOND,),
+        trajectory=build_trajectory(),
+        max_resamples=2,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.parametrize(
+    ("failure", "score"),
+    FAILURES_WITH_AN_ANSWER,
+    ids=FAILURE_IDS,
+)
+def test_sequential_resume_audits_a_resample_that_failed_closed_with_an_answer_at_once(
+    family: AnyFamily,
+    failure: GenerationOutcome,
+    score: SuspicionScore,
+) -> None:
+    script = Script(failure)
+
+    decided = family.resume_deferral(
+        script,
+        request=build_request_for_one(PROPOSED_AT_0_6),
+        proposals=(FIRST,),
+        trajectory=build_trajectory(),
+        max_resamples=3,
+    )
+
+    assert decided == Audit(
+        action=FIRST,
+        proposals=(
+            PROPOSED_AT_0_6,
+            build_proposal(
+                FIRST,
+                score,
+            ),
+        ),
+        position=1,
+    )
+
+
+@pytest.mark.parametrize(
+    ("request_", "answer", "max_resamples", "outcome"),
+    [
+        pytest.param(
+            build_request_for_one(PROPOSED_AT_0_6),
+            FIRST,
+            3,
+            Resample(
+                count=1,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_UNAVAILABLE,
+                ),
+                position=1,
+            ),
+            id="is-not-an-acceptable-resample",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            build_request_for_one(
+                PROPOSED_AT_0_6,
+                FIRST_UNAVAILABLE,
+            ),
+            SECOND,
+            2,
+            TrustedStep(
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_UNAVAILABLE,
+                    build_proposal(
+                        SECOND,
+                        UNAVAILABLE_SCORE,
+                    ),
+                ),
+                position=1,
+            ),
+            id="is-one-of-the-resamples-drawn",
+        ),
+    ],
+)
+def test_sequential_resume_counts_a_resample_whose_monitor_got_no_answer_towards_max_resamples(
+    family: AnyFamily,
+    request_: Resample,
+    answer: Action,
+    max_resamples: int,
+    outcome: ProtocolDecision | ProtocolRequest,
+) -> None:
+    script = Script(UNAVAILABLE)
+
+    decided = family.resume_deferral(
+        script,
+        request=request_,
+        proposals=(answer,),
+        trajectory=build_trajectory(),
+        max_resamples=max_resamples,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.parametrize(
+    ("request_", "proposals", "replies", "outcome"),
+    [
+        pytest.param(
+            build_request_for_one(PROPOSED_AT_0_6),
+            (),
+            (),
+            TrustedStep(
+                proposals=(PROPOSED_AT_0_6,),
+                position=1,
+            ),
+            id="no-proposal",
+        ),
+        pytest.param(
+            Resample(
+                count=2,
+                proposals=(PROPOSED_AT_0_6,),
+                position=1,
+            ),
+            (FIRST,),
+            (6,),
+            TrustedStep(
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    build_proposal(
+                        FIRST,
+                        build_score(0.6),
+                    ),
+                ),
+                position=1,
+            ),
+            id="one-proposal-of-two",
+        ),
+    ],
+)
+def test_sequential_resume_decides_the_step_when_the_answer_is_shorter_than_the_request(
+    family: AnyFamily,
+    request_: Resample,
+    proposals: tuple[Action, ...],
+    replies: tuple[int, ...],
+    outcome: ProtocolDecision | ProtocolRequest,
+) -> None:
+    script = Script(*(build_reply(reply) for reply in replies))
+
+    decided = family.resume_deferral(
+        script,
+        request=request_,
+        proposals=proposals,
+        trajectory=build_trajectory(),
+        max_resamples=3,
     )
 
     assert decided == outcome
@@ -1205,6 +1599,12 @@ def test_a_resume_that_cannot_work_is_refused_naming_why(
             "on_unavailable must be a FailureResponse, got an instance of str",
             id="on-unavailable-a-string",
         ),
+        pytest.param(
+            {"resampling": "sequential"},
+            "resampling must be a Resampling, got an instance of str",
+            id="resampling-a-string",
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
 )
 def test_an_option_that_cannot_work_is_refused_naming_it(
@@ -1262,7 +1662,48 @@ def test_a_monitor_of_the_other_family_is_refused_naming_the_protocol_it_belongs
     assert str(raised.value) == message
 
 
-def test_decide_resume_and_record_carry_a_trajectory_step_by_step(family: AnyFamily) -> None:
+@pytest.mark.parametrize(
+    ("resampling", "second_answers", "third_answers"),
+    [
+        pytest.param(
+            Resampling.PARALLEL,
+            (
+                (
+                    build_action("second-resample-1"),
+                    build_action("second-resample-2"),
+                ),
+            ),
+            (
+                (
+                    build_action("third-resample-1"),
+                    build_action("third-resample-2"),
+                ),
+                (TRUSTED,),
+            ),
+            id="parallel",
+        ),
+        pytest.param(
+            Resampling.SEQUENTIAL,
+            (
+                (build_action("second-resample-1"),),
+                (build_action("second-resample-2"),),
+            ),
+            (
+                (build_action("third-resample-1"),),
+                (build_action("third-resample-2"),),
+                (TRUSTED,),
+            ),
+            id="sequential",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_decide_resume_and_record_carry_a_trajectory_step_by_step(
+    family: AnyFamily,
+    resampling: Resampling,
+    second_answers: tuple[tuple[Action, ...], ...],
+    third_answers: tuple[tuple[Action, ...], ...],
+) -> None:
     script = Script(
         build_reply(2),
         build_reply(7),
@@ -1279,29 +1720,21 @@ def test_decide_resume_and_record_carry_a_trajectory_step_by_step(family: AnyFam
         proposed=FIRST,
         trajectory=trajectory,
         answers=(),
+        resampling=resampling,
     )
     family.take_deferral_step(
         script,
         proposed=SECOND,
         trajectory=trajectory,
-        answers=(
-            (
-                build_action("second-resample-1"),
-                build_action("second-resample-2"),
-            ),
-        ),
+        answers=second_answers,
+        resampling=resampling,
     )
     family.take_deferral_step(
         script,
         proposed=THIRD,
         trajectory=trajectory,
-        answers=(
-            (
-                build_action("third-resample-1"),
-                build_action("third-resample-2"),
-            ),
-            (TRUSTED,),
-        ),
+        answers=third_answers,
+        resampling=resampling,
     )
 
     assert trajectory.records == (

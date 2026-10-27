@@ -393,12 +393,16 @@ class Family[Rater, Deferral, Blocking]:
         proposed: Action,
         trajectory: Trajectory,
         answers: tuple[tuple[Action, ...], ...],
+        **options: object,
     ) -> None:
         """Decide about the proposal with the DeferToResample that build_deferral builds, answer
         each request with the next answer, and record the decision, as the program running the
         agent does.
         """
-        protocol = self.build_deferral(script)
+        protocol = self.build_deferral(
+            script,
+            **options,
+        )
         unanswered = iter(answers)
         outcome = self.decide(
             protocol,
