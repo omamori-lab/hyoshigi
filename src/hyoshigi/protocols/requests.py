@@ -15,7 +15,7 @@ class FailureResponse(StrEnum):
     """What a protocol decides about the agent's proposal when its monitor got no answer.
 
     AUDIT holds it for a person, BLOCK blocks it with the score's explanation as the reason,
-    TRUSTED_STEP asks for an action from the trusted model, and RUN runs it unrated.
+    TRUSTED_STEP asks for an action from the trusted model, and RUN runs it without a verdict.
 
     <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
     """
