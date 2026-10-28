@@ -83,7 +83,8 @@ class DeferToResample:
 
     With `on_audit` HOLD, the default, an Audit is returned as it is. With FLAG, every Audit
     the protocol would return is a Flag with the same action, proposals and position. FLAG needs
-    `max_resamples` at 0 and `defer_threshold` equal to `audit_threshold`.
+    `max_resamples` at 0, `defer_threshold` equal to `audit_threshold`, and `on_unavailable`
+    other than TRUSTED_STEP.
 
     The step's decision, over the agent's proposals in order: the first whose score failed
     closed with a cause other than Unavailable is Audit. Otherwise the resamples whose monitor
@@ -162,12 +163,14 @@ class DeferToResample:
         ask for one more resample or for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
-        longer the request's position long, proposals that are not a tuple of Action, more
-        proposals than the request asks for, and a TrustedStep answered with one of the agent's
-        proposals raise ConfigurationError.
+        longer the request's position long, a Resample that draws more than `max_resamples`
+        resamples in all, a TrustedStep under FLAG, proposals that are not a tuple of Action,
+        more proposals than the request asks for, and a TrustedStep answered with one of the
+        agent's proposals raise ConfigurationError.
         """
         check_answer(
             request,
+            protocol=self,
             proposals=proposals,
             trajectory=trajectory,
         )
@@ -253,12 +256,14 @@ class AsyncDeferToResample:
         for one more resample or for a trusted step.
 
         A request that is not a Resample or a TrustedStep, a trajectory whose history is no
-        longer the request's position long, proposals that are not a tuple of Action, more
-        proposals than the request asks for, and a TrustedStep answered with one of the agent's
-        proposals raise ConfigurationError.
+        longer the request's position long, a Resample that draws more than `max_resamples`
+        resamples in all, a TrustedStep under FLAG, proposals that are not a tuple of Action,
+        more proposals than the request asks for, and a TrustedStep answered with one of the
+        agent's proposals raise ConfigurationError.
         """
         check_answer(
             request,
+            protocol=self,
             proposals=proposals,
             trajectory=trajectory,
         )
@@ -321,6 +326,7 @@ def _check_options(protocol: DeferToResample | AsyncDeferToResample) -> None:
             max_resamples=max_resamples,
             defer_threshold=defer_threshold,
             audit_threshold=audit_threshold,
+            on_unavailable=protocol.on_unavailable,
         )
     # The dataclass is frozen, so the values are set past its guard.
     object.__setattr__(
@@ -345,9 +351,10 @@ def _check_trusted_monitoring(
     max_resamples: int,
     defer_threshold: float,
     audit_threshold: float,
+    on_unavailable: FailureResponse,
 ) -> None:
-    """Raise ConfigurationError unless the settings are trusted monitoring: `max_resamples` at 0
-    and equal thresholds.
+    """Raise ConfigurationError unless the settings are trusted monitoring: `max_resamples` at 0,
+    equal thresholds, and an `on_unavailable` that asks for no trusted step.
     """
     if max_resamples != 0:
         raise ConfigurationError(f"on_audit FLAG needs max_resamples 0, got {max_resamples}")
@@ -356,21 +363,31 @@ def _check_trusted_monitoring(
             f"on_audit FLAG needs defer_threshold ({defer_threshold}) equal to "
             f"audit_threshold ({audit_threshold})",
         )
+    if on_unavailable is FailureResponse.TRUSTED_STEP:
+        raise ConfigurationError(
+            "on_audit FLAG needs on_unavailable other than TRUSTED_STEP, since trusted "
+            "monitoring has no trusted model",
+        )
 
 
 def check_answer(
     request: ProtocolRequest,
     *,
+    protocol: DeferToResample | AsyncDeferToResample,
     proposals: tuple[Action, ...],
     trajectory: Trajectory,
 ) -> None:
-    """Raise ConfigurationError unless the request is a Resample or a TrustedStep at the length
-    of the history, and the proposals a tuple of at most as many actions as it asks for, none of
-    them, for a TrustedStep, one of the agent's proposals.
+    """Raise ConfigurationError unless the request is one the protocol asks for, a Resample or a
+    TrustedStep at the length of the history, and the proposals a tuple of at most as many
+    actions as it asks for, none of them, for a TrustedStep, one of the agent's proposals.
     """
     limit = _read_limit(request)
     if request.position != len(trajectory.history):
         raise ConfigurationError("the request's position is not the length of the history")
+    check_asked(
+        request,
+        protocol=protocol,
+    )
     check_instance(
         proposals,
         expected=tuple,
@@ -394,6 +411,29 @@ def check_answer(
             "a TrustedStep's answer must be the trusted model's action, not one of the agent's "
             "proposals",
         )
+
+
+def check_asked(
+    request: ProtocolRequest,
+    *,
+    protocol: DeferToResample | AsyncDeferToResample,
+) -> None:
+    """Raise ConfigurationError for a request the protocol never asks for: a Resample that
+    draws more than `max_resamples` resamples in all, or a TrustedStep under FLAG.
+    """
+    match request:
+        case Resample(
+            count=count,
+            proposals=proposals,
+        ):
+            last = len(proposals) - 1 + count
+            if last > protocol.max_resamples:
+                raise ConfigurationError(
+                    f"the request asks for resample {last}, but max_resamples is "
+                    f"{protocol.max_resamples}",
+                )
+        case TrustedStep() if protocol.on_audit is AuditResponse.FLAG:
+            raise ConfigurationError("on_audit FLAG never asks for a TrustedStep")
 
 
 def _read_limit(request: ProtocolRequest) -> int:
