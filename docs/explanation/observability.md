@@ -109,8 +109,8 @@ any monitor can be reported, and a monitor holds no backend of its own.
 
 The span carries the score's explanation, and a report sends it as the score's comment. The
 explanation is the monitor's reasoning and can quote the action. Neither the rating's span nor the
-report carries the prompt or the trajectory. A report's `redaction` masks the comment, and the
-exporter's own hooks redact the span
+report carries the prompt or the trajectory, and a review flag carries no explanation at all. A
+report's `redaction` masks the comment, and the exporter's own hooks redact the span
 ([Redacting what leaves the process](../how-to/redacting-what-leaves-the-process.md)). An
 instrumented client's span carries what its package records: a `langfuse.openai` generation records the call's input and output, and the input is the
 monitor's prompt (langfuse 5.0.2).

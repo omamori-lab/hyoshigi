@@ -2002,7 +2002,6 @@ def test_a_redaction_that_is_not_a_redaction_is_refused(
     ],
     ids=["empty", "blank", "none"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_review_flag_name_that_is_not_a_non_blank_string_is_refused(
     name: object,
     message: str,
@@ -2039,7 +2038,6 @@ def test_a_review_flag_name_that_is_not_a_non_blank_string_is_refused(
     ],
     ids=["bool", "string", "nan", "above-one", "below-zero"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_review_flag_threshold_that_is_not_a_number_from_0_to_1_is_refused(
     threshold: object,
     message: str,
@@ -2050,7 +2048,6 @@ def test_a_review_flag_threshold_that_is_not_a_number_from_0_to_1_is_refused(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_review_flag_threshold_is_kept_as_a_float() -> None:
     review_flag = ReviewFlag(threshold=Fraction(3, 5))  # ty: ignore[invalid-argument-type]
 
@@ -2081,7 +2078,6 @@ def test_a_review_flag_threshold_is_kept_as_a_float() -> None:
     ],
     ids=["langfuse", "langsmith", "async-langsmith"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_review_flag_that_is_not_a_review_flag_is_refused(
     langfuse: LangfuseStandIn,
     report: Callable[..., object],
@@ -2107,7 +2103,6 @@ def test_a_review_flag_that_is_not_a_review_flag_is_refused(
     ],
     ids=["langfuse", "langsmith", "async-langsmith"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_report_without_a_review_flag_refuses_to_flag_and_sends_nothing(
     langfuse: LangfuseStandIn,
     langsmith: LangSmithServer,
@@ -2138,7 +2133,6 @@ SEND_CASES = [
             "flagged",
             "suspicion",
         ],
-        marks=pytest.mark.xfail(strict=True),
         id="at-the-threshold",
     ),
     pytest.param(
@@ -2148,7 +2142,6 @@ SEND_CASES = [
             "flagged",
             "suspicion",
         ],
-        marks=pytest.mark.xfail(strict=True),
         id="above-the-threshold",
     ),
     pytest.param(
@@ -2219,7 +2212,6 @@ def test_langsmith_receives_a_flag_before_the_score_when_the_score_reaches_the_t
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_langfuse_receives_the_flag_on_the_trace_and_observation_of_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -2255,7 +2247,6 @@ def test_langfuse_receives_the_flag_on_the_trace_and_observation_of_the_ratings_
     }
 
 
-@pytest.mark.xfail(strict=True)
 def test_langsmith_receives_the_flag_on_the_run_of_the_ratings_span(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -2303,7 +2294,6 @@ def test_langsmith_receives_the_flag_on_the_run_of_the_ratings_span(
     ],
     ids=["default-name", "named"],
 )
-@pytest.mark.xfail(strict=True)
 def test_langfuse_receives_a_flag_as_a_boolean_score_with_no_comment(
     langfuse: LangfuseStandIn,
     review_flag: ReviewFlag,
@@ -2346,7 +2336,6 @@ def test_langfuse_receives_a_flag_as_a_boolean_score_with_no_comment(
     ],
     ids=["default-name", "named"],
 )
-@pytest.mark.xfail(strict=True)
 def test_langsmith_receives_a_flag_as_boolean_model_feedback_with_no_comment(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
@@ -2400,7 +2389,6 @@ def test_a_flagged_score_is_sent_with_a_worker_before_langsmith_answers(
     assert answered == []
 
 
-@pytest.mark.xfail(strict=True)
 def test_langsmith_receives_the_flag_and_the_score_a_worker_sends_once_the_worker_finishes(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
@@ -2434,7 +2422,6 @@ def test_langsmith_receives_the_flag_and_the_score_a_worker_sends_once_the_worke
     ],
     ids=["sync", "async"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_flag_that_fails_on_a_worker_is_logged_as_a_flag_by_the_reports_class_and_error_type(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
@@ -2454,7 +2441,6 @@ def test_a_flag_that_fails_on_a_worker_is_logged_as_a_flag_by_the_reports_class_
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_score_is_not_posted_when_langsmith_rejects_the_flag_sent_before_it(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
@@ -2491,7 +2477,6 @@ def test_a_score_is_not_posted_when_langsmith_rejects_the_flag_sent_before_it(
     ],
     ids=["sync", "async"],
 )
-@pytest.mark.xfail(strict=True)
 def test_a_flag_cancelled_on_its_worker_is_logged_as_a_cancelled_flag(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
@@ -2509,7 +2494,6 @@ def test_a_flag_cancelled_on_its_worker_is_logged_as_a_cancelled_flag(
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_flag_makes_the_attempts_stop_after_attempt_allows_when_the_run_is_not_found(
     family: Family[Monitor] | Family[AsyncMonitor],
     langsmith: LangSmithServer,
