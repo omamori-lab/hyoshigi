@@ -201,6 +201,12 @@ alternatives in this form, with each token's bytes besides
 20 [@openrouter2026parameters, {Section} "Top Logprobs"]. A `GuardMonitor` over such a model asks
 once and does not use `samples`.
 
+A model sets `top_log_probabilities` only when every provider that can serve it returns
+log-probabilities, since otherwise some of its replies fail closed as `Unreadable`. On OpenRouter,
+the request's `provider.require_parameters` routes it only to providers that support every
+parameter in it
+[@openrouter2026providerrouting, {Section} "Requiring Providers to Support All Parameters"].
+
 The monitor reads the label from the reply's text as it does for a sample, then finds the token
 that holds the label's first character. That token's text, without whitespace or leading markup
 and in lower case, must start a label of the written label's kind. The monitor weighs the token
