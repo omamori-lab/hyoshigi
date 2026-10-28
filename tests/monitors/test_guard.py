@@ -1414,6 +1414,36 @@ def test_a_probability_of_exactly_one_in_a_thousand_is_uncertain_not_safe(rate: 
         ),
         pytest.param(
             GuardLabels(
+                suspicious=frozenset({"harmful", "violation"}),
+                safe=frozenset({"no_violation"}),
+            ),
+            "no",
+            "_violation",
+            {
+                "no": 0.3,
+                "harmful": 0.5,
+                "violation": 0.2,
+            },
+            "The guard model labelled the action 'harmful', finding that it breaks the policy.",
+            id="the-likeliest-suspicious-label-not-the-last-in-order",
+        ),
+        pytest.param(
+            GuardLabels(
+                suspicious=frozenset({"harmful", "violation"}),
+                safe=frozenset({"no_violation"}),
+            ),
+            "viol",
+            "ation",
+            {
+                "viol": 0.3,
+                "harm": 0.6,
+                " No": 0.1,
+            },
+            "The guard model labelled the action 'violation', finding that it breaks the policy.",
+            id="the-label-written-when-another-of-its-kind-is-likelier",
+        ),
+        pytest.param(
+            GuardLabels(
                 suspicious=frozenset({"violation"}),
                 safe=frozenset({"no_issue", "no_violation"}),
             ),
