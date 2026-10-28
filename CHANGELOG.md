@@ -13,6 +13,8 @@ minor version.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
 ### Added
 
 - `DeferToResample` and `AsyncDeferToResample` take `on_audit`, an
@@ -53,10 +55,10 @@ minor version.
   over the whole run: every record of the delegation tree, in the order it
   was recorded, so a subagent and its delegator count the same total. The
   trajectory that `split_latest_step` returns for a subagent counts in the
-  subagent's place. The count in a row still reads the trajectory's own records. In
-  0.3.0 each trajectory counted only its own blocks, so an agent could stay
-  under the total by delegating. This is a breaking change for a run with
-  subagents, which can now reach `Audit` where 0.3.0 ran.
+  subagent's place. The count in a row still reads the trajectory's own
+  records. In 0.3.0 each trajectory counted only its own blocks, so an agent
+  could stay under the total by delegating. This is a breaking change for a
+  run with subagents, which can now reach `Audit` where 0.3.0 ran.
 - The stored trajectory format is version 3, in which each record holds its
   `sequence`, its number in the order the run recorded it, and `load` reads
   only version 3. A repeated, decreasing or negative `sequence` raises
@@ -377,7 +379,8 @@ minor version.
   thinks before it answers, and at 1024 tokens a rating could be cut off and
   fail closed.
 
-[Unreleased]: https://github.com/omamori-lab/hyoshigi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/omamori-lab/hyoshigi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/omamori-lab/hyoshigi/releases/tag/v0.1.0
