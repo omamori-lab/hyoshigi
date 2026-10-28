@@ -353,6 +353,36 @@ def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Traject
         )
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "start",
+    [
+        pytest.param(
+            lambda trajectory: trajectory.delegate(
+                INSTRUCTION,
+                call_id=["call_7"],
+            ),
+            id="delegate",
+        ),
+        pytest.param(
+            lambda trajectory: trajectory.join(
+                Trajectory(),
+                call_id=["call_7"],
+            ),
+            id="join",
+        ),
+    ],
+)
+def test_a_call_id_that_is_not_text_raises_naming_its_type(
+    delegating: Trajectory,
+    start: Callable[[Trajectory], Trajectory],
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        start(delegating)
+
+    assert str(raised.value) == "call_id must be a str, got an instance of list"
+
+
 def delegate_a_chain(
     trajectory: Trajectory,
     *,
