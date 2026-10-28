@@ -204,9 +204,9 @@ once and does not use `samples`. `GenerativeModel.from_litellm` builds such a mo
 ([how](connecting-a-model.md#litellms-functions-go-in-from_litellm)).
 
 A model sets `top_log_probabilities` only when every provider that can serve it returns
-log-probabilities, since otherwise some of its replies fail closed as `Unreadable`. On OpenRouter,
-the request's `provider.require_parameters` routes it only to providers that support every
-parameter in it
+log-probabilities for the reply alone, since otherwise some of its replies fail closed as
+`Unreadable`. On OpenRouter, the request's `provider.require_parameters` routes it only to
+providers that support every parameter in it
 [@openrouter2026providerrouting, {Section} "Requiring Providers to Support All Parameters"].
 
 The monitor reads the label from the reply's text as it does for a sample, then finds the token
@@ -331,8 +331,9 @@ log-probabilities:
 
 - The reply carries none.
 - Its tokens do not spell its text exactly, as when a provider splits a multi-byte character
-  across tokens. The monitor finds the label in the text and then the token that holds it, so
-  tokens that differ from the text point at the wrong token.
+  across tokens, or returns the tokens of a reasoning model's reasoning along with its reply.
+  The monitor finds the label in the text and then the token that holds it, so tokens that
+  differ from the text point at the wrong token.
 - Its text has no readable label.
 - The token at the label's first character lists no alternatives, or does not start a label of the
   written label's kind, as when the model's tokens join the label's first letters to the word
