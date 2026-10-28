@@ -1200,6 +1200,18 @@ def test_parallel_subagents_replay_in_the_order_they_were_joined(
     assert decided == outcome
 
 
+@pytest.fixture
+def blocked_then_delegating() -> Trajectory:
+    """A trajectory whose action a1 was blocked, and which then acted DELEGATING."""
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        (BLOCK("a1"),),
+    )
+    trajectory.act(DELEGATING)
+    return trajectory
+
+
 @pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("deciding", "position"),
@@ -1226,16 +1238,11 @@ def test_a_joined_subagents_blocks_count_in_its_runs_total(
         Trajectory,
     ],
     position: int,
+    blocked_then_delegating: Trajectory,
 ) -> None:
-    trajectory = build_trajectory()
-    record_steps(
-        trajectory,
-        (BLOCK("a1"),),
-    )
-    trajectory.act(DELEGATING)
-    joined = trajectory.join(
+    joined = blocked_then_delegating.join(
         work_apart(
-            trajectory.dump(),
+            blocked_then_delegating.dump(),
             call_id="call_1",
             steps=(BLOCK("s1"),),
         ),
@@ -1247,7 +1254,7 @@ def test_a_joined_subagents_blocks_count_in_its_runs_total(
         script,
         proposed=PROPOSED,
         trajectory=deciding(
-            trajectory,
+            blocked_then_delegating,
             joined,
         ),
         blocks_in_total=2,
@@ -1293,6 +1300,36 @@ def test_a_joined_runs_records_replay_in_the_order_they_were_recorded_across_its
     )
 
     assert decided == build_audit(2)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_joined_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
+    family: AnyFamily,
+    blocked_then_delegating: Trajectory,
+) -> None:
+    joined = blocked_then_delegating.join(
+        work_apart(
+            blocked_then_delegating.dump(),
+            call_id="call_1",
+            steps=(
+                BLOCK("s1"),
+                AUDIT("s2"),
+                RUN("s2"),
+            ),
+        ),
+        call_id="call_1",
+    )
+    step = joined.split_latest_step()
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=step.action,
+        trajectory=step.trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == REDECIDED
 
 
 @pytest.mark.parametrize(
