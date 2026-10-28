@@ -831,7 +831,6 @@ def test_a_subagent_delegated_by_a_split_copy_counts_its_own_blocks(family: AnyF
         pytest.param(
             lambda trajectory: trajectory,
             id="as-built",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             reload,
@@ -873,7 +872,6 @@ def test_a_subagent_kept_by_a_split_copy_counts_the_copys_blocks(
         pytest.param(
             lambda trajectory: trajectory,
             id="as-built",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             reload,
@@ -905,7 +903,6 @@ def test_a_subagent_kept_by_a_split_copy_counts_the_copys_reset(
     assert decided == build_run(1)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagent_two_levels_below_a_split_copy_counts_the_copys_blocks(
     family: AnyFamily,
 ) -> None:
@@ -956,7 +953,6 @@ def test_new_records_of_a_split_copys_subagent_follow_the_runs(
     assert decided == build_run(2)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_block_on_a_split_copys_subagent_stays_out_of_the_original_runs_total(
     family: AnyFamily,
 ) -> None:

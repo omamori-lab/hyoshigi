@@ -218,9 +218,10 @@ class Trajectory:
         """Return the latest action, and a new trajectory of everything before it.
 
         The new trajectory keeps the ratings and subagents of the earlier actions, the records
-        whose position is before the latest action's, and this trajectory's place in its run; it
-        shares the subagents' trajectories, and this trajectory is unchanged. A trajectory whose
-        latest entry is not an action raises ConfigurationError.
+        whose position is before the latest action's, and this trajectory's place in its run. It
+        holds copies of the subagents' trajectories, at every depth, so a record on a copy leaves
+        the original unchanged, and this trajectory is unchanged. A trajectory whose latest entry
+        is not an action raises ConfigurationError.
         """
         match self._history:
             case [
@@ -247,12 +248,50 @@ class Trajectory:
                 earlier._sequence_numbers = self._sequence_numbers[: len(earlier._records)]
                 earlier._sequence = self._sequence
                 earlier._delegation = self._delegation
+                earlier._copy_subagents()
                 return Step(
                     trajectory=earlier,
                     action=action,
                 )
             case _:
                 raise ConfigurationError("the latest entry of the trajectory is not an action")
+
+    def _copy_subagents(self) -> None:
+        """Replace each subagent below this trajectory, at every depth, with a copy delegated by
+        its new parent.
+        """
+        parents: list[Trajectory] = [self]
+        while parents:
+            parent = parents.pop()
+            parent._subagents = {
+                call_id: subagent._copy(
+                    Delegation(
+                        parent=parent,
+                        call_id=call_id,
+                    ),
+                )
+                for call_id, subagent in parent._subagents.items()
+            }
+            parents.extend(parent._subagents.values())
+
+    def _copy(
+        self,
+        delegation: Delegation,
+    ) -> Trajectory:
+        """Return a trajectory with this one's entries, ratings, records and subagents in lists of
+        its own, at the place in the run that `delegation` names.
+        """
+        copied = Trajectory()
+        copied._history = list(self._history)
+        copied._action_ids = set(self._action_ids)
+        copied._call_ids = set(self._call_ids)
+        copied._ratings = list(self._ratings)
+        copied._subagents = dict(self._subagents)
+        copied._records = list(self._records)
+        copied._sequence_numbers = list(self._sequence_numbers)
+        copied._sequence = self._sequence
+        copied._delegation = delegation
+        return copied
 
     def attach(
         self,

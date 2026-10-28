@@ -632,10 +632,6 @@ def test_splitting_the_latest_step_keeps_only_the_subagents_of_earlier_calls(
     assert list(step.trajectory.subagents) == ["call_7"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=ConfigurationError,
-)
 def test_the_original_subagent_takes_an_action_its_split_copy_took(
     delegating: Trajectory,
 ) -> None:
@@ -657,7 +653,6 @@ def test_the_original_subagent_takes_an_action_its_split_copy_took(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_recording_on_a_split_copys_subagent_leaves_the_original_subagent_unchanged(
     delegating: Trajectory,
 ) -> None:

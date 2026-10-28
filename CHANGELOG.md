@@ -66,6 +66,12 @@ minor version.
 - `Trajectory.delegate` raises `ConfigurationError` for a subagent more than
   32 levels below the root, the depth `load` reads. This is a breaking
   change for a deeper tree, which 0.3.0 built and dumped but could not load.
+- The trajectory that `split_latest_step` returns holds copies of the
+  subagents' trajectories, at every depth, delegated by the new trajectory,
+  so a record on a copy leaves the original unchanged. 0.3.0 shared the
+  subagents with the trajectory it split. This is a breaking change for code
+  that records on a subagent of the split trajectory and reads the record
+  from the original.
 
 ## [0.3.0] - 2026-10-27
 
