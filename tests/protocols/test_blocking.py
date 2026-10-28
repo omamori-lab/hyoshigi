@@ -807,6 +807,123 @@ def test_a_subagent_delegated_by_a_split_copy_counts_its_own_blocks(family: AnyF
     assert decided == build_audit(5)
 
 
+@pytest.mark.parametrize(
+    "keeping",
+    [
+        pytest.param(
+            lambda trajectory: trajectory,
+            id="as-built",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            reload,
+            id="loaded-from-a-dump",
+        ),
+    ],
+)
+def test_a_subagent_kept_by_a_split_copy_counts_the_copys_blocks(
+    family: AnyFamily,
+    keeping: Callable[[Trajectory], Trajectory],
+) -> None:
+    trajectory = build_trajectory()
+    subagent = start_subagent(trajectory)
+    start_subagent(subagent)
+    subagent.act(build_action("later"))
+    earlier = subagent.split_latest_step().trajectory
+    record_steps(
+        earlier,
+        (
+            BLOCK("e1"),
+            BLOCK("e2"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=keeping(earlier).subagents["call_1"],
+        blocks_in_total=2,
+    )
+
+    assert decided == build_audit(1)
+
+
+@pytest.mark.parametrize(
+    "keeping",
+    [
+        pytest.param(
+            lambda trajectory: trajectory,
+            id="as-built",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            reload,
+            id="loaded-from-a-dump",
+        ),
+    ],
+)
+def test_a_subagent_kept_by_a_split_copy_counts_the_copys_reset(
+    family: AnyFamily,
+    keeping: Callable[[Trajectory], Trajectory],
+) -> None:
+    trajectory = build_trajectory()
+    start_subagent(trajectory)
+    record_steps(
+        trajectory,
+        (
+            BLOCK("a2"),
+            BLOCK("a3"),
+        ),
+    )
+    trajectory.act(build_action("later"))
+    earlier = trajectory.split_latest_step().trajectory
+    record_steps(
+        earlier,
+        (
+            AUDIT("a4"),
+            RUN("a4"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=keeping(earlier).subagents["call_1"],
+        blocks_in_total=2,
+    )
+
+    assert decided == build_run(1)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_subagent_two_levels_below_a_split_copy_counts_the_copys_blocks(
+    family: AnyFamily,
+) -> None:
+    trajectory = build_trajectory()
+    start_subagent(start_subagent(trajectory))
+    trajectory.act(build_action("later"))
+    earlier = trajectory.split_latest_step().trajectory
+    record_steps(
+        earlier,
+        (
+            BLOCK("e1"),
+            BLOCK("e2"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=earlier.subagents["call_1"].subagents["call_1"],
+        blocks_in_total=2,
+    )
+
+    assert decided == build_audit(1)
+
+
 def test_a_split_copys_new_records_follow_the_runs(family: AnyFamily) -> None:
     trajectory = build_trajectory()
     subagent = start_subagent(trajectory)
