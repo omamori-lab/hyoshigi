@@ -57,20 +57,20 @@ minor version.
   unchanged.
 - `LangfuseScores`, `LangSmithFeedback` and `AsyncLangSmithFeedback` take
   `redaction`, and send the explanation through it as the comment.
-- `Trajectory.join(subagent, call_id=...)` takes back a subagent that ran
-  in another process, such as one loaded from the dump a worker returns,
-  under the tool call that delegated it, and returns the copy it holds: the
-  load of the subagent's dump through the trajectory's redaction, in the
-  run's sequence. The joined records take the run's next numbers in the
-  order of their own, so two subagents that ran at once from one loaded run
-  replay one after the other, in the order they were joined, and
-  `BlockAndFeedBack` counts their blocks in the run's total. The trajectory
-  given is unchanged. A subagent that is not a `Trajectory`, that a call
-  delegated, or that belongs to this run, such as its root or a copy split
-  from it, a call that is not in the trajectory or that delegated a
-  subagent already, and a tree that would reach past 32 levels below the
-  root raise `ConfigurationError`, and nothing changes. The stored format
-  is unchanged.
+- `Trajectory.join(subagent, call_id=...)` holds a subagent that ran in
+  another process, such as one loaded from the dump a worker returns, under
+  the tool call that delegated it. It returns the copy it holds: the load
+  of the subagent's dump through the trajectory's redaction, in the run's
+  sequence. The joined records take the run's next numbers in the order of
+  their own, so two subagents that ran at once from one loaded run replay
+  one after the other, in the order they were joined. `BlockAndFeedBack`
+  counts their blocks in the run's total. The trajectory given is
+  unchanged. `ConfigurationError` is raised, and nothing changes,
+  for a subagent that is not a `Trajectory`, that a call delegated, or that
+  belongs to this run, such as its root or a copy split from it. It is
+  raised too for a call that is not in the trajectory or that delegated a
+  subagent already, and for a tree that would reach past 32 levels below
+  the root. The stored format is unchanged.
 
 ## [0.4.0] - 2026-10-28
 
