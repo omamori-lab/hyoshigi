@@ -28,6 +28,7 @@ from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
+from hyoshigi.trajectory.redaction import Redaction
 from hyoshigi.trajectory.storage.events import dump_event, load_event
 from hyoshigi.trajectory.storage.paths import select_member
 from hyoshigi.trajectory.storage.records import dump_record, load_records, read_sequence_numbers
@@ -80,7 +81,11 @@ class Trajectory:
     17.3). Each observation also carries who wrote it.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        redaction: Redaction | None = None,
+    ) -> None:
         self._history: list[Event] = []
         self._action_ids: set[str] = set()
         self._call_ids: set[str] = set()
@@ -98,6 +103,7 @@ class Trajectory:
         task: str,
         *,
         answer: str,
+        redaction: Redaction | None = None,
     ) -> BlackBoxRun:
         """Build the trajectory of a black-box run and its answer as the action to rate."""
         trajectory = cls()
@@ -118,6 +124,7 @@ class Trajectory:
         request: JSON,
         *,
         authorship: Authorship = by_role,
+        redaction: Redaction | None = None,
     ) -> Self:
         """Build the trajectory of an Anthropic Messages request body.
 
@@ -141,6 +148,7 @@ class Trajectory:
         request: JSON,
         *,
         authorship: Authorship = by_role,
+        redaction: Redaction | None = None,
     ) -> Self:
         """Build the trajectory of an OpenAI chat completions request body.
 
@@ -165,6 +173,7 @@ class Trajectory:
         request: JSON,
         *,
         authorship: Authorship = by_role,
+        redaction: Redaction | None = None,
     ) -> Self:
         """Build the trajectory of an Open Responses request body.
 
@@ -451,7 +460,11 @@ class Trajectory:
         self._subagents[call_id] = child
         return child
 
-    def dump(self) -> dict[str, JSON]:
+    def dump(
+        self,
+        *,
+        redaction: Redaction | None = None,
+    ) -> dict[str, JSON]:
         """Return the trajectory, its ratings, its records with their sequence numbers, and its
         subagents' as JSON-compatible data.
         """
@@ -487,6 +500,8 @@ class Trajectory:
     def load(
         cls,
         data: JSON,
+        *,
+        redaction: Redaction | None = None,
     ) -> Self:
         """Rebuild a trajectory from what dump returned.
 

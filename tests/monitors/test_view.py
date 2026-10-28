@@ -146,3 +146,13 @@ def test_a_views_delegation_tools_are_kept_as_a_frozenset(
         frozenset({"task"}),
         frozenset,
     )
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_view_whose_redaction_is_not_a_redaction_raises_when_built() -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        View(redaction=str.upper)  # ty: ignore[invalid-argument-type]
+
+    assert (
+        str(raised.value) == "redaction must be a Redaction, got an instance of method_descriptor"
+    )

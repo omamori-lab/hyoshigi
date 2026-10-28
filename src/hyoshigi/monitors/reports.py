@@ -29,6 +29,7 @@ from hyoshigi.monitors.score import (
 from hyoshigi.monitors.tracing import EVALUATION_NAME, name_cause
 from hyoshigi.options import check_instance, describe_option_value, read_count
 from hyoshigi.trajectory.json_data import JSON
+from hyoshigi.trajectory.redaction import Redaction
 
 if TYPE_CHECKING:
     from langfuse import Langfuse
@@ -54,6 +55,7 @@ class LangfuseScores:
 
     client: Langfuse
     name: str = EVALUATION_NAME
+    redaction: Redaction | None = None
 
     def __post_init__(self) -> None:
         # Imported here because langfuse is the optional extra hyoshigi[langfuse].
@@ -120,6 +122,7 @@ class LangSmithFeedback:
     name: str = EVALUATION_NAME
     stop_after_attempt: int = 10
     executor: Executor | None = None
+    redaction: Redaction | None = None
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].
@@ -204,6 +207,7 @@ class AsyncLangSmithFeedback:
     name: str = EVALUATION_NAME
     stop_after_attempt: int = 10
     task_group: asyncio.TaskGroup | None = None
+    redaction: Redaction | None = None
 
     def __post_init__(self) -> None:
         # Imported here because langsmith is the optional extra hyoshigi[langsmith].

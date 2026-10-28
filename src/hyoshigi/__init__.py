@@ -84,6 +84,7 @@ from hyoshigi.trajectory.formats.authorship import Authorship, by_role, marked
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, Description, MediaPart, OpaquePart, Part, TextPart
+from hyoshigi.trajectory.redaction import Redaction
 from hyoshigi.trajectory.trajectory import BlackBoxRun, Rating, Step, Trajectory
 
 __all__ = [
@@ -162,6 +163,7 @@ __all__ = [
     "Question",
     "Rating",
     "Rationale",
+    "Redaction",
     "Refused",
     "Rejected",
     "RepeatedMonitor",
