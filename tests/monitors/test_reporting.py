@@ -23,7 +23,7 @@ import httpx
 import pytest
 from langfuse import Langfuse
 from langsmith import AsyncClient, Client
-from langsmith.utils import LangSmithAuthError
+from langsmith.utils import LangSmithAuthError, LangSmithNotFoundError
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -2507,3 +2507,24 @@ def test_a_flag_cancelled_on_its_worker_is_logged_as_a_cancelled_flag(
             f"{report} did not send the flag: CancelledError.",
         ),
     ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_flag_makes_the_attempts_stop_after_attempt_allows_when_the_run_is_not_found(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    langsmith.first_statuses = [
+        404,
+        404,
+    ]
+    report = replace(
+        family.feedback(langsmith.url),
+        review_flag=FLAGGING,
+        stop_after_attempt=2,
+    )
+
+    with pytest.raises(LangSmithNotFoundError):
+        flag_step(report)
+
+    assert len(langsmith.received) == 2
