@@ -485,6 +485,17 @@ class Trajectory:
         self._subagents[call_id] = child
         return child
 
+    def join(
+        self,
+        subagent: Trajectory,
+        *,
+        call_id: str,
+    ) -> Trajectory:
+        """A stub that holds nothing under the call and hands back what it was given, so the tests
+        of joining a subagent's run can build their objects before it is implemented.
+        """
+        return subagent
+
     def dump(
         self,
         *,

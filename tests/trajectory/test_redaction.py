@@ -1019,6 +1019,74 @@ def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> N
     assert loaded.records[0].action == loaded.history[1]  # ty: ignore[unresolved-attribute]
 
 
+@pytest.mark.xfail(strict=True)
+def test_a_trajectory_with_a_redaction_keeps_what_joins_it_redacted(masking: Trajectory) -> None:
+    masking.act(ASKING)
+
+    joined = masking.join(
+        Trajectory.load(STORED),
+        call_id="call_2",
+    )
+
+    assert joined.dump() == MASKED_STORED
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "select",
+    [
+        lambda joined: joined,
+        lambda joined: joined.subagents["call_2"],
+    ],
+    ids=["the-joined-trajectory", "its-subagent"],
+)
+def test_a_trajectory_joined_to_one_with_a_redaction_keeps_later_entries_redacted(
+    masking: Trajectory,
+    select: Callable[[Trajectory], Trajectory],
+) -> None:
+    masking.act(ASKING)
+    joined = select(
+        masking.join(
+            Trajectory.load(STORED),
+            call_id="call_2",
+        ),
+    )
+
+    joined.observe(TASK)
+
+    assert joined.history[-1] == MASKED_TASK
+
+
+def test_joining_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> None:
+    pseudonymising = Trajectory(redaction=build_pseudonyms())
+    pseudonymising.act(ASKING)
+
+    joined = pseudonymising.join(
+        Trajectory.load(STORED),
+        call_id="call_2",
+    )
+
+    assert joined.records[0].action == joined.history[1]  # ty: ignore[unresolved-attribute]
+
+
+def test_joining_leaves_the_trajectory_it_takes_unchanged(masking: Trajectory) -> None:
+    masking.record(
+        Run(
+            action=ASKING,
+            proposals=(PROPOSED,),
+            position=1,
+        ),
+    )
+    taken = Trajectory.load(STORED)
+
+    masking.join(
+        taken,
+        call_id="call_2",
+    )
+
+    assert taken.dump() == STORED
+
+
 @pytest.mark.parametrize(
     ("part", "kept"),
     [
