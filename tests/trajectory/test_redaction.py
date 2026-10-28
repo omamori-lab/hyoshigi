@@ -983,6 +983,14 @@ def test_a_dump_with_a_redaction_that_differs_on_each_call_loads_back() -> None:
     assert loaded.dump() == stored
 
 
+def test_a_dump_under_changing_pseudonyms_writes_a_rating_and_its_proposal_one_score() -> None:
+    stored = build_stored_trajectory().dump(redaction=build_pseudonyms())
+
+    loaded = Trajectory.load(stored)
+
+    assert loaded.ratings[0].score == loaded.records[0].proposals[0].score
+
+
 @pytest.mark.xfail(strict=True)
 def test_loading_with_a_redaction_keeps_what_it_loads_redacted() -> None:
     loaded = Trajectory.load(
