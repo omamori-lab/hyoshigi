@@ -734,8 +734,22 @@ def test_the_reset_applies_over_the_runs_records_in_the_order_they_were_recorded
     assert decided == outcome
 
 
+@pytest.mark.parametrize(
+    "keeping",
+    [
+        pytest.param(
+            lambda trajectory: trajectory,
+            id="as-built",
+        ),
+        pytest.param(
+            reload,
+            id="loaded-from-a-dump",
+        ),
+    ],
+)
 def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
     family: AnyFamily,
+    keeping: Callable[[Trajectory], Trajectory],
 ) -> None:
     trajectory = build_trajectory()
     record_steps(
@@ -751,7 +765,8 @@ def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
             RUN("s2"),
         ),
     )
-    step = nested.split_latest_step()
+    kept = keeping(trajectory).subagents["call_1"].subagents["call_1"]
+    step = kept.split_latest_step()
     script = Script(build_reply(2))
 
     decided = family.decide_blocking(
