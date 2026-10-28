@@ -2107,7 +2107,7 @@ def test_a_persons_run_after_an_audit_loads_back_at_the_same_position(
     )
 
 
-def test_a_flag_loads_back_at_its_position(trajectory: Trajectory) -> None:
+def test_a_flag_loads_back_with_its_action_and_its_score(trajectory: Trajectory) -> None:
     flag = Flag(
         action=DELETE_FILE,
         proposals=(PROPOSED_DELETE,),
@@ -2117,7 +2117,26 @@ def test_a_flag_loads_back_at_its_position(trajectory: Trajectory) -> None:
 
     loaded = Trajectory.load(trajectory.dump())
 
-    assert loaded.records == (flag,)
+    assert (
+        loaded.history,
+        loaded.ratings,
+        loaded.records,
+    ) == (
+        (
+            TASK,
+            READ_FILE,
+            CHART,
+            MEMORY,
+            DELETE_FILE,
+        ),
+        (
+            Rating(
+                action_id="a2",
+                score=REFUSED,
+            ),
+        ),
+        (flag,),
+    )
 
 
 STORED_RUN: dict[str, JSON] = {

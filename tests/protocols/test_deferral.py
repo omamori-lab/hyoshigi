@@ -1956,34 +1956,7 @@ def test_on_audit_decides_what_an_audited_proposal_becomes(
     assert decided == outcome
 
 
-@pytest.mark.parametrize(
-    ("on_audit", "outcome"),
-    [
-        pytest.param(
-            AuditResponse.HOLD,
-            Audit(
-                action=PROPOSED,
-                proposals=(PROPOSED_UNAVAILABLE,),
-                position=1,
-            ),
-            id="held",
-        ),
-        pytest.param(
-            AuditResponse.FLAG,
-            Flag(
-                action=PROPOSED,
-                proposals=(PROPOSED_UNAVAILABLE,),
-                position=1,
-            ),
-            id="flagged",
-        ),
-    ],
-)
-def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
-    family: AnyFamily,
-    on_audit: AuditResponse,
-    outcome: ProtocolDecision,
-) -> None:
+def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFamily) -> None:
     request = TrustedStep(
         proposals=(PROPOSED_UNAVAILABLE,),
         position=1,
@@ -1994,11 +1967,148 @@ def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
         request=request,
         proposals=(),
         trajectory=build_trajectory(),
-        on_audit=on_audit,
+        on_audit=AuditResponse.HOLD,
         **TRUSTED_MONITORING,
     )
 
-    assert resumed == outcome
+    assert resumed == Audit(
+        action=PROPOSED,
+        proposals=(PROPOSED_UNAVAILABLE,),
+        position=1,
+    )
+
+
+@pytest.mark.parametrize(
+    ("options", "request_", "message"),
+    [
+        pytest.param(
+            {},
+            Resample(
+                count=1,
+                proposals=(
+                    PROPOSED_AT_0_6,
+                    FIRST_AT_0_7,
+                    build_proposal(
+                        SECOND,
+                        build_score(0.8),
+                    ),
+                ),
+                position=1,
+            ),
+            "the request asks for resample 3, but max_resamples is 2",
+            id="a-resample-after-all-the-resamples",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {},
+            Resample(
+                count=3,
+                proposals=(PROPOSED_AT_0_6,),
+                position=1,
+            ),
+            "the request asks for resample 3, but max_resamples is 2",
+            id="a-resample-of-more-than-the-rest",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {"max_resamples": 0},
+            Resample(
+                count=1,
+                proposals=(PROPOSED_AT_0_9,),
+                position=1,
+            ),
+            "the request asks for resample 1, but max_resamples is 0",
+            id="a-resample-of-a-protocol-with-no-resamples",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **TRUSTED_MONITORING,
+                "on_audit": AuditResponse.FLAG,
+            },
+            Resample(
+                count=1,
+                proposals=(PROPOSED_AT_0_9,),
+                position=1,
+            ),
+            "the request asks for resample 1, but max_resamples is 0",
+            id="a-resample-under-flag",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            {
+                **TRUSTED_MONITORING,
+                "on_audit": AuditResponse.FLAG,
+            },
+            TrustedStep(
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            "on_audit FLAG never asks for a TrustedStep",
+            id="a-trusted-step-under-flag",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+    ],
+)
+def test_a_resume_of_a_request_the_protocol_never_asks_for_is_refused_naming_why(
+    family: AnyFamily,
+    options: dict[str, object],
+    request_: ProtocolRequest,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        family.resume_deferral(
+            Script(),
+            request=request_,
+            proposals=(),
+            trajectory=build_trajectory(),
+            **options,
+        )
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.parametrize(
+    ("on_unavailable", "outcome"),
+    [
+        pytest.param(
+            FailureResponse.BLOCK,
+            Block(
+                action=PROPOSED,
+                reason=UNAVAILABLE_EXPLANATION,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="block",
+        ),
+        pytest.param(
+            FailureResponse.RUN,
+            Run(
+                action=PROPOSED,
+                proposals=(PROPOSED_UNAVAILABLE,),
+                position=1,
+            ),
+            id="run",
+        ),
+    ],
+)
+def test_on_audit_flag_leaves_a_block_and_a_run_for_an_unavailable_rating_alone(
+    family: AnyFamily,
+    on_unavailable: FailureResponse,
+    outcome: ProtocolDecision,
+) -> None:
+    script = Script(UNAVAILABLE)
+
+    decided = family.decide_deferral(
+        script,
+        proposed=PROPOSED,
+        trajectory=build_trajectory(),
+        on_audit=AuditResponse.FLAG,
+        on_unavailable=on_unavailable,
+        **TRUSTED_MONITORING,
+    )
+
+    assert decided == outcome
 
 
 @pytest.mark.parametrize(
@@ -2069,6 +2179,19 @@ def test_on_audit_decides_what_a_trusted_step_answered_with_no_action_becomes(
             },
             "on_audit FLAG needs defer_threshold (0.5) equal to audit_threshold (0.9)",
             id="flag-with-different-thresholds",
+        ),
+        pytest.param(
+            {
+                "on_audit": AuditResponse.FLAG,
+                "max_resamples": 0,
+                "defer_threshold": 0.7,
+                "audit_threshold": 0.7,
+                "on_unavailable": FailureResponse.TRUSTED_STEP,
+            },
+            "on_audit FLAG needs on_unavailable other than TRUSTED_STEP, since trusted "
+            "monitoring has no trusted model",
+            id="flag-with-a-trusted-step-for-an-unavailable-rating",
+            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
