@@ -434,6 +434,10 @@ def check_asked(
                 )
         case TrustedStep() if protocol.on_audit is AuditResponse.FLAG:
             raise ConfigurationError("on_audit FLAG never asks for a TrustedStep")
+        case TrustedStep():
+            pass
+        case unreachable:
+            assert_never(unreachable)
 
 
 def _read_limit(request: ProtocolRequest) -> int:
