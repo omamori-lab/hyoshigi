@@ -215,13 +215,15 @@ installs without the `openai` extra beside LiteLLM. The LiteLLM adapter imports 
 classes from `openai`, which openai 2.54.0 and openai 3.35.1 both define.
 
 Versions 1.82.7, 1.82.8 and 1.107.0 of LiteLLM on PyPI carried malicious code that runs at every
-interpreter start, and the advisory does not list 1.106.5 [@osv2026litellm]. A lockfile that pins
-the version and the hash of each file keeps a later upload from replacing what was locked.
-`uv export` writes each locked version with its hashes unless `--no-hashes` is given
-[@uv2026cli, {Section} "uv export"], and `pip install --require-hashes` refuses a requirement that
-is unpinned or has no matching hash [@pypa2026secureinstalls, {Section} "Hash-checking Mode"]:
+interpreter start, and the advisory does not list 1.106.5 [@osv2026litellm]. `uv lock` writes a
+project's lockfile [@uv2026cli, {Section} "uv lock"], `uv export` writes each locked version with
+its hashes unless `--no-hashes` is given [@uv2026cli, {Section} "uv export"], and
+`pip install --require-hashes` refuses a requirement that is unpinned or has no matching hash
+[@pypa2026secureinstalls, {Section} "Hash-checking Mode"]. Locked and installed this way, a file
+uploaded later under the same version fails the check:
 
 ```console
+uv lock
 uv export --format requirements.txt --output-file requirements.txt
 pip install --require-hashes --requirement requirements.txt
 ```
