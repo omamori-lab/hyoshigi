@@ -459,10 +459,16 @@ class Trajectory:
     ) -> Trajectory:
         """Start a subagent's trajectory, held under the tool call that delegated it.
 
-        The call must be one an action in this trajectory made, and the subagent at most 32
-        levels below the root of the delegation tree; otherwise ConfigurationError is raised.
+        The call id must be a str naming a call an action in this trajectory made, and the
+        subagent at most 32 levels below the root of the delegation tree; otherwise
+        ConfigurationError is raised.
         The subagent's task is the instruction, authored by the delegator.
         """
+        check_instance(
+            call_id,
+            expected=str,
+            name="call_id",
+        )
         if call_id not in self._call_ids:
             raise ConfigurationError("delegate takes the id of a tool call in this trajectory")
         if call_id in self._subagents:
@@ -494,13 +500,13 @@ class Trajectory:
         that delegated it, and return the copy.
 
         The subagent must be a Trajectory at the root of a run apart from this one, such as one
-        loaded from a subagent's dump, the call one an action in this trajectory made with no
-        subagent yet, and each trajectory of the subagent's tree at most 32 levels below the root
-        once joined; otherwise ConfigurationError is raised and nothing changes. The copy is the
-        load of the subagent's dump through this trajectory's redaction, as load(data,
-        redaction=...) is, so it marks no action as split off. Its trajectories take this run's
-        sequence, and their records the run's next numbers, in the order of their own. The
-        subagent is unchanged.
+        loaded from a subagent's dump, the call id a str naming a call an action in this
+        trajectory made with no subagent yet, and each trajectory of the subagent's tree at most
+        32 levels below the root once joined; otherwise ConfigurationError is raised and nothing
+        changes. The copy is the load of the subagent's dump through this trajectory's
+        redaction, as load(data, redaction=...) is, so it marks no action as split off. Its
+        trajectories take this run's sequence, and their records the run's next numbers, in the
+        order of their own. The subagent is unchanged.
 
         <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
         """
@@ -508,6 +514,11 @@ class Trajectory:
             subagent,
             expected=Trajectory,
             name="subagent",
+        )
+        check_instance(
+            call_id,
+            expected=str,
+            name="call_id",
         )
         if call_id not in self._call_ids:
             raise ConfigurationError("join takes the id of a tool call in this trajectory")
