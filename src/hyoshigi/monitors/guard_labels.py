@@ -199,23 +199,6 @@ QWEN3GUARD = GuardLabels(
     slots=True,
     kw_only=True,
 )
-class _LabelLine:
-    """A known label a line names, in lower case, and whether the line can be the verdict.
-
-    A line can be the verdict when it holds the label alone, or after a verdict key such as
-    Label:. A label after any other key, alone in a list item or a quote, or at the start of
-    a longer line, still names that label for the conflict check.
-    """
-
-    label: str
-    is_verdict: bool
-
-
-@dataclass(
-    frozen=True,
-    slots=True,
-    kw_only=True,
-)
 class LabelMatch:
     """The guard's label, in lower case, and the index in its reply of the label's first
     character.
@@ -225,13 +208,30 @@ class LabelMatch:
     offset: int
 
 
-def find_label(
-    text: str,
-    *,
-    labels: GuardLabels,
-) -> LabelMatch | Unreadable:
-    """Return the guard's label with the index where it starts in the reply, or Unreadable."""
-    return Unreadable()
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
+class _LabelLine:
+    """A known label a line names, in lower case, where it starts in the reply, and whether the
+    line can be the verdict.
+
+    A line can be the verdict when it holds the label alone, or after a verdict key such as
+    Label:. A label after any other key, alone in a list item or a quote, or at the start of
+    a longer line, still names that label for the conflict check.
+    """
+
+    label: str
+    offset: int
+    is_verdict: bool
+
+    def locate(self) -> LabelMatch:
+        """The label with where it starts."""
+        return LabelMatch(
+            label=self.label,
+            offset=self.offset,
+        )
 
 
 def read_label(
@@ -240,6 +240,30 @@ def read_label(
     labels: GuardLabels,
 ) -> str | Unreadable:
     """Return the guard's label, in lower case, from where its format puts it, or Unreadable.
+
+    The label is the one find_label finds.
+    """
+    found = find_label(
+        text,
+        labels=labels,
+    )
+    return (
+        found
+        if isinstance(
+            found,
+            Unreadable,
+        )
+        else found.label
+    )
+
+
+def find_label(
+    text: str,
+    *,
+    labels: GuardLabels,
+) -> LabelMatch | Unreadable:
+    """Return the guard's label, in lower case, with the index of its first character in the
+    text, from where its format puts it, or Unreadable.
 
     A reply in which two lines name different labels is unreadable: a guard that quotes a
     label the agent planted must not have the quote read as its verdict. A suspicious label
@@ -270,7 +294,7 @@ def read_label(
         return Unreadable()
     last_line = label_lines.get(len(lines) - 1)
     if last_line is not None:
-        return last_line.label if last_line.is_verdict else Unreadable()
+        return last_line.locate() if last_line.is_verdict else Unreadable()
     return _read_first_line_label(
         lines,
         label_lines=label_lines,
@@ -283,7 +307,7 @@ def _read_keyed_label(
     *,
     key: str,
     labels: GuardLabels,
-) -> str | Unreadable:
+) -> LabelMatch | Unreadable:
     """Return the whole value of the one line that opens with the key, if it is a label.
 
     A suspicious value stands whatever the other lines say. A safe value stands only when no
@@ -309,14 +333,18 @@ def _read_keyed_label(
     if value is None:
         return Unreadable()
     label = value["label"].lower()
-    if label in labels.suspicious:
-        return label
-    if label in labels.safe and not _names_label_elsewhere(
-        lines,
-        besides=keyed_line,
-        labels=labels.suspicious,
+    if label in labels.suspicious or (
+        label in labels.safe
+        and not _names_label_elsewhere(
+            lines,
+            besides=keyed_line,
+            labels=labels.suspicious,
+        )
     ):
-        return label
+        return LabelMatch(
+            label=label,
+            offset=keyed_line.start() + value.start("label"),
+        )
     return Unreadable()
 
 
@@ -370,10 +398,10 @@ def _find_label_lines(
     label_lines: dict[int, _LabelLine] = {}
     for index, line in enumerate(lines):
         found = _match_label_line(
-            line.group(),
+            line,
             labels=labels,
         ) or _match_keyed_label_start(
-            line.group(),
+            line,
             labels=labels,
         )
         if found is not None:
@@ -382,7 +410,7 @@ def _find_label_lines(
 
 
 def _match_label_line(
-    line: str,
+    line: re.Match[str],
     *,
     labels: frozenset[str],
 ) -> _LabelLine | None:
@@ -391,7 +419,7 @@ def _match_label_line(
     A key that names a label, as in "violation: no_violation", makes the line name two
     labels, so it holds none.
     """
-    match = _LABEL_LINE.fullmatch(line)
+    match = _LABEL_LINE.fullmatch(line.group())
     if match is None or match["label"].lower() not in labels:
         return None
     key = match["key"]
@@ -399,6 +427,7 @@ def _match_label_line(
         return None
     return _LabelLine(
         label=match["label"].lower(),
+        offset=line.start() + match.start("label"),
         is_verdict=_is_verdict(match),
     )
 
@@ -416,7 +445,7 @@ def _is_verdict(match: re.Match[str]) -> bool:
 
 
 def _match_keyed_label_start(
-    line: str,
+    line: re.Match[str],
     *,
     labels: frozenset[str],
 ) -> _LabelLine | None:
@@ -425,11 +454,12 @@ def _match_keyed_label_start(
     A guard that gives its keyed label and then quotes the action on the same line still
     names its label; the line is no verdict, since more text follows.
     """
-    match = _KEYED_LABEL_START.match(line)
+    match = _KEYED_LABEL_START.match(line.group())
     if match is None or match["label"].lower() not in labels:
         return None
     return _LabelLine(
         label=match["label"].lower(),
+        offset=line.start() + match.start("label"),
         is_verdict=False,
     )
 
@@ -466,7 +496,7 @@ def _read_first_line_label(
     *,
     label_lines: dict[int, _LabelLine],
     suspicious: frozenset[str],
-) -> str | Unreadable:
+) -> LabelMatch | Unreadable:
     """Read an unsafe reply written first, followed only by category codes, as Llama Guard
     writes it (Meta, "Llama Guard 4 12B" model card).
     """
@@ -474,5 +504,5 @@ def _read_first_line_label(
     if first_line is None or not first_line.is_verdict or first_line.label not in suspicious:
         return Unreadable()
     if all(_CATEGORY_CODES.fullmatch(line.group()) for line in lines[1:]):
-        return first_line.label
+        return first_line.locate()
     return Unreadable()

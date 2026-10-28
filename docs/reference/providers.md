@@ -23,6 +23,13 @@ is the provider and the model id, such as `anthropic:claude-haiku-5-5`. Building
 empty model id, and for a `perceives` that is not a `MediaTypes` or names media the API cannot
 carry.
 
+## The adapters declare no log-probabilities
+
+The adapters build models with `top_log_probabilities` at 0 and return a `Generation` with no
+`log_probabilities`, so a `GuardMonitor` over an adapter samples. A model that reports
+log-probabilities comes from `GenerativeModel(name=..., generate=..., top_log_probabilities=...)`
+around the caller's own client ([Connecting a model](../how-to/connecting-a-model.md)).
+
 ## An outcome says whether the provider answered
 
 A rating that cannot be made fails closed: its score is 1.0, so the action counts as most suspicious

@@ -66,6 +66,10 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.Generation
 
+::: hyoshigi.TokenLogProbability
+
+::: hyoshigi.AlternativeToken
+
 ::: hyoshigi.Decision
 
 ::: hyoshigi.Truncated

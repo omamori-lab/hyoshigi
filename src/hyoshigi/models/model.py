@@ -12,7 +12,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeAliasType, get_args
 
 from hyoshigi.errors import ConfigurationError
-from hyoshigi.options import check_instance, describe_type, name_class, read_threshold
+from hyoshigi.options import (
+    check_instance,
+    describe_type,
+    name_class,
+    read_count,
+    read_log_probability,
+    read_threshold,
+)
 from hyoshigi.trajectory.parts import MEDIA_TYPE, MediaPart, TextPart
 
 if TYPE_CHECKING:
@@ -132,10 +139,25 @@ class Question:
     kw_only=True,
 )
 class AlternativeToken:
-    """A token a model could have written at a position, with its log-probability."""
+    """A token a model could have written at a position, with its log-probability.
+
+    The log-probability is a number of at most 0, kept as a float; minus infinity is a
+    probability of 0. Anything else raises ConfigurationError.
+    """
 
     token: str
     log_probability: float
+
+    def __post_init__(self) -> None:
+        # The dataclass is frozen, so the float is set past its guard.
+        object.__setattr__(
+            self,
+            "log_probability",
+            read_token_log_probability(
+                self.token,
+                log_probability=self.log_probability,
+            ),
+        )
 
 
 @dataclass(
@@ -144,11 +166,32 @@ class AlternativeToken:
     kw_only=True,
 )
 class TokenLogProbability:
-    """A generated token with its log-probability and the likeliest alternatives to it."""
+    """A generated token with its log-probability and the likeliest alternatives to it.
+
+    The log-probability is read as an AlternativeToken's is. The alternatives are a tuple of
+    AlternativeToken, which may leave out the generated token itself; anything else raises
+    ConfigurationError.
+    """
 
     token: str
     log_probability: float
     alternatives: tuple[AlternativeToken, ...] = ()
+
+    def __post_init__(self) -> None:
+        # The dataclass is frozen, so the float is set past its guard.
+        object.__setattr__(
+            self,
+            "log_probability",
+            read_token_log_probability(
+                self.token,
+                log_probability=self.log_probability,
+            ),
+        )
+        check_items(
+            self.alternatives,
+            expected=AlternativeToken,
+            name="alternatives",
+        )
 
 
 @dataclass(
@@ -157,10 +200,23 @@ class TokenLogProbability:
     kw_only=True,
 )
 class Generation:
-    """A complete reply, with the log-probability of each generated token if the model gave them."""
+    """A complete reply, with the log-probability of each generated token if the model gave them.
+
+    `log_probabilities` is a tuple of TokenLogProbability, one per generated token in order,
+    and empty when the model gave none; anything else raises ConfigurationError.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/choosing-a-monitor/>
+    """
 
     text: str
     log_probabilities: tuple[TokenLogProbability, ...] = ()
+
+    def __post_init__(self) -> None:
+        check_items(
+            self.log_probabilities,
+            expected=TokenLogProbability,
+            name="log_probabilities",
+        )
 
 
 @dataclass(
@@ -279,6 +335,59 @@ def check_name(name: str) -> None:
         raise ConfigurationError("a model needs a name, such as the provider's model id")
 
 
+def read_token_log_probability(
+    token: object,
+    *,
+    log_probability: object,
+) -> float:
+    """Raise ConfigurationError unless the token is a str; return the log-probability as a float."""
+    check_instance(
+        token,
+        expected=str,
+        name="token",
+    )
+    return read_log_probability(
+        log_probability,
+        name="log_probability",
+    )
+
+
+def check_items(
+    items: tuple[object, ...],
+    *,
+    expected: type,
+    name: str,
+) -> None:
+    """Raise ConfigurationError unless items is a tuple of instances of the expected class,
+    naming the first wrong item by its position.
+    """
+    check_instance(
+        items,
+        expected=tuple,
+        name=name,
+    )
+    for position, item in enumerate(items):
+        check_instance(
+            item,
+            expected=expected,
+            name=f"{name}[{position}]",
+        )
+
+
+def keep_top_log_probabilities(model: GenerativeModel | AsyncGenerativeModel) -> None:
+    """Keep the model's top_log_probabilities as an int, or raise ConfigurationError."""
+    # The dataclass is frozen, so the int is set past its guard.
+    object.__setattr__(
+        model,
+        "top_log_probabilities",
+        read_count(
+            model.top_log_probabilities,
+            name="top_log_probabilities",
+            minimum=0,
+        ),
+    )
+
+
 def check_model(
     name: str,
     *,
@@ -358,6 +467,14 @@ class GenerativeModel:
 
     The function may be called more than once per rating, and returns an outcome rather
     than raising for a failure it expects.
+
+    `top_log_probabilities` is the number of likeliest alternative tokens the function returns
+    with each generated token's log-probability, a whole number from 0 to sys.maxsize kept as
+    an int; 0 says the function returns none. Above 0, the function asks its provider for them
+    on every call and returns them on every Generation, and a GuardMonitor scores from them.
+    Anything else raises ConfigurationError.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/choosing-a-monitor/>
     """
 
     name: str
@@ -372,6 +489,7 @@ class GenerativeModel:
             function_name="generate",
             perceives=self.perceives,
         )
+        keep_top_log_probabilities(self)
 
     @classmethod
     def from_openai(
@@ -461,7 +579,10 @@ class AsyncGenerativeModel:
     """A model that writes a reply to a prompt, through the caller's async function.
 
     The function may be called more than once per rating, concurrently, and returns an
-    outcome rather than raising for a failure it expects.
+    outcome rather than raising for a failure it expects. `top_log_probabilities` is read as
+    GenerativeModel reads it.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/choosing-a-monitor/>
     """
 
     name: str
@@ -476,6 +597,7 @@ class AsyncGenerativeModel:
             function_name="generate",
             perceives=self.perceives,
         )
+        keep_top_log_probabilities(self)
 
     @classmethod
     def from_openai(

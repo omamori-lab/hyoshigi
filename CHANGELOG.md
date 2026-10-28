@@ -13,6 +13,26 @@ minor version.
 
 ## [Unreleased]
 
+### Added
+
+- `GenerativeModel` and `AsyncGenerativeModel` take `top_log_probabilities`, a
+  whole number from 0, 0 by default: the number of likeliest alternative
+  tokens the model's function returns with each generated token.
+  `Generation` gains `log_probabilities`, a tuple of `TokenLogProbability`,
+  each holding a token, its log-probability and its `alternatives`, a tuple of
+  `AlternativeToken`. Both new classes are exported. A value of the wrong type,
+  a negative count, a log-probability above 0 or NaN raises
+  `ConfigurationError` when the object is built.
+- `GuardMonitor` and `AsyncGuardMonitor` over a model with
+  `top_log_probabilities` above 0 ask once and score the probability on the
+  suspicious labels at the label's first token, in place of the share of
+  `samples` labelled suspicious. The explanation states one of three findings
+  and no number. A reply that carries no log-probabilities, whose tokens do not
+  spell its text, or whose label token has no alternatives or does not start
+  the label's kind fails the rating closed as `Unreadable`. `samples` is
+  checked and not used on this path, and `HardLabelWarning` is raised only when
+  the monitor samples. A model that declares 0 is sampled as before.
+
 ## [0.4.0] - 2026-10-28
 
 ### Added

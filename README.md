@@ -204,6 +204,10 @@ guard = GuardMonitor(
 )
 ```
 
+The guard asks `samples` times and scores the share labelled suspicious. A model that
+returns log-probabilities, declared with `top_log_probabilities` on `GenerativeModel`, is asked
+once, and the monitor scores the probability on the suspicious labels at the label's token.
+
 ## Composing monitors
 
 ```python

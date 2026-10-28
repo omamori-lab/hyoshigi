@@ -17,7 +17,7 @@ the explanation. hyoshigi raises only for misuse.
 
 | Cause | What happened | Monitors that return it |
 |---|---|---|
-| `Unreadable` | No reply held a readable score or label | `LLMMonitor`, `GuardMonitor` |
+| `Unreadable` | No reply held a readable score or label, or a guard's log-probabilities could not score its label | `LLMMonitor`, `GuardMonitor` |
 | `Truncated` | A reply was cut off at the model's output limit | `LLMMonitor`, `GuardMonitor` |
 | `Refused` | The model or its provider declined | all three |
 | `Rejected` | The provider answered that it cannot use the prompt: a prompt over the context window, an image it cannot use, or a request too large (HTTP 413) | all three |
@@ -36,7 +36,10 @@ Each monitor reaches a cause in its own way.
   sample is set aside: when more than half the samples answered, the score is
   the share of them labelled suspicious, with the unanswered ones in the
   evidence's `unavailable`, and otherwise the score fails closed with the
-  first unavailable sample.
+  first unavailable sample. Over a model that reports log-probabilities it
+  asks once. A reply whose log-probabilities cannot score its label fails the
+  score closed as `Unreadable`, and a refusal, a rejection, a cut-off reply or
+  an unavailable answer fails it closed with its own cause.
 - `DecisionMonitor` fails closed with the first refusal, rejection or
   unavailable answer in the order of its statements. A decision model answers with a
   probability, so this monitor has no reply to misread or cut off.

@@ -4,6 +4,7 @@ A constructor checks the type of each option, so a count given as a float fails 
 object is built and not at the first rating.
 """
 
+import math
 import numbers
 import operator
 import sys
@@ -161,6 +162,36 @@ def read_threshold(
         )
     # Adding 0.0 turns -0.0 into 0.0.
     return float(value) + 0.0
+
+
+def read_log_probability(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    """Return a log-probability as a float: a real number of at most 0, minus infinity included.
+
+    A number too small for a float, such as -(10**400), is read as minus infinity. A bool, a
+    string, NaN or a number above 0 raises ConfigurationError.
+    """
+    if (
+        isinstance(
+            value,
+            bool,
+        )
+        or not isinstance(
+            value,
+            numbers.Real,
+        )
+        or not value <= 0
+    ):
+        raise ConfigurationError(
+            f"{name} must be a number of at most 0, got {describe_option_value(value)}",
+        )
+    try:
+        return float(value)
+    except OverflowError:
+        return -math.inf
 
 
 def check_instance(
