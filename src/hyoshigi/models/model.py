@@ -569,6 +569,34 @@ class GenerativeModel:
             perceives=perceives,
         )
 
+    @classmethod
+    def from_litellm(
+        cls,
+        completion: Callable[..., object],
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
+        top_log_probabilities: int = 0,
+    ) -> GenerativeModel:
+        """A model on LiteLLM's chat completions, through the caller's litellm.completion.
+
+        Options of the call, such as max_completion_tokens or drop_params, are bound to the
+        function with functools.partial. Above 0, top_log_probabilities asks for that many
+        alternatives to each generated token, which the model returns and declares.
+
+        <https://omamori-lab.github.io/hyoshigi/reference/providers/>
+        """
+        # Imported here because the module imports the OpenAI SDK's errors, which only the
+        # adapters read.
+        from hyoshigi.models import litellm as provider
+
+        return provider.build_model(
+            completion,
+            model=model,
+            perceives=perceives,
+            top_log_probabilities=top_log_probabilities,
+        )
+
 
 @dataclass(
     frozen=True,
@@ -675,6 +703,34 @@ class AsyncGenerativeModel:
             max_output_tokens=max_output_tokens,
             reasoning_effort=reasoning_effort,
             perceives=perceives,
+        )
+
+    @classmethod
+    def from_litellm(
+        cls,
+        acompletion: Callable[..., Awaitable[object]],
+        *,
+        model: str,
+        perceives: MediaTypes = TEXT_ONLY,
+        top_log_probabilities: int = 0,
+    ) -> AsyncGenerativeModel:
+        """A model on LiteLLM's chat completions, through the caller's litellm.acompletion.
+
+        Options of the call, such as max_completion_tokens or drop_params, are bound to the
+        function with functools.partial. Above 0, top_log_probabilities asks for that many
+        alternatives to each generated token, which the model returns and declares.
+
+        <https://omamori-lab.github.io/hyoshigi/reference/providers/>
+        """
+        # Imported here because the module imports the OpenAI SDK's errors, which only the
+        # adapters read.
+        from hyoshigi.models import litellm as provider
+
+        return provider.build_async_model(
+            acompletion,
+            model=model,
+            perceives=perceives,
+            top_log_probabilities=top_log_probabilities,
         )
 
 
