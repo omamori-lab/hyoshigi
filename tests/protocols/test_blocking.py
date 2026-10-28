@@ -1142,7 +1142,6 @@ def work_apart(
             "call_2",
             build_audit(2),
             id="call-1-then-call-2",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             "call_2",
@@ -1212,7 +1211,6 @@ def blocked_then_delegating() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("deciding", "position"),
     [
@@ -1263,7 +1261,6 @@ def test_a_joined_subagents_blocks_count_in_its_runs_total(
     assert decided == build_audit(position)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_joined_runs_records_replay_in_the_order_they_were_recorded_across_its_subagents(
     family: AnyFamily,
 ) -> None:
@@ -1302,7 +1299,6 @@ def test_a_joined_runs_records_replay_in_the_order_they_were_recorded_across_its
     assert decided == build_audit(2)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_joined_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
     family: AnyFamily,
     blocked_then_delegating: Trajectory,

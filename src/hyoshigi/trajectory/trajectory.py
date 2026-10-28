@@ -490,10 +490,64 @@ class Trajectory:
         *,
         call_id: str,
     ) -> Trajectory:
-        """A stub that holds nothing under the call and hands back what it was given, so the tests
-        of joining a subagent's run can build their objects before it is implemented.
+        """Hold a copy of a subagent's trajectory, kept apart from this run, under the tool call
+        that delegated it, and return the copy.
+
+        The subagent must be a Trajectory at the root of a run apart from this one, such as one
+        loaded from a subagent's dump, the call one an action in this trajectory made with no
+        subagent yet, and each trajectory of the subagent's tree at most 32 levels below the root
+        once joined; otherwise ConfigurationError is raised and nothing changes. The copy is the
+        load of the subagent's dump through this trajectory's redaction, as load(data,
+        redaction=...) is, so it marks no action as split off. Its trajectories take this run's
+        sequence, and their records the run's next numbers, in the order of their own. The
+        subagent is unchanged.
+
+        <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
         """
-        return subagent
+        check_instance(
+            subagent,
+            expected=Trajectory,
+            name="subagent",
+        )
+        if call_id not in self._call_ids:
+            raise ConfigurationError("join takes the id of a tool call in this trajectory")
+        if call_id in self._subagents:
+            raise ConfigurationError("a subagent is already delegated by this call")
+        # Every trajectory of a run, and every copy split from one, shares the run's sequence.
+        if subagent._delegation is not None or subagent._sequence is self._sequence:
+            raise ConfigurationError("join takes the root of a run apart from this one")
+        joined = Trajectory.load(
+            subagent.dump(),
+            redaction=self._redaction,
+        )
+        members = list_run(joined)
+        joined._delegation = Delegation(
+            parent=self,
+            call_id=call_id,
+        )
+        # The path from a trajectory to the root holds one trajectory more than its depth.
+        if max(len(trace_path(member)) for member in members) > NESTING_LIMIT + 1:
+            raise ConfigurationError(f"subagents are nested at most {NESTING_LIMIT} deep")
+        self._take_into_run(members)
+        self._subagents[call_id] = joined
+        return joined
+
+    def _take_into_run(
+        self,
+        members: list[Trajectory],
+    ) -> None:
+        """Give each trajectory this run's sequence, and its records the sequence's next numbers,
+        in the order of their own numbers.
+        """
+        numbers = {
+            number: next(self._sequence)
+            for number in sorted(
+                number for member in members for number in member._sequence_numbers
+            )
+        }
+        for member in members:
+            member._sequence_numbers = [numbers[number] for number in member._sequence_numbers]
+            member._sequence = self._sequence
 
     def dump(
         self,

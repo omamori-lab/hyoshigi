@@ -153,12 +153,18 @@ the limit leaves the total, and the `Audit` that the limit caused resets the blo
 it, in the delegator and in every subagent. `Trajectory.dump` stores each record's number, and
 `Trajectory.load` restores it. The earlier trajectory that `split_latest_step` returns for a
 subagent takes the subagent's place in the run, so the total leaves out the records of the step it
-drops.
+drops. A subagent that runs in another process loads the run and numbers its records after the
+run's, so two subagents that run at once give their records the same numbers.
+`Trajectory.join` takes each back under its call and gives the records of the tree it joins the
+run's next numbers, in the order of their own. The run then replays each joined subagent's records
+in its own order, those of the subagent joined first before those of the next.
 
 When agents run at once, the count can miss a block. The protocol counts the records when `decide`
 runs, and the program records the decision afterwards, so a `Block` that another trajectory records
 in between is missing from that count. With the run's total at 19, two subagents that decide at
-once can both be blocked, and the total reaches 21 before the next proposal is `Audit`.
+once can both be blocked, and the total reaches 21 before the next proposal is `Audit`. A subagent
+in another process counts the run it loaded and its own records, so it misses every block that a
+subagent running beside it records, until both are joined.
 
 ## A failure without a verdict goes to a person by default
 

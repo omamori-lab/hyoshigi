@@ -461,6 +461,102 @@ $: expected a hyoshigi.trajectory, format version 3
 $.ratings[0].action_id: expected the id of an action in the history
 ```
 
+## A subagent that ran in another process joins with `join`
+
+A subagent can run in another process, such as a separate graph or worker. The delegator's run
+reaches it as a dump: the process loads the run, delegates the subagent there, records into it,
+and sends back the subagent's dump. `join(subagent, call_id=...)` holds a copy of what comes back
+under the delegating call, and returns the copy. The copy is the load of the subagent's dump
+through the delegator's redaction, and the trajectory given stays as it was. Its records take the
+run's next numbers, in the order of their own, so two subagents that ran at once replay one after
+the other, in the order they were joined
+([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
+The subagent must be the root of a run apart from this one, such as a trajectory loaded from a
+dump, the call one an action made that delegated no subagent yet, and the joined tree at most 32
+levels below the root. Anything else raises `ConfigurationError` and changes neither trajectory:
+
+```python
+orchestrator = Trajectory()
+orchestrator.observe(
+    Observation(
+        author=Author.USER,
+        parts=(TextPart(text="Find who owns report.txt and summary.txt."),),
+    ),
+)
+orchestrator.act(
+    Action(
+        id="fan-out",
+        tool_calls=(
+            ToolCall(
+                id="call-5",
+                name="spawn",
+                arguments='{"task": "Find who owns report.txt."}',
+            ),
+            ToolCall(
+                id="call-6",
+                name="spawn",
+                arguments='{"task": "Find who owns summary.txt."}',
+            ),
+        ),
+    ),
+)
+sent = json.dumps(orchestrator.dump())
+
+worker = Trajectory.load(json.loads(sent)).delegate(
+    "Find who owns report.txt.",
+    call_id="call-5",
+)
+worker.act(
+    Action(
+        id="look",
+        tool_calls=(
+            ToolCall(
+                id="call-7",
+                name="shell",
+                arguments='{"command": "stat report.txt"}',
+            ),
+        ),
+    ),
+)
+returned = json.dumps(worker.dump())
+
+joined = orchestrator.join(
+    Trajectory.load(json.loads(returned)),
+    call_id="call-5",
+)
+print(list(orchestrator.subagents))
+print(orchestrator.subagents["call-5"] is joined)
+print(joined.history[0].author)
+for subagent, call_id in (
+    (
+        Trajectory.load(json.loads(returned)),
+        "call-5",
+    ),
+    (
+        worker,
+        "call-6",
+    ),
+):
+    try:
+        orchestrator.join(
+            subagent,
+            call_id=call_id,
+        )
+    except ConfigurationError as error:
+        print(error)
+```
+
+```text
+['call-5']
+True
+delegator
+a subagent is already delegated by this call
+join takes the root of a run apart from this one
+```
+
+`worker` is refused because the process that ran it delegated it, so it is a subagent of that
+run.
+
 ## The latest action is rated against everything before it
 
 A stored trajectory, or the transcript of a finished turn, can end in the action to rate.

@@ -848,7 +848,6 @@ def test_rating_the_latest_step_passes_each_piece_of_it_through_each_redaction_o
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_action_split_off_a_root_is_read_through_the_redaction_of_the_run_the_root_joins(
     rate: Rate,
 ) -> None:

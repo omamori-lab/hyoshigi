@@ -658,7 +658,8 @@ score. The protocol counts from the records:
 
 The count in a row reads the trajectory's own records. The total reads every record in the run,
 its subagents' included, in the order they were recorded, so a subagent and its delegator count the
-same total
+same total. The blocks of a subagent that ran in another process count once `Trajectory.join` takes
+it back
 ([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
 Here three blocks send the fourth proposal to a person, who approves it. The fifth proposal's
 rating gets no answer, so `on_unavailable`, `AUDIT` by default, holds it for the person too:
