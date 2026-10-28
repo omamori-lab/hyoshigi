@@ -463,10 +463,11 @@ $.ratings[0].action_id: expected the id of an action in the history
 A stored trajectory, or the transcript of a finished turn, can end in the action to rate.
 `split_latest_step` returns a `Step`, a named tuple of a new trajectory of everything before the
 latest action, and that action. The new trajectory keeps the ratings and subagents of the earlier
-actions and the records whose position is before the latest action, and shares the subagents'
-trajectories. The trajectory it was split from is unchanged. A new trajectory split from a
-subagent's takes the subagent's place in its run, and the run's total of blocks counted from it
-leaves out the latest step's records. When the latest entry is not an action, `split_latest_step`
+actions and the records whose position is before the latest action. It holds copies of the
+subagents' trajectories, at every depth, in its own run, so a record on a copy leaves the original
+unchanged. The trajectory it was split from is unchanged. A new trajectory split from a subagent's
+takes the subagent's place in its run, and the run's total of blocks counted from it, or from one
+of its subagents, leaves out the latest step's records and counts those recorded on it. When the latest entry is not an action, `split_latest_step`
 raises `ConfigurationError`.
 
 `rate_latest_step(trajectory)` splits the trajectory and rates the action against the part before
