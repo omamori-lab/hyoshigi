@@ -732,30 +732,69 @@ def refuse_to_redact(text: str) -> str:
     raise RuntimeError(text)
 
 
+REFUSING = Redaction(
+    text=refuse_to_redact,
+    media=partial(
+        replace,
+        data=b"blurred",
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    ("build_report", "read_sent"),
+    [
+        (
+            lambda family, langfuse, langsmith: LangfuseScores(
+                client=langfuse.client,
+                redaction=REFUSING,
+            ),
+            lambda langfuse, langsmith: langfuse.read_scores(),
+        ),
+        (
+            lambda family, langfuse, langsmith: replace(
+                family.feedback(langsmith.url),
+                redaction=REFUSING,
+            ),
+            lambda langfuse, langsmith: langsmith.received,
+        ),
+    ],
+    ids=["langfuse", "langsmith"],
+)
 def test_a_report_whose_redaction_raises_sends_no_score(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
     langfuse: LangfuseStandIn,
+    langsmith: LangSmithServer,
+    build_report: Callable[..., LangfuseScores | LangSmithFeedback | AsyncLangSmithFeedback],
+    read_sent: Callable[
+        [
+            LangfuseStandIn,
+            LangSmithServer,
+        ],
+        list[object],
+    ],
 ) -> None:
     monitor = family.reported(
         monitor=family.llm(Script(DIALLING_REPLY)),
         reports=(
-            LangfuseScores(
-                client=langfuse.client,
-                redaction=Redaction(
-                    text=refuse_to_redact,
-                    media=partial(
-                        replace,
-                        data=b"blurred",
-                    ),
-                ),
+            build_report(
+                family,
+                langfuse,
+                langsmith,
             ),
         ),
     )
 
     rate(monitor)
 
-    assert langfuse.read_scores() == []
+    assert (
+        read_sent(
+            langfuse,
+            langsmith,
+        )
+        == []
+    )
 
 
 @pytest.mark.parametrize(

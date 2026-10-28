@@ -35,6 +35,7 @@ from hyoshigi import (
     MediaPart,
     MediaTypes,
     MonitorPrompt,
+    Observation,
     Prompt,
     PromptPart,
     Question,
@@ -82,6 +83,31 @@ TO_TEXT = Redaction(
 PLACEHOLDER = Redaction(
     text=str,
     media=lambda part: TextPart(text="a card for 555-0100"),
+)
+# Each phone number masked; media kept as it is, so the text in text media shows its redaction.
+TEXT_MASKED = Redaction(
+    text=partial(
+        re.sub,
+        "[0-9]{3}-[0-9]{4}",
+        "###-####",
+    ),
+    media=lambda part: part,
+)
+# Text in brackets, and media with " blurred" after its bytes, so each application shows.
+BRACKETED = Redaction(
+    text=lambda text: f"[{text}]",
+    media=lambda part: replace(
+        part,
+        data=(part.data or b"") + b" blurred",
+    ),
+)
+# Text in parentheses, and media with " scaled" after its bytes, so each application shows.
+PARENTHESISED = Redaction(
+    text=lambda text: f"({text})",
+    media=lambda part: replace(
+        part,
+        data=(part.data or b"") + b" scaled",
+    ),
 )
 # Each phone number masked; media given a description written by the scaffold, which holds a
 # phone number.
@@ -356,6 +382,63 @@ STATED = (
 )
 
 
+class RateLatestStep(Protocol):
+    def __call__(
+        self,
+        script: Script,
+        *,
+        trajectory: Trajectory,
+        view: View,
+    ) -> SuspicionScore: ...
+
+
+def rate_latest_step_synchronously(
+    script: Script,
+    *,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = LLMMonitor(
+        model=GenerativeModel(
+            name=MODEL_NAME,
+            generate=script.generate,
+            perceives=script.perceives,
+        ),
+        view=view,
+        prompt=ECHO,
+    )
+    return monitor.rate_latest_step(trajectory)
+
+
+def rate_latest_step_asynchronously(
+    script: Script,
+    *,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = AsyncLLMMonitor(
+        model=AsyncGenerativeModel(
+            name=MODEL_NAME,
+            generate=script.generate_asynchronously,
+            perceives=script.perceives,
+        ),
+        view=view,
+        prompt=ECHO,
+    )
+    return asyncio.run(monitor.rate_latest_step(trajectory))
+
+
+@pytest.fixture(
+    params=[
+        rate_latest_step_synchronously,
+        rate_latest_step_asynchronously,
+    ],
+    ids=["sync", "async"],
+)
+def rate_latest_step(request: pytest.FixtureRequest) -> RateLatestStep:
+    return request.param
+
+
 def build_task(redaction: Redaction | None = None) -> Trajectory:
     """The trajectory of the task, kept through the redaction when one is given."""
     return Trajectory.from_run(
@@ -363,6 +446,23 @@ def build_task(redaction: Redaction | None = None) -> Trajectory:
         answer="Done.",
         redaction=redaction,
     ).trajectory
+
+
+def build_note() -> Trajectory:
+    """The trajectory of the task and a note from the user in text media."""
+    trajectory = build_task()
+    trajectory.observe(
+        Observation(
+            author=Author.USER,
+            parts=(
+                MediaPart(
+                    media_type="text/plain",
+                    data=b"A note with 555-0100",
+                ),
+            ),
+        ),
+    )
+    return trajectory
 
 
 def build_upload(redaction: Redaction | None = None) -> Trajectory:
@@ -632,4 +732,119 @@ def test_media_lifted_from_the_history_keeps_its_ref_when_a_redaction_describes_
             "</media></tool_call>|<agent>Dialling ###-####.</agent>\n"
             '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>',
         ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("build", "action", "content"),
+    [
+        (
+            build_task,
+            Action(
+                tool_calls=(
+                    ToolCall(
+                        id="call_3",
+                        name="upload",
+                        # The payload is base64 of "Call 555-0100".
+                        arguments='{"file": "data:text/plain;base64,Q2FsbCA1NTUtMDEwMA=="}',
+                    ),
+                ),
+            ),
+            (
+                TextPart(
+                    text="<user>Call Ana on ###-####.</user>|"
+                    '<tool_call id="call_3" name="upload">{"file": "[media 1]"}'
+                    '<media type="text/plain" ref="1">Call ###-####</media></tool_call>',
+                ),
+            ),
+        ),
+        (
+            build_note,
+            DIALLING,
+            (
+                TextPart(
+                    text="<user>Call Ana on ###-####.</user>\n"
+                    '<user><media type="text/plain">A note with ###-####</media></user>|'
+                    "<agent>Dialling ###-####.</agent>\n"
+                    '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>',
+                ),
+            ),
+        ),
+    ],
+    ids=["lifted-from-an-argument", "in-the-history"],
+)
+def test_text_media_reaches_the_model_with_its_text_redacted(
+    rate: Rate,
+    build: Callable[[], Trajectory],
+    action: Action,
+    content: tuple[PromptPart, ...],
+) -> None:
+    script = Script(perceives=TEXT_ONLY)
+
+    rate(
+        script,
+        action=action,
+        trajectory=build(),
+        view=View(redaction=TEXT_MASKED),
+    )
+
+    assert script.received[0] == content
+
+
+@pytest.mark.xfail(strict=True)
+def test_rating_the_latest_step_passes_each_piece_of_it_through_each_redaction_once(
+    rate_latest_step: RateLatestStep,
+) -> None:
+    trajectory = Trajectory(redaction=BRACKETED)
+    trajectory.observe(
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text="Call Ana."),),
+        ),
+    )
+    trajectory.act(
+        Action(
+            id="a1",
+            parts=(
+                TextPart(text="Dialling."),
+                MediaPart(
+                    media_type="image/png",
+                    data=b"PNG",
+                ),
+            ),
+            tool_calls=(
+                ToolCall(
+                    id="call_1",
+                    name="upload",
+                    arguments='{"image": "data:image/png;base64,iVBORw0KGgo="}',
+                ),
+            ),
+        ),
+    )
+    script = Script(perceives=IMAGES)
+
+    rate_latest_step(
+        script,
+        trajectory=trajectory,
+        view=View(redaction=PARENTHESISED),
+    )
+
+    assert script.received[0] == (
+        TextPart(
+            text='<user>([Call Ana.])</user>|<agent>([Dialling.])<media type="image/png">',
+        ),
+        MediaPart(
+            media_type="image/png",
+            data=b"PNG blurred scaled",
+        ),
+        TextPart(
+            text='</media></agent>\n<tool_call id="call_1" name="upload">([{"image": "[media 1]"}])'
+            '<media type="image/png" ref="1">',
+        ),
+        MediaPart(
+            media_type="image/png",
+            data=b"\x89PNG\r\n\x1a\n blurred scaled",
+        ),
+        TextPart(text="</media></tool_call>"),
     )
