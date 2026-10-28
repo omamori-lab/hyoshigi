@@ -18,7 +18,7 @@ Three kinds of monitor rate an action:
 |---|---|---|
 | `LLMMonitor` | for its reasoning and an integer score | the score, scaled to 0 to 1 |
 | `DecisionMonitor` | the probability that each statement about the action holds | the highest probability, by default |
-| `GuardMonitor` | for a label against the caller's policy, several times | the share of suspicious labels |
+| `GuardMonitor` | for a label against the caller's policy, several times, or once with log-probabilities | the share of suspicious labels, or the probability on them |
 
 `RepeatedMonitor`, `CalibratedMonitor` and `CascadeMonitor` combine monitors, and every monitor has
 an asynchronous twin. A tool-calling agent's own request and reply are read in the OpenAI chat

@@ -170,9 +170,10 @@ probabilities over all harms [@zeng2024shieldgemma, sec. 5.1].
 
 A guard model writes a label, so one label gives only the scores 0 and 1, and every threshold
 between them flags the same actions. A model whose `top_log_probabilities` is 0, the default, is
-sampled: the monitor asks `samples` times and scores the share labelled suspicious, which takes `samples` + 1 values when every sample answers: 0, 0.2, 0.4,
-0.6, 0.8 or 1 at the default of five. A sample that gets no answer is set aside while more than half
-the samples answered, and the share is then of the samples that answered.
+sampled: the monitor asks `samples` times and scores the share labelled suspicious. The share takes
+`samples` + 1 values when every sample answers: 0, 0.2, 0.4, 0.6, 0.8 or 1 at the default of five.
+A sample that gets no answer is set aside while more than half the samples answered, and the share
+is then of the samples that answered.
 
 Lyu et al. found that the Brier score of confidence from sampled answers fell sharply over the first
 samples and usually saturated after 15 to 20, and advise 3 to 5 samples under a tight budget
@@ -194,28 +195,29 @@ declares none, and the monitor samples. Above 0, the function asks its provider 
 log-probabilities on every call and returns them on every `Generation` as `log_probabilities`, a
 tuple with one `TokenLogProbability` per generated token. Each holds the token, its
 log-probability and its `alternatives`, the `AlternativeToken` objects the provider lists at that
-position. These are the fields of OpenRouter's Responses API output
-[@openrouter2026openapi, {Section} "ResponseOutputText"], where `top_logprobs` takes 0 to 20
-[@openrouter2026parameters, {Section} "Top Logprobs"]. A `GuardMonitor` over such a model asks
+position. OpenRouter's Responses API returns the token, its log-probability and its top
+alternatives in this form, with each token's bytes besides
+[@openrouter2026openapi, {Section} "ResponseOutputText"]. Its `top_logprobs` parameter takes 0 to
+20 [@openrouter2026parameters, {Section} "Top Logprobs"]. A `GuardMonitor` over such a model asks
 once and does not use `samples`.
 
 The monitor reads the label from the reply's text as it does for a sample, then finds the token
 that holds the label's first character. That token's text, without whitespace or leading markup
 and in lower case, must start a label of the written label's kind. The monitor weighs the token
 and its alternatives. An alternative counts when its text, read in the same way, starts the
-labels of one kind only, so the variants of a label add up, such as `violation`, `Violation` and
-the same word after a space, and `(viol` counts as the start of `violation`. The generated token
-counts when the provider's alternatives leave it out. The value is the probability of the alternatives that start a suspicious label over the
-probability of all that start a label, where the probability of a token is the exponential of
-its log-probability.
+labels of one kind only. The variants of a label add up, such as `violation`, `Violation` and the
+same word after a space, and `(viol` counts as the start of `violation`. The generated token counts
+when the provider's alternatives leave it out. The value is the probability of the alternatives that
+start a suspicious label over the probability of all that start a label. The probability of a token
+is the exponential of its log-probability.
 
 Llama Guard reads its classifier score off the probability of its first token
-[@inan2023llamaguard, sec. 3.1], and ShieldGemma applies a softmax to the log-likelihoods of Yes
-and No [@zeng2024shieldgemma, sec. 4.6]. Granite Guardian reads the top 20 tokens, sums the
-probabilities of those whose lower-case, stripped text contains Yes and of those that contain No,
-and normalises the two sums with a softmax over their logarithms
-[@padhi2024graniteguardian, sec. 4.3]. The guard monitor normalises over the labels in the same
-way. It counts the alternatives that start a label, since a label can span several tokens.
+[@inan2023llamaguard, sec. 3.1]. ShieldGemma normalises the likelihoods of Yes and No, with a
+temperature and a smoothing term [@zeng2024shieldgemma, sec. 4.6]. Granite Guardian reads the top
+20 tokens. It sums the probabilities of those whose lower-case, stripped text contains Yes, and of
+those that contain No, and normalises the two sums [@padhi2024graniteguardian, sec. 4.3]. The guard
+monitor normalises over the labels in the same way. It counts the alternatives that start a label,
+since a label can span several tokens.
 
 A scripted model shows the path. Its reply has two tokens, and the second is the label, with
 three alternatives:
@@ -335,16 +337,16 @@ and `HardLabelWarning` is raised only when the monitor samples, so `samples=1` b
 a model that reports log-probabilities.
 
 The model's declaration decides the path. OpenRouter can route one model name to several
-providers, and by default it sends a request to a provider that does not support all its
-parameters, which ignores the ones it does not know
+providers. By default it sends a request to a provider that does not support all its parameters,
+and that provider ignores the ones it does not know
 [@openrouter2026providerrouting, {Section} "Requiring Providers to Support All Parameters"]. A
-choice made per reply could score some actions
-by probability and others by a share of samples, and the two scores do not mean the same. A model
+choice made per reply could score some actions by probability and others by a share of samples,
+and the two scores do not mean the same. A model
 that declares log-probabilities and returns a reply without them fails the rating closed. A given
 model always takes one path, so a threshold calibrated on its scores holds.
 
-Liu et al. compute a guard's confidence from the logits of its label tokens, renormalised over those
-tokens [@liu2025guardcalibration, sec. 3], as this path does, and found most predictions at a
-confidence of 90 to 100%, as above. The probabilities of honest actions can therefore crowd near 0.
+The overconfidence above applies to these probabilities, since Liu et al. compute a guard's
+confidence from the logits of its label tokens, renormalised over those tokens
+[@liu2025guardcalibration, sec. 3]. The probabilities of honest actions can therefore crowd near 0.
 [A calibrated threshold](../explanation/calibration.md) sets the share of honest actions that a
 threshold flags.

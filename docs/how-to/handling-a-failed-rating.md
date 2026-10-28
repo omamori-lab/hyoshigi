@@ -189,6 +189,8 @@ value 1.0, failed_closed True, causes: no answer, HTTP status 429
 
 A `GuardMonitor` sets an unavailable sample aside, and a `RepeatedMonitor` an unavailable call,
 while more than half answered; when at most half answered, the rating fails closed as `Unavailable`.
+A guard over a model that reports log-probabilities asks once, so an unavailable answer fails its
+rating closed.
 A guard's `Labels` keeps the unanswered samples in `unavailable`, and a repeated score's `Composite`
 keeps every call's score. Two of three calls answer here, so the score is their mean and does not
 fail closed:
