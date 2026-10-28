@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import re
 import subprocess
 import sys
 import threading
@@ -49,6 +50,7 @@ from hyoshigi import (
     Monitor,
     Prompt,
     Rationale,
+    Redaction,
     Refused,
     RepeatedMonitor,
     ReportedMonitor,
@@ -110,6 +112,19 @@ UNUSED_URL = "http://127.0.0.1:9"
 # clients' read timeouts, 10 s for AsyncClient and 60 s for Client, so a rating that waits for the
 # answer gets it.
 ANSWER_HOLD_SECONDS = 5
+# Each digit masked; media blurred to new bytes.
+MASKED = Redaction(
+    text=partial(
+        re.sub,
+        "[0-9]",
+        "#",
+    ),
+    media=partial(
+        replace,
+        data=b"blurred",
+    ),
+)
+DIALLING_REPLY = Generation(text="<reasoning>It dials 555-0100.</reasoning><score>3</score>")
 
 
 class Script:
@@ -660,6 +675,90 @@ def test_langsmith_receives_the_score_as_model_feedback_on_the_run_of_the_rating
             CALM_FEEDBACK,
         ),
     ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_langfuse_receives_the_explanation_through_the_reports_redaction(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langfuse: LangfuseStandIn,
+) -> None:
+    monitor = family.reported(
+        monitor=family.llm(Script(DIALLING_REPLY)),
+        reports=(
+            LangfuseScores(
+                client=langfuse.client,
+                redaction=MASKED,
+            ),
+        ),
+    )
+
+    rate(monitor)
+
+    assert [score["comment"] for score in langfuse.read_scores()] == ["It dials ###-####."]
+
+
+@pytest.mark.xfail(strict=True)
+def test_langsmith_receives_the_explanation_through_the_reports_redaction(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    monitor = family.reported(
+        monitor=family.llm(Script(DIALLING_REPLY)),
+        reports=(
+            replace(
+                family.feedback(langsmith.url),
+                redaction=MASKED,
+            ),
+        ),
+    )
+
+    rate(monitor)
+
+    assert langsmith.received == [
+        (
+            "/feedback",
+            {
+                **CALM_FEEDBACK,
+                "comment": "It dials ###-####.",
+            },
+        ),
+    ]
+
+
+def refuse_to_redact(text: str) -> str:
+    """A redaction's text function that fails, as a redaction service that cannot be reached
+    does.
+    """
+    raise RuntimeError(text)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_report_whose_redaction_raises_sends_no_score(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langfuse: LangfuseStandIn,
+) -> None:
+    monitor = family.reported(
+        monitor=family.llm(Script(DIALLING_REPLY)),
+        reports=(
+            LangfuseScores(
+                client=langfuse.client,
+                redaction=Redaction(
+                    text=refuse_to_redact,
+                    media=partial(
+                        replace,
+                        data=b"blurred",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    rate(monitor)
+
+    assert langfuse.read_scores() == []
 
 
 @pytest.mark.parametrize(
@@ -1609,3 +1708,46 @@ def test_a_stop_after_attempt_that_is_not_a_positive_integer_is_refused(
         )
 
     assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("report", "find_client"),
+    [
+        (
+            LangfuseScores,
+            lambda langfuse: langfuse.client,
+        ),
+        (
+            partial(
+                LangSmithFeedback,
+                project_id=PROJECT_ID,
+            ),
+            lambda langfuse: build_client(),
+        ),
+        (
+            partial(
+                AsyncLangSmithFeedback,
+                project_id=PROJECT_ID,
+            ),
+            lambda langfuse: build_async_client(),
+        ),
+    ],
+    ids=["langfuse", "langsmith", "async-langsmith"],
+)
+def test_a_redaction_that_is_not_a_redaction_is_refused(
+    langfuse: LangfuseStandIn,
+    report: Callable[..., object],
+    find_client: Callable[[LangfuseStandIn], object],
+) -> None:
+    client = find_client(langfuse)
+
+    with pytest.raises(ConfigurationError) as raised:
+        report(
+            client=client,
+            redaction=MASKED.text,
+        )
+
+    assert (
+        str(raised.value) == "redaction must be a Redaction, got an instance of functools.partial"
+    )

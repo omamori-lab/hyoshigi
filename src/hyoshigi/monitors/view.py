@@ -6,6 +6,7 @@ from enum import Flag, auto
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.options import check_instance, describe_option_value, read_count
+from hyoshigi.trajectory.redaction import Redaction
 
 
 class Channel(Flag):
@@ -46,6 +47,7 @@ class View:
     channels: Channel = Channel.DEFAULT
     most_recent: int | None = None
     delegation_tools: frozenset[str] = frozenset()
+    redaction: Redaction | None = None
 
     def __post_init__(self) -> None:
         check_instance(
