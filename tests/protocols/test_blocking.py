@@ -479,6 +479,24 @@ def reload(trajectory: Trajectory) -> Trajectory:
     return Trajectory.load(trajectory.dump())
 
 
+@pytest.fixture
+def split_at_the_limit() -> Trajectory:
+    """The trajectory before the latest action of a delegator that delegated a subagent, was
+    blocked twice, and acted once more.
+    """
+    trajectory = build_trajectory()
+    start_subagent(trajectory)
+    record_steps(
+        trajectory,
+        (
+            BLOCK("a2"),
+            BLOCK("a3"),
+        ),
+    )
+    trajectory.act(build_action("later"))
+    return trajectory.split_latest_step().trajectory
+
+
 @pytest.mark.parametrize(
     ("limits", "outcome"),
     [
@@ -866,20 +884,10 @@ def test_a_subagent_kept_by_a_split_copy_counts_the_copys_blocks(
 def test_a_subagent_kept_by_a_split_copy_counts_the_copys_reset(
     family: AnyFamily,
     keeping: Callable[[Trajectory], Trajectory],
+    split_at_the_limit: Trajectory,
 ) -> None:
-    trajectory = build_trajectory()
-    start_subagent(trajectory)
     record_steps(
-        trajectory,
-        (
-            BLOCK("a2"),
-            BLOCK("a3"),
-        ),
-    )
-    trajectory.act(build_action("later"))
-    earlier = trajectory.split_latest_step().trajectory
-    record_steps(
-        earlier,
+        split_at_the_limit,
         (
             AUDIT("a4"),
             RUN("a4"),
@@ -890,7 +898,7 @@ def test_a_subagent_kept_by_a_split_copy_counts_the_copys_reset(
     decided = family.decide_blocking(
         script,
         proposed=PROPOSED,
-        trajectory=keeping(earlier).subagents["call_1"],
+        trajectory=keeping(split_at_the_limit).subagents["call_1"],
         blocks_in_total=2,
     )
 
@@ -922,6 +930,57 @@ def test_a_subagent_two_levels_below_a_split_copy_counts_the_copys_blocks(
     )
 
     assert decided == build_audit(1)
+
+
+def test_new_records_of_a_split_copys_subagent_follow_the_runs(
+    family: AnyFamily,
+    split_at_the_limit: Trajectory,
+) -> None:
+    copied = split_at_the_limit.subagents["call_1"]
+    record_steps(
+        copied,
+        (
+            AUDIT("s1"),
+            RUN("s1"),
+        ),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=copied,
+        blocks_in_total=2,
+    )
+
+    assert decided == build_run(2)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_block_on_a_split_copys_subagent_stays_out_of_the_original_runs_total(
+    family: AnyFamily,
+) -> None:
+    trajectory = build_trajectory()
+    original = start_subagent(trajectory)
+    record_steps(
+        trajectory,
+        (BLOCK("a2"),),
+    )
+    trajectory.act(build_action("later"))
+    record_steps(
+        trajectory.split_latest_step().trajectory.subagents["call_1"],
+        (BLOCK("s1"),),
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=original,
+        blocks_in_total=2,
+    )
+
+    assert decided == build_run(1)
 
 
 def test_a_split_copys_new_records_follow_the_runs(family: AnyFamily) -> None:
