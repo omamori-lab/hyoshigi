@@ -41,6 +41,7 @@ An action whose thought holds reasoning the provider hid is rated on what the
 monitor can read. Content the monitor cannot perceive in the action's parts or
 tool calls, such as a tool the provider already ran or an image only the agent
 describes, fails the rating closed.
+Content a redaction removes is content the monitor cannot judge ([Redacting what leaves the process](../how-to/redacting-what-leaves-the-process.md#a-monitor-cannot-judge-what-a-redaction-removed)).
 
 The readers of a provider's request take `authorship=by_role` by default,
 which makes every user-role message the user's, and the user's words
