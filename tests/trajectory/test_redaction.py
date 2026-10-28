@@ -20,6 +20,7 @@ from hyoshigi import (
     ConfigurationError,
     Description,
     FailedClosed,
+    FormatError,
     Halt,
     MediaPart,
     Observation,
@@ -63,6 +64,15 @@ TO_TEXT = Redaction(
         "#",
     ),
     media=lambda part: TextPart(text="image 1"),
+)
+# Each digit masked; media kept as it is, so the text in text media shows its redaction.
+TEXT_MASKED = Redaction(
+    text=partial(
+        re.sub,
+        "[0-9]",
+        "#",
+    ),
+    media=lambda part: part,
 )
 TASK = Observation(
     author=Author.USER,
@@ -1007,3 +1017,139 @@ def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> N
     )
 
     assert loaded.records[0].action == loaded.history[1]  # ty: ignore[unresolved-attribute]
+
+
+@pytest.mark.parametrize(
+    ("part", "kept"),
+    [
+        pytest.param(
+            MediaPart(
+                media_type="text/plain",
+                data=b"Call Ana on 555-0100.",
+            ),
+            MediaPart(
+                media_type="text/plain",
+                data=b"Call Ana on ###-####.",
+            ),
+            marks=pytest.mark.xfail(strict=True),
+            id="utf-8",
+        ),
+        pytest.param(
+            MediaPart(
+                media_type="text/plain",
+                data=b"555-0100",
+                description=Description(
+                    text="A note with 555-0100",
+                    author=Author.TOOL,
+                ),
+            ),
+            MediaPart(
+                media_type="text/plain",
+                data=b"###-####",
+                description=Description(
+                    text="A note with ###-####",
+                    author=Author.TOOL,
+                ),
+            ),
+            marks=pytest.mark.xfail(strict=True),
+            id="utf-8-and-a-description",
+        ),
+        pytest.param(
+            MediaPart(
+                media_type="text/plain",
+                data=b"\xff555-0100",
+            ),
+            MediaPart(
+                media_type="text/plain",
+                data=b"\xff555-0100",
+            ),
+            id="not-utf-8",
+        ),
+        pytest.param(
+            MediaPart(
+                media_type="text/plain",
+                url="https://files.example.com/555-0100.txt",
+            ),
+            MediaPart(
+                media_type="text/plain",
+                url="https://files.example.com/555-0100.txt",
+            ),
+            id="by-url",
+        ),
+    ],
+)
+def test_text_media_is_kept_with_its_utf_8_text_redacted(
+    part: MediaPart,
+    kept: MediaPart,
+) -> None:
+    trajectory = Trajectory(redaction=TEXT_MASKED)
+
+    trajectory.observe(
+        ToolObservation(
+            call_id="call_1",
+            parts=(part,),
+        ),
+    )
+
+    assert trajectory.history[-1].parts == (kept,)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_dump_with_a_redaction_writes_text_media_with_its_text_redacted() -> None:
+    trajectory = Trajectory()
+    trajectory.observe(
+        Observation(
+            author=Author.USER,
+            parts=(
+                MediaPart(
+                    media_type="text/plain",
+                    data=b"Call Ana on 555-0100.",
+                ),
+            ),
+        ),
+    )
+
+    stored = trajectory.dump(redaction=TEXT_MASKED)
+
+    assert stored == {
+        **STORED_SUBAGENT_FIELDS,
+        "history": [
+            {
+                "kind": "observation",
+                "author": "user",
+                "source": None,
+                "parts": [
+                    {
+                        "kind": "media",
+                        "media_type": "text/plain",
+                        "url": None,
+                        # base64 of "Call Ana on ###-####."
+                        "data": "Q2FsbCBBbmEgb24gIyMjLSMjIyMu",
+                        "description": None,
+                    },
+                ],
+            },
+        ],
+    }
+
+
+@pytest.mark.xfail(strict=True)
+def test_loading_with_what_is_not_a_redaction_raises_before_reading_the_data() -> None:
+    with pytest.raises(
+        (
+            ConfigurationError,
+            FormatError,
+        ),
+    ) as raised:
+        Trajectory.load(
+            {},
+            redaction=MASKED.text,  # ty: ignore[invalid-argument-type]
+        )
+
+    assert (
+        type(raised.value),
+        str(raised.value),
+    ) == (
+        ConfigurationError,
+        "redaction must be a Redaction, got an instance of functools.partial",
+    )
