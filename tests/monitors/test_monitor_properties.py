@@ -14,6 +14,7 @@ from hyoshigi import (
     GPT_OSS_SAFEGUARD,
     Action,
     Aggregation,
+    AlternativeToken,
     AsyncCalibratedMonitor,
     AsyncCascadeMonitor,
     AsyncDecisionModel,
@@ -42,6 +43,7 @@ from hyoshigi import (
     RepeatedMonitor,
     SuspicionScore,
     TextPart,
+    TokenLogProbability,
     Trajectory,
     Truncated,
     Unavailable,
@@ -97,6 +99,49 @@ DECISIONS = st.builds(
     Decision,
     probability=UNIT,
     confidence=st.none() | UNIT,
+)
+
+
+# Pieces of the labels valid and invalid, markup and blanks, so that tokens often spell a label.
+TOKENS = st.sampled_from(
+    ["valid", "invalid", "inv", "val", "alid", "\n", " ", "", "_", "Label: ", "(inv"],
+) | st.text(max_size=3)
+LOG_PROBABILITIES = st.floats(
+    max_value=0.0,
+    allow_nan=False,
+)
+POSITIONS = st.builds(
+    TokenLogProbability,
+    token=TOKENS,
+    log_probability=LOG_PROBABILITIES,
+    alternatives=st.lists(
+        st.builds(
+            AlternativeToken,
+            token=TOKENS,
+            log_probability=LOG_PROBABILITIES,
+        ),
+        max_size=4,
+    ).map(tuple),
+)
+# A reply whose text is its tokens in order, or whose text is unrelated to them.
+REPORTED_REPLIES = st.one_of(
+    st.lists(
+        POSITIONS,
+        max_size=6,
+    ).map(
+        lambda positions: Generation(
+            text="".join(position.token for position in positions),
+            log_probabilities=tuple(positions),
+        ),
+    ),
+    st.builds(
+        Generation,
+        text=st.text(),
+        log_probabilities=st.lists(
+            POSITIONS,
+            max_size=3,
+        ).map(tuple),
+    ),
 )
 
 
@@ -363,6 +408,27 @@ def test_every_monitor_and_wrapper_gives_a_value_from_0_to_1(
             script,
         ),
     )
+
+    assert 0.0 <= score.value <= 1.0
+
+
+@FAMILIES
+@given(reply=REPORTED_REPLIES)
+def test_a_guard_scoring_log_probabilities_gives_a_value_from_0_to_1_whatever_the_tokens(
+    family: Family,
+    reply: Generation,
+) -> None:
+    guard = family.guard(
+        model=family.generative_model(
+            name=MODEL_NAME,
+            generate=family.give((reply,)),
+            top_log_probabilities=20,
+        ),
+        prompt=GUARD_PROMPT,
+        labels=GPT_OSS_SAFEGUARD,
+    )
+
+    score = family.rate(guard)
 
     assert 0.0 <= score.value <= 1.0
 
