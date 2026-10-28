@@ -29,22 +29,12 @@ from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservat
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.storage.events import dump_event, load_event
+from hyoshigi.trajectory.storage.paths import select_member
 from hyoshigi.trajectory.storage.records import dump_record, load_records, read_sequence_numbers
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score, load_score
 
 FORMAT = "hyoshigi.trajectory"
 VERSION = 3
-_NAME_ESCAPES = {
-    **{code: f"\\u{code:04x}" for code in range(0x20)},
-    **{code: f"\\u{code:04x}" for code in range(0xD800, 0xE000)},
-    ord("\b"): "\\b",
-    ord("\t"): "\\t",
-    ord("\n"): "\\n",
-    ord("\f"): "\\f",
-    ord("\r"): "\\r",
-    ord("'"): "\\'",
-    ord("\\"): "\\\\",
-}
 
 
 class BlackBoxRun(NamedTuple):
@@ -771,17 +761,3 @@ def build_feedback(
             parts=parts,
         ),
     ]
-
-
-def select_member(
-    name: str,
-    *,
-    path: str,
-) -> str:
-    r"""Return the path to the member `name` of the object at `path`.
-
-    The member is named in single quotes and escaped as in a Normalized Path (RFC 9535,
-    sec. 2.7). An unpaired surrogate, which no JSONPath can name, is written as an
-    escape, such as `\ud800`.
-    """
-    return f"{path}['{name.translate(_NAME_ESCAPES)}']"
