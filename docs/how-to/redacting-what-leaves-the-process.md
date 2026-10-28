@@ -370,6 +370,55 @@ every process. An idempotent redaction, which leaves its own output unchanged, k
 dump as it was. One that changes its own output, such as a blur, compounds each time a dump is
 loaded with it.
 
+`load(data, redaction=..., content=StoredContent.REDACTED)` loads content that was stored redacted
+as it is, and keeps the redaction for later entries. A trajectory kept redacted at entry, or dumped
+through a redaction, then loads with no second pass, so a redaction that changes its own output
+does not compound. `content` is `StoredContent.RAW` by default, which redacts everything loaded.
+`REDACTED` without a redaction raises `ConfigurationError`, since the entries added later would
+be kept unredacted:
+
+```python
+from hyoshigi import ConfigurationError, StoredContent
+
+
+def bracket(text: str) -> str:
+    """Put the text in brackets, so each pass of the redaction shows."""
+    return f"[{text}]"
+
+
+bracketing = Redaction(
+    text=bracket,
+    media=replace_media,
+)
+bracketed = Trajectory(redaction=bracketing)
+bracketed.observe(
+    Observation(
+        author=Author.USER,
+        parts=(TextPart(text="Call Ana."),),
+    ),
+)
+for content in StoredContent:
+    reloaded = Trajectory.load(
+        bracketed.dump(),
+        redaction=bracketing,
+        content=content,
+    )
+    print(f"{content} {reloaded.history[0].parts}")
+try:
+    Trajectory.load(
+        bracketed.dump(),
+        content=StoredContent.REDACTED,
+    )
+except ConfigurationError as error:
+    print(error)
+```
+
+```text
+raw (TextPart(text='[[Call Ana.]]'),)
+redacted (TextPart(text='[Call Ana.]'),)
+content=StoredContent.REDACTED takes the redaction for the entries added later
+```
+
 ## A report sends the explanation redacted
 
 `LangfuseScores`, `LangSmithFeedback` and `AsyncLangSmithFeedback` take a `redaction` and send the
