@@ -6,7 +6,8 @@ tag and pose as another entry. Text media is its escaped text, and other media t
 perceives sits in place among the text; the rest is its description, tagged with who wrote
 it, or a placeholder. The view's redaction applies to the history, which the trajectory keeps
 through its own; the trajectory's redaction, then the view's, applies to the rated action and to
-media lifted from a tool call's arguments.
+media lifted from a tool call's arguments. An action split off the trajectory, which kept it
+redacted, is redacted by the view's alone, and its lifted media by both.
 
 <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
 """
@@ -21,9 +22,17 @@ from typing import assert_never
 from hyoshigi.models.model import MediaTypes, PromptPart
 from hyoshigi.monitors.view import Channel, View
 from hyoshigi.trajectory.history import Action, Observation, ToolCall, ToolObservation
-from hyoshigi.trajectory.parts import MEDIA_TYPE, Author, MediaPart, OpaquePart, Part, TextPart
+from hyoshigi.trajectory.parts import (
+    MEDIA_TYPE,
+    Author,
+    MediaPart,
+    OpaquePart,
+    Part,
+    TextPart,
+    read_text,
+)
 from hyoshigi.trajectory.redaction import Redactor
-from hyoshigi.trajectory.trajectory import Trajectory
+from hyoshigi.trajectory.trajectory import Trajectory, is_split_off
 
 # RFC 2045, section 5.1: a parameter is an attribute and a value joined by =, each one or
 # more US-ASCII characters except SPACE, controls and the tspecials ( ) < > @ , ; : \ " / [ ] ? =
@@ -111,10 +120,22 @@ def render(
         view=view,
     )
     shown = view.channels | Channel.AGENT_PARTS | Channel.TOOL_CALLS
+    # The trajectory kept an action split off it through its redaction already.
+    entry_redaction = (
+        None
+        if is_split_off(
+            action,
+            trajectory=trajectory,
+        )
+        else trajectory.redaction
+    )
     proposed = [
         entry
         for entry in _render_action(
-            redactor.redact_action(action),
+            Redactor(
+                entry_redaction,
+                view.redaction,
+            ).redact_action(action),
             perceives=perceives,
             redactor=redactor,
         )
@@ -432,7 +453,7 @@ def _render_media(
     description or a mark. `ref` numbers media lifted from a tool call's arguments.
     """
     if part.media_type.lower().startswith("text/"):
-        text = _decode_text(part.data)
+        text = read_text(part)
         if text is None:
             return _describe_media(
                 part,
@@ -488,16 +509,6 @@ def _describe_media(
         type=part.media_type,
         ref=ref,
     )
-
-
-def _decode_text(data: bytes | None) -> str | None:
-    """Return bytes as UTF-8 text, or None when there are none or they are not UTF-8."""
-    if data is None:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
 
 
 def _render_tool_call(

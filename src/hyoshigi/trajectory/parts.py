@@ -149,6 +149,18 @@ class OpaquePart:
 type Part = TextPart | MediaPart | OpaquePart
 
 
+def read_text(part: MediaPart) -> str | None:
+    """Return text media's bytes as UTF-8 text, or None for media of another type, media given
+    by URL and bytes that are not UTF-8.
+    """
+    if not part.media_type.lower().startswith("text/") or part.data is None:
+        return None
+    try:
+        return part.data.decode()
+    except UnicodeDecodeError:
+        return None
+
+
 def check_parts(
     parts: tuple[Part, ...],
     *,

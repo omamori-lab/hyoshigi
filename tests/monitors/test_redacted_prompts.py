@@ -735,7 +735,6 @@ def test_media_lifted_from_the_history_keeps_its_ref_when_a_redaction_describes_
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "action", "content"),
     [
@@ -792,7 +791,6 @@ def test_text_media_reaches_the_model_with_its_text_redacted(
     assert script.received[0] == content
 
 
-@pytest.mark.xfail(strict=True)
 def test_rating_the_latest_step_passes_each_piece_of_it_through_each_redaction_once(
     rate_latest_step: RateLatestStep,
 ) -> None:
