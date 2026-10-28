@@ -353,7 +353,6 @@ def test_delegating_from_a_call_not_in_the_trajectory_raises(trajectory: Traject
         )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "start",
     [
