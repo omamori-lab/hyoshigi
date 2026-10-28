@@ -1031,7 +1031,6 @@ def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> N
                 media_type="text/plain",
                 data=b"Call Ana on ###-####.",
             ),
-            marks=pytest.mark.xfail(strict=True),
             id="utf-8",
         ),
         pytest.param(
@@ -1051,7 +1050,6 @@ def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> N
                     author=Author.TOOL,
                 ),
             ),
-            marks=pytest.mark.xfail(strict=True),
             id="utf-8-and-a-description",
         ),
         pytest.param(
@@ -1094,7 +1092,6 @@ def test_text_media_is_kept_with_its_utf_8_text_redacted(
     assert trajectory.history[-1].parts == (kept,)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_dump_with_a_redaction_writes_text_media_with_its_text_redacted() -> None:
     trajectory = Trajectory()
     trajectory.observe(
@@ -1133,7 +1130,6 @@ def test_a_dump_with_a_redaction_writes_text_media_with_its_text_redacted() -> N
     }
 
 
-@pytest.mark.xfail(strict=True)
 def test_loading_with_what_is_not_a_redaction_raises_before_reading_the_data() -> None:
     with pytest.raises(
         (

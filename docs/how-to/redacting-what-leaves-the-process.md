@@ -114,15 +114,18 @@ def read_prompt() -> str:
 
 `text` takes a string and returns a string. `media` takes a `MediaPart` and returns a part: the
 media blurred, a `TextPart` in its place, or the part as it was. The text in the part that `media`
-returns then passes through `text`. Both functions are required, so no media passes for want of a
-function. A function that is not callable raises `ConfigurationError` when the `Redaction` is
-built, and one that returns another type raises it where the redaction is applied.
+returns then passes through `text`: a `TextPart`'s text, a description, and the bytes of text media
+(a `text/*` type) as UTF-8 text, a data URL's payload included. Bytes that are not UTF-8 stay as
+`media` left them, and text media given by URL is `media`'s alone. Both functions are required, so
+no media passes for want of a function. A function that is not callable raises
+`ConfigurationError` when the `Redaction` is built, and one that returns another type raises it
+where the redaction is applied.
 
 A redaction reaches every piece of content: text parts, thoughts, tool-call arguments, observations
-and their `source`, media and their descriptions, a score's explanation, the reply text that a
-score's cause holds (a cut-off reply's text, a refusal's explanation), the proposals in records,
-and a block's or a halt's reason. Ids, tool names, authors, scores' values and records' positions
-stay as they are, so ratings and records still name their actions.
+and their `source`, media, their descriptions and the text of text media, a score's explanation,
+the reply text that a score's cause holds (a cut-off reply's text, a refusal's explanation), the
+proposals in records, and a block's or a halt's reason. Ids, tool names, authors, scores' values
+and records' positions stay as they are, so ratings and records still name their actions.
 
 ## Redacting at entry covers every later point
 
@@ -315,8 +318,10 @@ FailedClosed(model='scripted', cause=Unperceivable(content=('image/png',)))
 ```
 
 `rate_latest_step` takes the rated action from the trajectory's history. On a trajectory redacted
-at entry, that action is the redacted copy, and an image replaced by text at entry is rated as that
-text.
+at entry, that action is the redacted copy, so the trajectory's redaction is not applied to it
+again: the view's applies once, and media lifted from its arguments passes through the
+trajectory's media function and then the view's, as a history entry's does. Each piece of content
+passes through each redaction once. An image replaced by text at entry is rated as that text.
 
 ## A monitor cannot judge what a redaction removed
 

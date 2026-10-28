@@ -103,6 +103,8 @@ class Trajectory:
         # Every trajectory of a run shares it, so each record takes a number no other record has.
         self._sequence = count()
         self._delegation: Delegation | None = None
+        # The latest action split off this trajectory, which it kept redacted.
+        self._split_off: Action | None = None
 
     @classmethod
     def from_run(
@@ -259,6 +261,7 @@ class Trajectory:
                 earlier._sequence_numbers = self._sequence_numbers[: len(earlier._records)]
                 earlier._sequence = self._sequence
                 earlier._delegation = self._delegation
+                earlier._split_off = action
                 earlier._copy_subagents()
                 return Step(
                     trajectory=earlier,
@@ -547,6 +550,7 @@ class Trajectory:
         Trajectory(redaction=...) does; a redaction that is not a Redaction raises
         ConfigurationError.
         """
+        check_redaction(redaction)
         if redaction is not None:
             data = cls.load(data).dump(redaction=redaction)
         seen: set[int] = set()
@@ -745,6 +749,17 @@ def trace_path(trajectory: Trajectory) -> list[Trajectory]:
     while (delegation := path[-1]._delegation) is not None:
         path.append(delegation.parent)
     return path
+
+
+def is_split_off(
+    action: Action,
+    *,
+    trajectory: Trajectory,
+) -> bool:
+    """Whether the action is the one split_latest_step split off the trajectory, which the
+    trajectory's redaction already reached.
+    """
+    return action is trajectory._split_off
 
 
 def list_run(trajectory: Trajectory) -> list[Trajectory]:

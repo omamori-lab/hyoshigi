@@ -2,9 +2,9 @@
 reported.
 
 A redaction reaches text parts, thoughts, tool-call arguments, observations and their sources,
-media and their descriptions, a score's explanation and the reply text its cause holds, and a
-block's or a halt's reason. Ids, tool names, authors, values and positions stay as they are, so
-ratings and records still name their actions.
+media, their descriptions and the UTF-8 text of text media, a score's explanation and the reply
+text its cause holds, and a block's or a halt's reason. Ids, tool names, authors, values and
+positions stay as they are, so ratings and records still name their actions.
 
 <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
 """
@@ -35,7 +35,7 @@ from hyoshigi.protocols.decisions import (
     Run,
 )
 from hyoshigi.trajectory.history import Action, Event, Observation
-from hyoshigi.trajectory.parts import MediaPart, OpaquePart, Part, TextPart
+from hyoshigi.trajectory.parts import MediaPart, OpaquePart, Part, TextPart, read_text
 
 
 @dataclass(
@@ -47,7 +47,8 @@ class Redaction:
     """Maps a trajectory's content to what is kept or sent in its place.
 
     `text` maps a str to a str. `media` maps a MediaPart to a part, such as the media blurred
-    or a TextPart in its place, and the text in the part it returns then passes through `text`.
+    or a TextPart in its place, and the text in the part it returns then passes through `text`:
+    a TextPart's text, a description, and the bytes of text media that are UTF-8.
     Each is callable, or ConfigurationError is raised when the redaction is built; a function
     that returns another type raises it where the redaction is applied.
 
@@ -296,21 +297,45 @@ def _redact_part(
                     redaction=redaction,
                 ),
             )
-        case MediaPart(description=description) if description is not None:
-            return replace(
+        case MediaPart():
+            return _redact_media(
                 part,
-                description=replace(
-                    description,
-                    text=_redact_text(
-                        description.text,
-                        redaction=redaction,
-                    ),
-                ),
+                redaction=redaction,
             )
-        case MediaPart() | OpaquePart():
+        case OpaquePart():
             return part
         case unreachable:
             assert_never(unreachable)
+
+
+def _redact_media(
+    part: MediaPart,
+    *,
+    redaction: Redaction,
+) -> MediaPart:
+    """Return media with the UTF-8 text of text media, and its description, through the
+    redaction's text function; other bytes and a URL stay as they are.
+    """
+    text = read_text(part)
+    description = part.description
+    return replace(
+        part,
+        data=part.data
+        if text is None
+        else _redact_text(
+            text,
+            redaction=redaction,
+        ).encode(),
+        description=None
+        if description is None
+        else replace(
+            description,
+            text=_redact_text(
+                description.text,
+                redaction=redaction,
+            ),
+        ),
+    )
 
 
 def _redact_text(

@@ -34,17 +34,19 @@ minor version.
   the monitor samples. A model that declares 0 is sampled as before.
 - `Redaction`, a text function and a media function, redacts a
   trajectory's content where it leaves the process: text parts, thoughts,
-  tool-call arguments, observations and their sources, media and their
-  descriptions, a score's explanation and the reply text in its cause, the
-  proposals in records, and a block's or a halt's reason. Ids, tool names,
-  authors, values and positions stay as they are. Each point where content
-  leaves takes it as its own option, off unless set.
+  tool-call arguments, observations and their sources, media, their
+  descriptions and the UTF-8 text of text media, a score's explanation and
+  the reply text in its cause, the proposals in records, and a block's or a
+  halt's reason. Ids, tool names, authors, values and positions stay as they
+  are. Each point where content leaves takes it as its own option, off unless
+  set.
 - `Trajectory(redaction=...)`, and the same option on `from_run`,
   `from_anthropic`, `from_openai_chat`, `from_open_responses` and `load`,
   keeps each entry, rating and record redacted before it is appended. Split
   copies and subagents keep the redaction, a record's action stays its
   history entry, and a monitor reads an action rated against the trajectory
-  through the same redaction.
+  through the same redaction, once: `rate_latest_step` does not redact the
+  action it takes from the history again.
 - `View(redaction=...)` redacts the history and the rated action a monitor's
   model reads, after the trajectory's own, and media lifted from a tool
   call's arguments passes through both media functions. Media the model
