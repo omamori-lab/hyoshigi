@@ -1840,15 +1840,9 @@ def test_a_prompt_the_api_cannot_use_is_rejected_with_its_status(
             ContentPolicyViolationError,
             400,
         ),
-        pytest.param(
-            fail(
-                RejectedRequestError,
-                400,
-            ),
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="a RejectedRequestError is read as a 400 that raises",
-            ),
+        fail(
+            RejectedRequestError,
+            400,
         ),
         GuardrailRaisedException("blocked"),
         BlockedPiiEntityError("blocked"),

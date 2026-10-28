@@ -484,7 +484,7 @@ text.
 
 | Error | Outcome |
 |---|---|
-| `ContentPolicyViolationError`, `GuardrailRaisedException` or `BlockedPiiEntityError` | `Refused()` |
+| `ContentPolicyViolationError`, `RejectedRequestError`, `GuardrailRaisedException` or `BlockedPiiEntityError` | `Refused()` |
 | an error with a `code` that is `refusal` or contains `policy`, at any status | `Refused()` |
 | `ContextWindowExceededError` or `ImageFetchError` | `Rejected(status=400)` |
 | 413, or a `code` that says the prompt cannot be used, as for OpenAI Responses | `Rejected` with the status |
@@ -501,8 +501,11 @@ LiteLLM's exceptions inherit from OpenAI's, and a status error carries its statu
 `Exception` instead [@litellm2026source, {}litellm/exceptions.py], and the adapter finds them, and
 the classes it reads by class, in the module `litellm.exceptions` once LiteLLM is imported. An
 instance of one of these classes can exist only once its module is loaded, so hyoshigi imports
-LiteLLM no sooner. A `Timeout`, an `APIConnectionError` and an `APIResponseValidationError` carry a
-status that LiteLLM sets, 408 or 500, which the adapter does not read, since no answer came.
+LiteLLM no sooner. LiteLLM's proxy raises `RejectedRequestError`, a `BadRequestError` with the
+status 400, when a pre-call hook such as a guardrail rejects a completion
+[@litellm2026source, {}litellm/proxy/utils.py], so it is a refusal like a guardrail's block. A
+`Timeout`, an `APIConnectionError` and an `APIResponseValidationError` carry a status that LiteLLM
+sets, 408 or 500, which the adapter does not read, since no answer came.
 LiteLLM raises an `APIConnectionError` for an error it does not map
 [@litellm2026exceptions, {Section} "LiteLLM Exceptions"], so that error is `Unavailable()`.
 

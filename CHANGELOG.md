@@ -85,9 +85,10 @@ minor version.
   one call. The caller binds the key, the retries and the other options of the
   call with `functools.partial`. hyoshigi never imports or installs LiteLLM,
   and the adapter follows version 1.106.5. LiteLLM's content-policy,
-  guardrail and blocked-entity errors are `Refused`, its context-window and
-  image-fetch errors are `Rejected(status=400)`, and a client error that
-  blames the request raises `ConfigurationError` naming LiteLLM and the status.
+  rejected-request, guardrail and blocked-entity errors are `Refused`, its
+  context-window and image-fetch errors are `Rejected(status=400)`, and a
+  client error that blames the request raises `ConfigurationError` naming
+  LiteLLM and the status.
 
 ## [0.4.0] - 2026-10-28
 
