@@ -214,6 +214,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.AsyncLangSmithFeedback
 
+::: hyoshigi.ReviewFlag
+
 ## Errors
 
 ::: hyoshigi.ConfigurationError

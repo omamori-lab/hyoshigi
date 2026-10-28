@@ -642,6 +642,11 @@ Flag {"command": "cat q3.md"}
 5 {"command": "cat q3.md"}
 ```
 
+A `Flag` reaches Langfuse or LangSmith through a report built with a `review_flag`: the report's
+`flag` method marks the step there, as [A review flag marks the steps a person
+reviews](reporting-scores-to-langfuse-and-langsmith.md#a-review-flag-marks-the-steps-a-person-reviews)
+sets out.
+
 ## Block and feed back blocks the action and tells the agent why
 
 `BlockAndFeedBack` has `decide` only, and makes no requests. A proposal at or above

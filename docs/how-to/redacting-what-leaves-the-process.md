@@ -425,8 +425,9 @@ content=StoredContent.REDACTED takes the redaction for the entries added later
 score's explanation through its text function as the comment
 ([a redacted comment](reporting-scores-to-langfuse-and-langsmith.md#a-redaction-masks-the-comment)).
 The metadata says whether the score failed closed, the class of its cause and the models, and holds
-no content. The backends' clients send the comment as given. Langfuse's `mask` applies to an
-observation's input, output and metadata (langfuse 5.0.2,
+no content. A report's review flag, which marks a step for review, carries no comment and no
+metadata, so a `redaction` has nothing to mask in it. The backends' clients send the comment as
+given. Langfuse's `mask` applies to an observation's input, output and metadata (langfuse 5.0.2,
 `LangfuseObservationWrapper._mask_attribute`), and `create_score` queues the comment unmasked
 (`Langfuse.create_score`). LangSmith's `anonymizer` applies to a run's inputs, outputs, metadata
 and error (langsmith 0.14.11, `Client._hide_run_inputs`, `_hide_run_outputs`,

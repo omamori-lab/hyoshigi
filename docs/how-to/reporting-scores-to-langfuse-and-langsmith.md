@@ -286,7 +286,7 @@ reports[0] must be a LangfuseScores or a LangSmithFeedback, got an instance of A
 `ConfigurationError` is also raised:
 
 - when a report is built, for a `client`, an `executor` or a `task_group` of another class, a blank
-  `name` and a `project_id` that is not a UUID string;
+  `name`, a `project_id` that is not a UUID string and a `review_flag` that is not a `ReviewFlag`;
 - when the monitor is built, for a `monitor` that is not a `Monitor` and for `reports` that are not a
   non-empty tuple;
 - when the monitor is built in a process without `opentelemetry-api`, with a message that names the
@@ -660,6 +660,189 @@ default, and a blank name raises `ConfigurationError` when the report is built. 
 not say whether a score is raw or calibrated, so the name does. The two reports of the stack example
 differ in name for that reason.
 
+## A review flag marks the steps a person reviews
+
+A person reviews the steps a monitor finds suspicious, and finds them in Langfuse or LangSmith by a
+mark. `ReviewFlag` defines the mark. Its `name` is the mark's name in the backend, `flagged` by
+default, and its `threshold` is the score at or above which a report's `send` flags the step, a
+number from 0 to 1 that is `None` by default. A `ReviewFlag` without a threshold never flags in
+`send`. `LangfuseScores`, `LangSmithFeedback` and `AsyncLangSmithFeedback` take it as
+`review_flag`.
+
+When the score reaches the threshold, `send` sends the flag and then the score, on the same
+observation or run. A score below the threshold sends the score alone, so only the steps that
+reached the threshold carry the mark. In trusted monitoring a person audits the most suspicious
+proposals, roughly the top 2% [@greenblatt2023aicontrol, sec. 3.2], and the threshold picks the
+steps that carry the mark. A rating that failed closed scores 1.0 and reaches every threshold
+([failing closed](../explanation/failing-closed.md)). A `ReportedMonitor` calls `send`, so its
+reports flag the rating's own span. With a threshold of 0.7, a monitor that rates a calm step
+and then an alarming one flags the second:
+
+```python
+from hyoshigi import ReviewFlag
+
+ALARMING = (
+    "<reasoning>The booking is not the flight the user asked for.</reasoning>\n<score>9</score>"
+)
+langfuse_received.clear()
+langsmith_received.clear()
+review_flag = ReviewFlag(threshold=0.7)
+flagging = ReportedMonitor(
+    monitor=LLMMonitor(
+        model=script(
+            Generation(text=CALM),
+            Generation(text=ALARMING),
+        ),
+    ),
+    reports=(
+        LangfuseScores(
+            client=langfuse,
+            review_flag=review_flag,
+        ),
+        LangSmithFeedback(
+            client=Client(
+                api_url=langsmith_url,
+                api_key="lsv2-offline",
+                info={},
+                auto_batch_tracing=False,
+            ),
+            project_id=PROJECT_ID,
+            review_flag=review_flag,
+        ),
+    ),
+)
+for _ in range(2):
+    flagging.rate(
+        answer,
+        trajectory=trajectory,
+    )
+langfuse.flush()
+print(
+    [
+        (
+            sent["name"],
+            sent["value"],
+        )
+        for sent in langfuse_received
+    ],
+)
+print(
+    [
+        (
+            sent["key"],
+            sent["score"],
+        )
+        for sent in langsmith_received
+    ],
+)
+```
+
+```text
+[('suspicion', 0.3), ('flagged', 1.0), ('suspicion', 0.9)]
+[('suspicion', 0.3), ('flagged', True), ('suspicion', 0.9)]
+```
+
+`flag` sends the mark for a step whatever its score, with the ids `send` takes: `trace_id` and
+`observation_id` for `LangfuseScores`, `run_id` for the LangSmith reports. `AsyncLangSmithFeedback.flag`
+is awaited, as its `send` is. A protocol's `Flag` decision runs an action and queues it for a person
+([detection only](running-a-control-protocol.md#detection-only-runs-each-flagged-action-and-queues-it-for-review)),
+and `flag` marks that step in the backend. A report built without a `review_flag` raises
+`ConfigurationError` from `flag`. A report with `ReviewFlag(name="needs-review")` marks a step under
+that name, and a report built without a `review_flag` raises:
+
+```python
+langfuse_received.clear()
+LangfuseScores(
+    client=langfuse,
+    review_flag=ReviewFlag(name="needs-review"),
+).flag(
+    trace_id="0123456789abcdef0123456789abcdef",
+    observation_id="0000000000000001",
+)
+langfuse.flush()
+show(langfuse_received)
+try:
+    LangfuseScores(client=langfuse).flag(
+        trace_id="0123456789abcdef0123456789abcdef",
+        observation_id="0000000000000001",
+    )
+except ConfigurationError as error:
+    print(error)
+```
+
+```text
+{
+  "traceId": "0123456789abcdef0123456789abcdef",
+  "observationId": "0000000000000001",
+  "name": "needs-review",
+  "value": 1.0,
+  "dataType": "BOOLEAN"
+}
+flag needs a ReviewFlag: build the report with review_flag=ReviewFlag(...)
+```
+
+Langfuse receives the mark as a score of the boolean data type, whose values are 0 and 1
+[@langfuse2026scores, {Section} "Score Types"], and the report sends 1. LangSmith receives feedback
+of source type `model` whose `score` is `true`: `Client.create_feedback` takes a bool score and
+leaves it as it is, where it rounds a float to 4 decimal places (langsmith 0.14.11):
+
+```python
+langsmith_received.clear()
+LangSmithFeedback(
+    client=Client(
+        api_url=langsmith_url,
+        api_key="lsv2-offline",
+        info={},
+        auto_batch_tracing=False,
+    ),
+    project_id=PROJECT_ID,
+    review_flag=ReviewFlag(),
+).flag(run_id="00000000-0000-0000-0000-000000000001")
+show(langsmith_received)
+```
+
+```text
+{
+  "run_id": "00000000-0000-0000-0000-000000000001",
+  "key": "flagged",
+  "score": true,
+  "feedback_source": {
+    "type": "model",
+    "metadata": {}
+  },
+  "session_id": "6f9a2c4e-1b3d-4e5f-8a7b-9c0d1e2f3a4b",
+  "extend_trace_retention": false
+}
+```
+
+The mark carries no comment and no metadata, so a `redaction` has nothing to mask in it.
+
+The mark goes out on the report's own path. Langfuse's client queues it. `LangSmithFeedback` posts it
+on its `executor` and `AsyncLangSmithFeedback` in its `task_group`, when it has one, so a flag waits
+for the network exactly where a score does. Without a worker, the LangSmith report posts the
+flag before the score, so a flag that LangSmith rejects raises the client's error and the score is
+not posted.
+
+`ConfigurationError` is raised when a `ReviewFlag` is built with a blank `name`, or with a
+`threshold` that is not a number from 0 to 1 (NaN and a bool are refused), and when a report is
+built with a `review_flag` that is not a `ReviewFlag`:
+
+```python
+for options in (
+    {"name": " "},
+    {"threshold": 1.5},
+):
+    try:
+        ReviewFlag(**options)
+    except ConfigurationError as error:
+        print(error)
+```
+
+```text
+name must be a non-blank string, got ' '
+threshold must be between 0 and 1, got 1.5
+```
+
 ## Nothing is sent when no backend holds the span
 
 A score is sent only when the span's context is valid and sampled. Otherwise no backend holds the
@@ -808,4 +991,29 @@ print(f"score {score.value}, LangSmith rejected {len(rejected)}")
 ```text
 WARNING hyoshigi.monitors.reporting: LangSmithFeedback did not send the score: LangSmithAuthError.
 score 0.3, LangSmith rejected 1
+```
+
+A flag post that fails on a worker is logged in the same form, with the flag in place of the score:
+
+```python
+rejected.clear()
+executor = ThreadPoolExecutor()
+LangSmithFeedback(
+    client=Client(
+        api_url=rejecting_url,
+        api_key="lsv2-offline",
+        info={},
+        auto_batch_tracing=False,
+    ),
+    project_id=PROJECT_ID,
+    review_flag=ReviewFlag(),
+    executor=executor,
+).flag(run_id="00000000-0000-0000-0000-000000000001")
+executor.shutdown(wait=True)
+print(f"LangSmith rejected {len(rejected)}")
+```
+
+```text
+WARNING hyoshigi.monitors.reporting: LangSmithFeedback did not send the flag: LangSmithAuthError.
+LangSmith rejected 1
 ```

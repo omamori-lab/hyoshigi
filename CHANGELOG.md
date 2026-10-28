@@ -90,6 +90,22 @@ minor version.
   context-window and image-fetch errors are `Rejected(status=400)`, and a
   client error that blames the request raises `ConfigurationError` naming
   LiteLLM and the status.
+- `ReviewFlag`, exported, marks a step for a person to review. `name` is the
+  mark's name in the backend, `flagged` by default, and `threshold` is the
+  score at or above which a report's `send` flags the step, a number from 0 to
+  1, `None` by default. `LangfuseScores`, `LangSmithFeedback` and
+  `AsyncLangSmithFeedback` take `review_flag`. When the score reaches its
+  threshold, `send` sends the flag before the score, on the same observation
+  or run: a boolean score of value 1 in Langfuse and boolean feedback in
+  LangSmith, with no comment, so a `redaction` does not apply to it. Their
+  `flag` method sends it for any step with the ids `send` takes, for a
+  `Flag` decision, and raises `ConfigurationError` on a report built without
+  a `review_flag`. `AsyncLangSmithFeedback.flag` is awaited. The flag goes out
+  on the report's own path: Langfuse's queue, the executor or task group when
+  given, inline when not. A flag post that fails or is cancelled on a worker
+  is logged as `did not send the flag`. A blank `name`, a `threshold` that is
+  not a number from 0 to 1 (NaN and a bool included) and a `review_flag` that
+  is not a `ReviewFlag` raise `ConfigurationError` when built.
 
 ## [0.4.0] - 2026-10-28
 
