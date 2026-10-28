@@ -22,7 +22,7 @@ order they happened, as its event stream [@wang2025openhands, sec. 2.1].
 
 ## The trajectory only grows
 
-A trajectory grows through `act`, `observe`, `delegate`, `attach` and
+A trajectory grows through `act`, `observe`, `delegate`, `join`, `attach` and
 `record`, and has no method that removes or replaces an entry. `history`
 returns a tuple, and actions and observations are frozen dataclasses, so an
 entry stays as it was recorded. A trajectory given a `Redaction` redacts each entry before it is

@@ -1019,7 +1019,6 @@ def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> N
     assert loaded.records[0].action == loaded.history[1]  # ty: ignore[unresolved-attribute]
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_trajectory_with_a_redaction_keeps_what_joins_it_redacted(masking: Trajectory) -> None:
     masking.act(ASKING)
 
@@ -1031,7 +1030,6 @@ def test_a_trajectory_with_a_redaction_keeps_what_joins_it_redacted(masking: Tra
     assert joined.dump() == MASKED_STORED
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "select",
     [

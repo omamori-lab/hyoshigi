@@ -131,8 +131,10 @@ and records' positions stay as they are, so ratings and records still name their
 
 `Trajectory(redaction=...)` keeps a redacted copy of each entry. `act`, `observe`, `attach`,
 `record` and `delegate` redact what they add before it is appended, and nothing kept is rewritten
-afterwards. The copies `split_latest_step` makes and the trajectory's subagents redact the same, and
-`from_run`, `from_anthropic`, `from_openai_chat` and `from_open_responses` take the option too. The
+afterwards. The copies `split_latest_step` makes and the trajectory's subagents redact the same,
+`join` holds the load of a subagent's dump through the redaction, as `load(data, redaction=...)`
+does, and `from_run`, `from_anthropic`, `from_openai_chat` and `from_open_responses` take the
+option too. The
 action's id and its tool call's id hold digits in a phone number's shape and stay as they are:
 
 ```python

@@ -435,7 +435,6 @@ def build_chain(depth: int) -> Trajectory:
     return root
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("joining_depth", "chain_depth"),
     [
@@ -529,7 +528,6 @@ def build_split_copy_joining() -> Joining:
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("arrange", "message"),
     [
@@ -608,7 +606,6 @@ def test_joining_what_cannot_join_raises_naming_why(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_refused_join_leaves_both_runs_unchanged() -> None:
     joining = build_joining(16)
     taken = build_chain(16)
