@@ -435,7 +435,7 @@ a lone surrogate, return `Unavailable()`. Media of any other type, text media am
 `ConfigurationError` naming it.
 
 LiteLLM documents `top_logprobs` as an integer from 0 to 5
-[@litellm2026input, {Section} "Input Params"]. The adapter sets no maximum, so a count that a
+[@litellm2026input, {Section} "Optional Fields"]. The adapter sets no maximum, so a count that a
 provider refuses is a 400 and raises `ConfigurationError` at the first rating. By default LiteLLM
 raises for a parameter that a provider does not support, and `drop_params` drops it instead
 [@litellm2026input, {Section} "Common Params"]. A model that declares log-probabilities
@@ -500,8 +500,8 @@ LiteLLM's exceptions inherit from OpenAI's, and a status error carries its statu
 `GuardrailRaisedException`, `BlockedPiiEntityError` and `BudgetExceededError` inherit from
 `Exception` instead [@litellm2026source, {}litellm/exceptions.py], and the adapter finds them, and
 the classes it reads by class, in the module `litellm.exceptions` once LiteLLM is imported. An
-instance of one of these classes can exist only once its module is loaded, so hyoshigi imports
-LiteLLM no sooner. LiteLLM's proxy raises `RejectedRequestError`, a `BadRequestError` with the
+instance of one of these classes can exist only once its module is loaded, and hyoshigi never
+imports LiteLLM itself. LiteLLM's proxy raises `RejectedRequestError`, a `BadRequestError` with the
 status 400, when a pre-call hook such as a guardrail rejects a completion
 [@litellm2026source, {}litellm/proxy/utils.py], so it is a refusal like a guardrail's block. A
 `Timeout`, an `APIConnectionError` and an `APIResponseValidationError` carry a status that LiteLLM

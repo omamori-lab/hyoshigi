@@ -81,8 +81,9 @@ minor version.
 - `GenerativeModel.from_litellm` and `AsyncGenerativeModel.from_litellm` build
   a model on the caller's `litellm.completion` or `litellm.acompletion`, with
   `perceives` and `top_log_probabilities`. Above 0 the request asks for the
-  log-probabilities and the model returns them, so a `GuardMonitor` scores in
-  one call. The caller binds the key, the retries and the other options of the
+  log-probabilities and the model returns those the provider sends, so a
+  `GuardMonitor` scores in one call; a reply without them fails the guard
+  closed. The caller binds the key, the retries and the other options of the
   call with `functools.partial`. hyoshigi never imports or installs LiteLLM,
   and the adapter follows version 1.106.5. LiteLLM's content-policy,
   rejected-request, guardrail and blocked-entity errors are `Refused`, its
