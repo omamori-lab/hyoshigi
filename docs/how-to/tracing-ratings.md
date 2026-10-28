@@ -102,6 +102,9 @@ Once the rating has a score, the span carries these attributes:
 | `hyoshigi.failed_closed` | Whether the score failed closed |
 | `hyoshigi.cause` | The class of the cause, only when the score failed closed |
 
+The exporter's own hooks redact the explanation on its way out
+([The rating's span leaves through the exporter](redacting-what-leaves-the-process.md#the-ratings-span-leaves-through-the-exporter)).
+
 A rating that cannot be made fails closed: its score is 1.0, so the action counts as most
 suspicious, as [A rating that cannot be made scores 1.0](../explanation/failing-closed.md) sets
 out. Its span carries that score like any other, `hyoshigi.cause` names why, and the span's status

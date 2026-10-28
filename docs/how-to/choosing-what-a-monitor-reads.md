@@ -2,7 +2,9 @@
 
 A `View` sets what a monitor reads of a trajectory. Its `channels` choose the kinds of entry,
 `most_recent` limits how many of the latest entries the monitor keeps, and `delegation_tools` names
-the tools whose results are subagent reports. An `LLMMonitor`, a `DecisionMonitor` and a
+the tools whose results are subagent reports. Its `redaction` redacts what the monitor's model reads
+([A view redacts what the monitor's model reads](redacting-what-leaves-the-process.md#a-view-redacts-what-the-monitors-model-reads)).
+An `LLMMonitor`, a `DecisionMonitor` and a
 `GuardMonitor`, with their async twins, take a `view`, which is `View()` by default. The default
 reads the task, the tool calls with their errors and the subagent reports. [The default view hides
 tool results and the agent's text](../explanation/the-default-view.md) gives the reasons. The action
@@ -446,8 +448,8 @@ takes `subagent` as its trajectory, where the delegator's instruction is the tas
 ## A view that cannot work raises when it is built
 
 `View` raises `ConfigurationError` for `channels` that is not a `Channel`, for a `most_recent` that
-is not a whole number of at least 1, and for `delegation_tools` that is not an iterable of strings.
-A bare string raises, since iterating it gives its letters. The names are kept as a frozenset:
+is not a whole number of at least 1, for `delegation_tools` that is not an iterable of strings, and
+for a `redaction` that is not a `Redaction`. A bare string raises, since iterating it gives its letters. The names are kept as a frozenset:
 
 ```python
 for options in (

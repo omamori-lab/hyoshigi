@@ -317,8 +317,10 @@ the model is not asked. Media the agent described in its own words counts as unp
 description is the agent's claim about it, and a description by another author stands in for the
 media. Media earlier in the history reaches the monitor as a description or a placeholder, and the
 rating goes on. An `OpaquePart` in the rated action, such as a server tool the provider ran inside
-the agent's model call, fails closed the same way, with its kind as the content. The remedy for
-media is a model that perceives it:
+the agent's model call, fails closed the same way, with its kind as the content. A redaction that
+puts text in the media's place leaves the failure as it was
+([Media the model cannot perceive still fails the rating closed](redacting-what-leaves-the-process.md#media-the-model-cannot-perceive-still-fails-the-rating-closed)).
+The remedy for media is a model that perceives it:
 
 ```python
 from hyoshigi import Action, MediaPart, MediaTypes, TextPart

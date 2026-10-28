@@ -42,6 +42,8 @@ Every public name imports from the package root, as `from hyoshigi import Trajec
 
 ::: hyoshigi.JSON
 
+::: hyoshigi.Redaction
+
 ## Models
 
 ::: hyoshigi.GenerativeModel

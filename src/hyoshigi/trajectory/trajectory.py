@@ -28,7 +28,7 @@ from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservation
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
-from hyoshigi.trajectory.redaction import Redaction
+from hyoshigi.trajectory.redaction import Redaction, Redactor, check_redaction
 from hyoshigi.trajectory.storage.events import dump_event, load_event
 from hyoshigi.trajectory.storage.paths import select_member
 from hyoshigi.trajectory.storage.records import dump_record, load_records, read_sequence_numbers
@@ -78,7 +78,12 @@ class Trajectory:
 
     A trajectory is a history of actions and observations (Sutton and Barto,
     "Reinforcement Learning: An Introduction", second edition, sections 3.1 and
-    17.3). Each observation also carries who wrote it.
+    17.3). Each observation also carries who wrote it. With a `redaction`, a Redaction, each
+    entry, rating and record is redacted before it is kept, and a split copy, a subagent and a
+    monitor's reading of an action rated against it redact the same; anything else raises
+    ConfigurationError.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
     """
 
     def __init__(
@@ -86,6 +91,8 @@ class Trajectory:
         *,
         redaction: Redaction | None = None,
     ) -> None:
+        check_redaction(redaction)
+        self._redaction = redaction
         self._history: list[Event] = []
         self._action_ids: set[str] = set()
         self._call_ids: set[str] = set()
@@ -106,7 +113,7 @@ class Trajectory:
         redaction: Redaction | None = None,
     ) -> BlackBoxRun:
         """Build the trajectory of a black-box run and its answer as the action to rate."""
-        trajectory = cls()
+        trajectory = cls(redaction=redaction)
         trajectory.observe(
             Observation(
                 author=Author.USER,
@@ -131,7 +138,7 @@ class Trajectory:
         Raises FormatError, naming the JSONPath of the first problem, on a body that is
         not in the Messages format.
         """
-        trajectory = cls()
+        trajectory = cls(redaction=redaction)
         for path, event in anthropic.read_request(
             request,
             authorship=authorship,
@@ -156,7 +163,7 @@ class Trajectory:
         as media parts. Raises FormatError, naming the JSONPath of the first problem, on a
         body that is not in the chat completions format.
         """
-        trajectory = cls()
+        trajectory = cls(redaction=redaction)
         for path, event in openai_chat.read_request(
             request,
             authorship=authorship,
@@ -180,7 +187,7 @@ class Trajectory:
         The model's consecutive items become one action. Raises FormatError, naming the
         JSONPath of the first problem, on a body that is not in the Open Responses format.
         """
-        trajectory = cls()
+        trajectory = cls(redaction=redaction)
         for path, event in open_responses.read_request(
             request,
             authorship=authorship,
@@ -190,6 +197,11 @@ class Trajectory:
                 path=path,
             )
         return trajectory
+
+    @property
+    def redaction(self) -> Redaction | None:
+        """The redaction each entry passes through before it is kept, or None."""
+        return self._redaction
 
     @property
     def history(self) -> tuple[Event, ...]:
@@ -228,7 +240,7 @@ class Trajectory:
                 Action() as action,
             ]:
                 call_ids = {call.id for call in action.tool_calls}
-                earlier = Trajectory()
+                earlier = Trajectory(redaction=self._redaction)
                 earlier._history = earlier_history
                 earlier._action_ids = self._action_ids - {action.id}
                 earlier._call_ids = self._call_ids - call_ids
@@ -280,7 +292,7 @@ class Trajectory:
         """Return a trajectory with this one's entries, ratings, records and subagents in lists of
         its own, at the place in the run that `delegation` names.
         """
-        copied = Trajectory()
+        copied = Trajectory(redaction=self._redaction)
         copied._history = list(self._history)
         copied._action_ids = set(self._action_ids)
         copied._call_ids = set(self._call_ids)
@@ -302,7 +314,7 @@ class Trajectory:
 
         The score must be a SuspicionScore and the action's id in the history; otherwise
         ConfigurationError is raised and nothing is recorded. An action can be rated more than
-        once, and each rating is kept.
+        once, and each rating is kept, its score redacted.
         """
         check_instance(
             score,
@@ -319,7 +331,7 @@ class Trajectory:
         self._ratings.append(
             Rating(
                 action_id=to.id,
-                score=score,
+                score=Redactor(self._redaction).redact_score(score),
             ),
         )
 
@@ -333,9 +345,9 @@ class Trajectory:
         first proposal of that action, unless that proposal is a trusted step. A Block adds its
         action, then the reason, written by the monitor: an error answering each of the action's
         tool calls, in order, or one observation when it made none. An Audit or a Halt adds the
-        record only. A decision that is not one of the six, a position that is not the length
-        of the history, and an action act refuses raise ConfigurationError, and nothing is
-        recorded.
+        record only. The decision is redacted once, and its action is the action it adds. A
+        decision that is not one of the six, a position that is not the length of the history,
+        and an action act refuses raise ConfigurationError, and nothing is recorded.
 
         <https://omamori-lab.github.io/hyoshigi/explanation/control-protocols/>
         """
@@ -349,6 +361,7 @@ class Trajectory:
             )
         if decision.position != len(self._history):
             raise ConfigurationError("the decision's position is not the length of the history")
+        decision = Redactor(self._redaction).redact_decision(decision)
         match decision:
             case Run(action=action) | Flag(action=action) | Replace(action=action):
                 self._run(
@@ -359,7 +372,7 @@ class Trajectory:
                 action=action,
                 reason=reason,
             ):
-                self.act(action)
+                self._keep(action)
                 self._history.extend(
                     build_feedback(
                         action,
@@ -379,20 +392,22 @@ class Trajectory:
         *,
         proposals: tuple[Proposal, ...],
     ) -> None:
-        """Act the action, and attach the score of its first proposal, if that has one."""
-        self.act(action)
+        """Keep the action, and rate it with the score of its first proposal, if that has one."""
+        self._keep(action)
         score = next(proposal.score for proposal in proposals if proposal.action == action)
         if score is not None:
-            self.attach(
-                score,
-                to=action,
+            self._ratings.append(
+                Rating(
+                    action_id=action.id,
+                    score=score,
+                ),
             )
 
     def act(
         self,
         action: Action,
     ) -> None:
-        """Record an action the agent took.
+        """Record an action the agent took, redacted.
 
         The action must be an Action, and its id and each of its tool calls' ids new to the
         trajectory; otherwise ConfigurationError is raised and nothing is recorded.
@@ -402,6 +417,13 @@ class Trajectory:
             expected=Action,
             name="action",
         )
+        self._keep(Redactor(self._redaction).redact_action(action))
+
+    def _keep(
+        self,
+        action: Action,
+    ) -> None:
+        """Append an action whose id and tool calls' ids are new, or raise ConfigurationError."""
         call_ids = [call.id for call in action.tool_calls]
         if action.id in self._action_ids:
             raise ConfigurationError("an action with this id is already in the trajectory")
@@ -417,15 +439,15 @@ class Trajectory:
         self,
         observation: Observation,
     ) -> None:
-        """Record an observation that reached the agent; anything but an Observation raises
-        ConfigurationError.
+        """Record an observation that reached the agent, redacted; anything but an Observation
+        raises ConfigurationError.
         """
         check_instance(
             observation,
             expected=Observation,
             name="observation",
         )
-        self._history.append(observation)
+        self._history.append(Redactor(self._redaction).redact_observation(observation))
 
     def delegate(
         self,
@@ -445,7 +467,7 @@ class Trajectory:
             raise ConfigurationError("a subagent is already delegated by this call")
         if len(trace_path(self)) > NESTING_LIMIT:
             raise ConfigurationError(f"subagents are nested at most {NESTING_LIMIT} deep")
-        child = Trajectory()
+        child = Trajectory(redaction=self._redaction)
         child.observe(
             Observation(
                 author=Author.DELEGATOR,
@@ -466,25 +488,35 @@ class Trajectory:
         redaction: Redaction | None = None,
     ) -> dict[str, JSON]:
         """Return the trajectory, its ratings, its records with their sequence numbers, and its
-        subagents' as JSON-compatible data.
+        subagents' as JSON-compatible data, through the redaction when one is given.
+
+        The trajectory is unchanged. A redaction that is not a Redaction raises
+        ConfigurationError.
         """
+        check_redaction(redaction)
+        return self._dump(Redactor(redaction))
+
+    def _dump(
+        self,
+        redactor: Redactor,
+    ) -> dict[str, JSON]:
         subagents: dict[str, JSON] = {
-            call_id: child.dump() for call_id, child in self._subagents.items()
+            call_id: child._dump(redactor) for call_id, child in self._subagents.items()
         }
         return {
             "format": FORMAT,
             "version": VERSION,
-            "history": [dump_event(event) for event in self._history],
+            "history": [dump_event(redactor.redact_event(event)) for event in self._history],
             "ratings": [
                 {
                     "action_id": rating.action_id,
-                    "score": dump_score(rating.score),
+                    "score": dump_score(redactor.redact_score(rating.score)),
                 }
                 for rating in self._ratings
             ],
             "records": [
                 {
-                    **dump_record(decision),
+                    **dump_record(redactor.redact_decision(decision)),
                     "sequence": number,
                 }
                 for decision, number in zip(
@@ -510,8 +542,13 @@ class Trajectory:
         subagents nested more than 32 levels deep, and on a record's sequence number that
         is not a whole number of at least 0, greater than the one before it, that no other
         record in the run has. Keys dump does not write are ignored. Records recorded after
-        loading take numbers past the largest loaded.
+        loading take numbers past the largest loaded. With a redaction, the trajectory is the
+        load of what dump writes through it, and it and its subagents keep the redaction, as
+        Trajectory(redaction=...) does; a redaction that is not a Redaction raises
+        ConfigurationError.
         """
+        if redaction is not None:
+            data = cls.load(data).dump(redaction=redaction)
         seen: set[int] = set()
         trajectory = cls._load(
             data,
@@ -528,6 +565,7 @@ class Trajectory:
         )
         for member in list_run(trajectory):
             member._sequence = sequence
+            member._redaction = redaction
         return trajectory
 
     @classmethod

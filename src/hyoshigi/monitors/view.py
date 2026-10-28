@@ -1,4 +1,6 @@
-"""What a monitor reads of a trajectory: its channels, and how many recent entries."""
+"""What a monitor reads of a trajectory: its channels, how many recent entries, and through
+which redaction.
+"""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -6,7 +8,7 @@ from enum import Flag, auto
 
 from hyoshigi.errors import ConfigurationError
 from hyoshigi.options import check_instance, describe_option_value, read_count
-from hyoshigi.trajectory.redaction import Redaction
+from hyoshigi.trajectory.redaction import Redaction, check_redaction
 
 
 class Channel(Flag):
@@ -41,7 +43,11 @@ class View:
     or every entry when it is None; the task's entries are kept in addition. It is a whole
     number from 1 to sys.maxsize, kept as an int. `delegation_tools` names the tools whose
     observations are subagent reports: any iterable of strings but a string, kept as a
-    frozenset. Anything else raises ConfigurationError when the view is built.
+    frozenset. `redaction`, a Redaction, redacts the history and the rated action the monitor's
+    model reads, after the trajectory's own. Anything else raises ConfigurationError when the
+    view is built.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
     """
 
     channels: Channel = Channel.DEFAULT
@@ -55,6 +61,7 @@ class View:
             expected=Channel,
             name="channels",
         )
+        check_redaction(self.redaction)
         # The dataclass is frozen, so the checked values are set past its guard.
         if self.most_recent is not None:
             count = read_count(

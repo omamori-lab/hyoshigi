@@ -45,19 +45,19 @@ ECHO = MonitorPrompt(
     request="{trajectory}|{proposed_action}",
 )
 TASK = "Call Ana on 555-0100."
-# Each digit masked; media blurred to new bytes.
+# Each phone number masked, which leaves a data URL's digits alone; media blurred to new bytes.
 MASKED = Redaction(
     text=partial(
         re.sub,
-        "[0-9]",
-        "#",
+        "[0-9]{3}-[0-9]{4}",
+        "###-####",
     ),
     media=partial(
         replace,
         data=b"blurred",
     ),
 )
-# Each digit masked; media replaced with a text placeholder.
+# Each digit masked, a data URL's included; media replaced with a text placeholder.
 TO_TEXT = Redaction(
     text=partial(
         re.sub,
@@ -66,10 +66,10 @@ TO_TEXT = Redaction(
     ),
     media=lambda part: TextPart(text="image 1"),
 )
-# Text kept as written; media replaced with a text placeholder.
+# Text kept as written; media replaced with a text placeholder that holds a phone number.
 PLACEHOLDER = Redaction(
     text=str,
-    media=lambda part: TextPart(text="image 1"),
+    media=lambda part: TextPart(text="a card for 555-0100"),
 )
 # The eight bytes every PNG file starts with (RFC 2083, section 3.1), in base64 iVBORw0KGgo=.
 PNG = MediaPart(
@@ -217,7 +217,6 @@ def build_upload(redaction: Redaction | None = None) -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "view"),
     [
@@ -257,7 +256,6 @@ def test_the_model_reads_the_history_and_the_proposed_action_redacted(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "action", "view", "content"),
     [
@@ -309,7 +307,7 @@ def test_the_model_reads_the_history_and_the_proposed_action_redacted(
                 TextPart(
                     text="<user>Call Ana on ###-####.</user>|"
                     '<tool_call id="call_1" name="upload">{"image": "[media 1]"}'
-                    '<media ref="1">image #</media></tool_call>',
+                    '<media ref="1">a card for ###-####</media></tool_call>',
                 ),
             ),
         ),
@@ -363,8 +361,6 @@ def test_media_lifted_from_a_tool_calls_arguments_reaches_the_model_redacted(
     assert script.received[0].content == content
 
 
-# Passes before redaction exists, as the media is then rendered as it is; a monitor that
-# judges what it cannot perceive by the redaction's text fails it.
 @pytest.mark.parametrize(
     ("build", "action", "view"),
     [
@@ -407,8 +403,6 @@ def test_a_rating_of_media_the_model_cannot_perceive_fails_closed_whatever_the_r
     assert score == UNPERCEIVABLE_SCORE
 
 
-# Passes before redaction exists, as the media is then rendered as it is; a monitor that names
-# hidden reasoning after the redaction fails it.
 def test_the_hidden_reasoning_names_media_in_the_thought_a_redaction_turned_into_text(
     rate: Rate,
 ) -> None:

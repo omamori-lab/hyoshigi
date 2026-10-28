@@ -1,8 +1,9 @@
 """The reports a rating's score can be sent to: Langfuse scores and LangSmith feedback.
 
-Each report sends a score with its explanation as the comment and metadata saying whether it
-failed closed, the class of its cause and the models behind it. A report takes the ids its
-backend knows the scored step by; ReportedMonitor gives it the ids of its rating's span.
+Each report sends a score with its explanation as the comment, through the report's redaction
+when it has one, and metadata saying whether it failed closed, the class of its cause and the
+models behind it. A report takes the ids its backend knows the scored step by; ReportedMonitor
+gives it the ids of its rating's span.
 """
 
 # The SDKs' clients are imported only to type, since each SDK is an optional extra.
@@ -29,7 +30,7 @@ from hyoshigi.monitors.score import (
 from hyoshigi.monitors.tracing import EVALUATION_NAME, name_cause
 from hyoshigi.options import check_instance, describe_option_value, read_count
 from hyoshigi.trajectory.json_data import JSON
-from hyoshigi.trajectory.redaction import Redaction
+from hyoshigi.trajectory.redaction import Redaction, Redactor, check_redaction
 
 if TYPE_CHECKING:
     from langfuse import Langfuse
@@ -49,8 +50,10 @@ class LangfuseScores:
 
     The client queues the score and sends it in the background (Langfuse.create_score), so
     `send` neither waits for the network nor raises for a failed request, which the client
-    logs. `name` is the score's name in Langfuse, a non-blank string. A `client` that is not a
-    langfuse.Langfuse raises ConfigurationError when the report is built, as does a blank name.
+    logs. `name` is the score's name in Langfuse, a non-blank string. The comment is the
+    explanation through `redaction`, a Redaction, when one is given. A `client` that is not a
+    langfuse.Langfuse raises ConfigurationError when the report is built, as do a blank name and
+    a redaction that is not a Redaction.
     """
 
     client: Langfuse
@@ -67,6 +70,7 @@ class LangfuseScores:
             name="client",
         )
         _check_name(self.name)
+        check_redaction(self.redaction)
 
     def send(
         self,
@@ -84,7 +88,7 @@ class LangfuseScores:
             name=self.name,
             value=score.value,
             data_type="NUMERIC",
-            comment=score.explanation,
+            comment=Redactor(self.redaction).redact_text(score.explanation),
             metadata=describe_score(score),
             trace_id=trace_id,
             observation_id=observation_id,
@@ -109,10 +113,11 @@ class LangSmithFeedback:
     and a post that LangSmith answers with 404 holds the exit for up to about 511 s at
     `stop_after_attempt=10`. `project_id` is the run's project id, a UUID string.
     `stop_after_attempt` is the number of attempts create_feedback makes, a positive integer,
-    10 by default as in LangSmith. A `client` that is not a langsmith.Client, a blank `name`,
-    a `project_id` that is not a UUID string, a `stop_after_attempt` that is not a positive
-    integer or an `executor` that is not a concurrent.futures.Executor raises
-    ConfigurationError when the report is built.
+    10 by default as in LangSmith. The comment is the explanation through `redaction`, a
+    Redaction, when one is given. A `client` that is not a langsmith.Client, a blank `name`, a
+    `project_id` that is not a UUID string, a `stop_after_attempt` that is not a positive
+    integer, an `executor` that is not a concurrent.futures.Executor or a `redaction` that is
+    not a Redaction raises ConfigurationError when the report is built.
 
     <https://omamori-lab.github.io/hyoshigi/how-to/reporting-scores-to-langfuse-and-langsmith/>
     """
@@ -141,6 +146,7 @@ class LangSmithFeedback:
             name="stop_after_attempt",
             minimum=1,
         )
+        check_redaction(self.redaction)
         if self.executor is not None:
             check_instance(
                 self.executor,
@@ -166,7 +172,7 @@ class LangSmithFeedback:
             run_id,
             key=self.name,
             score=score.value,
-            comment=score.explanation,
+            comment=Redactor(self.redaction).redact_text(score.explanation),
             feedback_source_type=FeedbackSourceType.MODEL,
             source_info=describe_score(score),
             session_id=self.project_id,
@@ -226,6 +232,7 @@ class AsyncLangSmithFeedback:
             name="stop_after_attempt",
             minimum=1,
         )
+        check_redaction(self.redaction)
         if self.task_group is not None:
             check_instance(
                 self.task_group,
@@ -251,7 +258,7 @@ class AsyncLangSmithFeedback:
             run_id,
             key=self.name,
             score=score.value,
-            comment=score.explanation,
+            comment=Redactor(self.redaction).redact_text(score.explanation),
             feedback_source_type=FeedbackSourceType.MODEL,
             source_info=describe_score(score),
             session_id=self.project_id,

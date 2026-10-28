@@ -25,7 +25,8 @@ order they happened, as its event stream [@wang2025openhands, sec. 2.1].
 A trajectory grows through `act`, `observe`, `delegate`, `attach` and
 `record`, and has no method that removes or replaces an entry. `history`
 returns a tuple, and actions and observations are frozen dataclasses, so an
-entry stays as it was recorded. The history is all of the run's past data, the
+entry stays as it was recorded. A trajectory given a `Redaction` redacts each entry before it is
+appended, so the entry it keeps is the redacted one. The history is all of the run's past data, the
 most that can be known about the past from within it, and it grows with every
 step [@sutton2018reinforcement, sec. 17.3]. A monitor holds configuration only
 and keeps nothing between calls, so the trajectory is all that it knows of the
