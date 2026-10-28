@@ -211,6 +211,29 @@ class _LabelLine:
     is_verdict: bool
 
 
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
+class LabelMatch:
+    """The guard's label, in lower case, and the index in its reply of the label's first
+    character.
+    """
+
+    label: str
+    offset: int
+
+
+def find_label(
+    text: str,
+    *,
+    labels: GuardLabels,
+) -> LabelMatch | Unreadable:
+    """Return the guard's label with the index where it starts in the reply, or Unreadable."""
+    return Unreadable()
+
+
 def read_label(
     text: str,
     *,
