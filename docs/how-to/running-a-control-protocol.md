@@ -69,6 +69,11 @@ def shell(command: str) -> Action:
     )
 
 
+def describe(action: Action) -> str:
+    """The arguments of each of the action's tool calls, or nothing for an action that made none."""
+    return " ".join(call.arguments for call in action.tool_calls)
+
+
 def start(task: str) -> Trajectory:
     """A trajectory that holds the user's task."""
     trajectory = Trajectory()
@@ -184,7 +189,7 @@ decision = decide_step(
 )
 print(
     type(decision).__name__,
-    decision.action.tool_calls[0].arguments,
+    describe(decision.action),
 )
 print([proposal.score.value for proposal in decision.proposals])
 ```
@@ -310,7 +315,7 @@ def carry_out(
         case Run(action=action) | Flag(action=action) | Replace(action=action):
             print(
                 type(decision).__name__,
-                action.tool_calls[0].arguments,
+                describe(action),
             )
             # The program runs each tool call here, and observes its result.
             for call in action.tool_calls:
@@ -335,7 +340,7 @@ def carry_out(
         case Audit(action=action):
             print(
                 "Audit",
-                action.tool_calls[0].arguments,
+                describe(action),
             )
             return carry_out(
                 person(decision),
@@ -584,8 +589,9 @@ detection only: an intrusion detection system alerts without blocking. The progr
 as it runs a `Run`, and queues the `Flag` for a person to audit afterwards. `FLAG` needs
 `max_resamples=0`, equal thresholds and an `on_unavailable` other than `TRUSTED_STEP`, and any other
 settings raise `ConfigurationError` when the protocol is built. Every audited action runs, including
-an attack, an action whose rating failed and an action whose monitor got no answer, and each reaches
-a person only afterwards. `carry_out` above runs a `Flag` and adds it to `review_queue`. The first
+an attack, an action whose rating failed and, under `on_unavailable=AUDIT`, an action whose monitor
+got no answer, and each reaches a person only afterwards. Under `on_unavailable=RUN` that action runs
+as a `Run`, which no person reviews, and under `BLOCK` it is blocked. `carry_out` above runs a `Flag` and adds it to `review_queue`. The first
 proposal here scores below the threshold and runs as a `Run`, the second is flagged, and the third's
 rating gets no answer, so `on_unavailable`, `AUDIT` by default, makes it a `Flag` as well:
 
@@ -623,7 +629,7 @@ print([type(record).__name__ for record in watched.records])
 for flag in review_queue:
     print(
         flag.position,
-        flag.action.tool_calls[0].arguments,
+        describe(flag.action),
     )
 ```
 
@@ -809,11 +815,11 @@ for record in trajectory.records:
             " ",
             proposal.policy.value,
             score,
-            proposal.action.tool_calls[0].arguments,
+            describe(proposal.action),
         )
 print(
     [
-        event.tool_calls[0].arguments
+        describe(event)
         for event in trajectory.history
         if isinstance(
             event,

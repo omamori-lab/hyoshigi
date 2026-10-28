@@ -112,8 +112,10 @@ score falls between them, and trusted monitoring has no T, so `FLAG` refuses
 `BlockAndFeedBack` has no `on_audit`, since a `Flag` at its limit would let the agent through the
 limit.
 
-Under `FLAG`, every audited action runs. That includes an attack, an action whose rating failed and
-an action whose monitor got no answer, and each reaches a person only after it has run.
+Under `FLAG`, every audited action runs. That includes an attack, an action whose rating failed and,
+under `on_unavailable=AUDIT`, the default, an action whose monitor got no answer; each reaches a
+person only after it has run. Under `on_unavailable=RUN` an action whose monitor got no answer runs
+as a `Run`, and no person sees it; under `BLOCK` it is blocked.
 
 ## Block and feed back follows Claude Code's auto mode
 
