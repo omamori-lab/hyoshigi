@@ -40,6 +40,7 @@ from hyoshigi.models.model import (
     check_perceives,
     collect,
 )
+from hyoshigi.models.openai_errors import UNUSABLE_INPUT_CODES, read_status
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import MediaPart, TextPart
 
@@ -55,32 +56,6 @@ DECISION_IMAGES = MediaTypes("image/png", "image/jpeg", "image/webp", "image/gif
 _FAILURES = (
     APIError,
     UnicodeError,
-)
-# Statuses that are no answer rather than a mistake: request timeout, conflict and too many
-# requests.
-_UNAVAILABLE_STATUSES = frozenset({408, 409, 429})
-# The error codes that blame what the prompt holds, which an agent can shape, not the request:
-# an input beyond the context window (https://github.com/openai/openai-openapi, openapi.yaml,
-# schema SessionTurnErrorCodeResource), an invalid prompt and an image that cannot be used (the
-# same file, schema ResponseErrorCode, less image_content_policy_violation, a policy refusal,
-# and image_file_not_found, which no request built here can cause).
-_UNUSABLE_INPUT_CODES = frozenset(
-    {
-        "context_length_exceeded",
-        "invalid_prompt",
-        "invalid_image",
-        "invalid_image_format",
-        "invalid_base64_image",
-        "invalid_image_url",
-        "image_too_large",
-        "image_too_small",
-        "image_parse_error",
-        "invalid_image_mode",
-        "image_file_too_large",
-        "unsupported_image_media_type",
-        "empty_image_file",
-        "failed_to_download_image",
-    },
 )
 
 
@@ -239,34 +214,16 @@ def read_failure(error: Failure) -> Refused | Rejected | Unavailable:
     <https://omamori-lab.github.io/hyoshigi/reference/providers/>
     """
     match error:
-        case APIStatusError(code=str(code)) if responses.names_refusal(code):
-            return Refused()
         case APIStatusError(
             status_code=status,
             code=code,
-        ) if is_rejection(
-            status,
-            code=code,
         ):
-            return Rejected(status=status)
-        case APIStatusError(status_code=status) if (
-            400 <= status < 500 and status not in _UNAVAILABLE_STATUSES
-        ):
-            raise ConfigurationError(f"OpenAI rejected the request with HTTP status {status}")
-        case APIStatusError(status_code=status):
-            return Unavailable(status=status)
+            return read_status(
+                status,
+                code=code,
+                provider="OpenAI",
+            )
     return Unavailable()
-
-
-def is_rejection(
-    status: int,
-    *,
-    code: object,
-) -> bool:
-    """Whether a status and its error code say the prompt cannot be used: a 413, or a code that
-    blames what the prompt holds.
-    """
-    return status == 413 or code in _UNUSABLE_INPUT_CODES
 
 
 def build_model(
@@ -313,7 +270,7 @@ def build_model(
         else:
             return responses.read_reply(
                 load_body(reply.http_response.content),
-                rejections=_UNUSABLE_INPUT_CODES,
+                rejections=UNUSABLE_INPUT_CODES,
             )
         return read_failure(error)
 
@@ -368,7 +325,7 @@ def build_async_model(
         else:
             return responses.read_reply(
                 load_body(reply.http_response.content),
-                rejections=_UNUSABLE_INPUT_CODES,
+                rejections=UNUSABLE_INPUT_CODES,
             )
         return read_failure(error)
 
