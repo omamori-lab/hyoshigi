@@ -4,7 +4,11 @@ Each entry is one element: an observation, or an action's thought, its parts or 
 its tool calls. Text inside an element is HTML-escaped, so a tool result cannot close a
 tag and pose as another entry. Text media is its escaped text, and other media the model
 perceives sits in place among the text; the rest is its description, tagged with who wrote
-it, or a placeholder.
+it, or a placeholder. The view's redaction applies to the history, which the trajectory keeps
+through its own; the trajectory's redaction, then the view's, applies to the rated action and to
+media lifted from a tool call's arguments.
+
+<https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
 """
 
 import html
@@ -18,6 +22,7 @@ from hyoshigi.models.model import MediaTypes, PromptPart
 from hyoshigi.monitors.view import Channel, View
 from hyoshigi.trajectory.history import Action, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.parts import MEDIA_TYPE, Author, MediaPart, OpaquePart, Part, TextPart
+from hyoshigi.trajectory.redaction import Redactor
 from hyoshigi.trajectory.trajectory import Trajectory
 
 # RFC 2045, section 5.1: a parameter is an attribute and a value joined by =, each one or
@@ -45,7 +50,7 @@ class Rendering:
     `hidden_reasoning` names the kinds of the rated thought's opaque parts and the media
     types of its media not shown, or shown only as the agent's own description, and is empty
     when the view does not show the thought. `unperceivable` names the same of the action's
-    parts and tool calls.
+    parts and tool calls. Both are found in the action before any redaction.
     """
 
     trajectory: tuple[PromptPart, ...]
@@ -90,12 +95,17 @@ def render(
     The action's parts and tool calls are shown whatever the view, and its thought when
     the view shows thoughts; `most_recent` limits only the history.
     """
+    redactor = Redactor(
+        trajectory.redaction,
+        view.redaction,
+    )
     history = _select(
         list(
             _render_history(
                 trajectory,
                 view=view,
                 perceives=perceives,
+                redactor=redactor,
             ),
         ),
         view=view,
@@ -104,8 +114,18 @@ def render(
     proposed = [
         entry
         for entry in _render_action(
+            redactor.redact_action(action),
+            perceives=perceives,
+            redactor=redactor,
+        )
+        if entry.channel in shown
+    ]
+    unredacted = [
+        entry
+        for entry in _render_action(
             action,
             perceives=perceives,
+            redactor=Redactor(),
         )
         if entry.channel in shown
     ]
@@ -113,11 +133,11 @@ def render(
         trajectory=_join(history),
         proposed_action=_join(proposed),
         hidden_reasoning=_collect_unseen(
-            proposed,
+            unredacted,
             channels=Channel.THOUGHTS,
         ),
         unperceivable=_collect_unseen(
-            proposed,
+            unredacted,
             channels=Channel.AGENT_PARTS | Channel.TOOL_CALLS,
         ),
     )
@@ -190,10 +210,17 @@ def _render_history(
     *,
     view: View,
     perceives: MediaTypes,
+    redactor: Redactor,
 ) -> Iterator[_Entry]:
-    """Yield the entries of the trajectory's history in order; its subagents' are not."""
+    """Yield the entries of the trajectory's history, through the view's redaction, in order;
+    its subagents' are not. `redactor` redacts the media lifted from tool calls.
+    """
     delegations = set(trajectory.subagents)
-    for event in trajectory.history:
+    view_redactor = Redactor(view.redaction)
+    for event in map(
+        view_redactor.redact_event,
+        trajectory.history,
+    ):
         match event:
             case Action():
                 delegations.update(
@@ -202,6 +229,7 @@ def _render_history(
                 yield from _render_action(
                     event,
                     perceives=perceives,
+                    redactor=redactor,
                 )
             case Observation():
                 yield _render_observation(
@@ -218,8 +246,12 @@ def _render_action(
     action: Action,
     *,
     perceives: MediaTypes,
+    redactor: Redactor,
 ) -> Iterator[_Entry]:
-    """Yield an action's thought, its parts, then each tool call; nothing for what is empty."""
+    """Yield an action's thought, its parts, then each tool call; nothing for what is empty.
+
+    `redactor` redacts the media lifted from the tool calls' arguments.
+    """
     if action.thought:
         yield _render_entry(
             action.thought,
@@ -240,6 +272,7 @@ def _render_action(
             content=_render_tool_call(
                 call,
                 perceives=perceives,
+                redactor=redactor,
             ),
         )
 
@@ -469,10 +502,12 @@ def _render_tool_call(
     call: ToolCall,
     *,
     perceives: MediaTypes,
+    redactor: Redactor,
 ) -> _Content:
     """Render a tool call, each data URL string in its arguments lifted out after them.
 
-    The n-th lifted string is replaced by "[media n]", and its media carries ref="n".
+    The n-th lifted string is replaced by "[media n]", and its media, through `redactor`,
+    carries ref="n".
     """
     lifted: list[MediaPart] = []
 
@@ -500,8 +535,8 @@ def _render_tool_call(
         ),
     )
     media = [
-        _render_media(
-            part,
+        _render_lifted(
+            redactor.redact_part(part),
             perceives=perceives,
             ref=str(number),
         )
@@ -520,6 +555,35 @@ def _render_tool_call(
         ),
         id=call.id,
         name=call.name,
+    )
+
+
+def _render_lifted(
+    part: Part,
+    *,
+    perceives: MediaTypes,
+    ref: str,
+) -> _Content:
+    """Render media lifted from a tool call's arguments, or the part a redaction put in its
+    place, in an element that carries its ref.
+    """
+    if isinstance(
+        part,
+        MediaPart,
+    ):
+        return _render_media(
+            part,
+            perceives=perceives,
+            ref=ref,
+        )
+    return _wrap(
+        "media",
+        content=_render_part(
+            part,
+            channel=Channel.TOOL_CALLS,
+            perceives=perceives,
+        ),
+        ref=ref,
     )
 
 

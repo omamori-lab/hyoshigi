@@ -433,7 +433,6 @@ def masking() -> Trajectory:
     return trajectory
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("functions", "message"),
     [
@@ -467,16 +466,15 @@ def test_a_redaction_refuses_a_function_that_is_not_callable_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("redaction", "message"),
     [
         (
             Redaction(
-                text=lambda text: None,  # ty: ignore[invalid-argument-type]
+                text=str.encode,  # ty: ignore[invalid-argument-type]
                 media=lambda part: part,
             ),
-            "text must return a str, got None",
+            "text must return a str, got an instance of bytes",
         ),
         (
             Redaction(
@@ -500,7 +498,6 @@ def test_a_redaction_whose_function_returns_the_wrong_type_raises_naming_it(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "redact",
     [
@@ -524,14 +521,12 @@ def test_a_redaction_that_is_not_a_redaction_is_refused_naming_it(
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_an_action_is_kept_redacted_with_its_ids_and_tool_names(masking: Trajectory) -> None:
     masking.act(DIALLING)
 
     assert masking.history[-1] == MASKED_DIALLING
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("observation", "kept"),
     [
@@ -572,7 +567,6 @@ def test_an_observation_is_kept_redacted_with_its_author_and_call(
     assert masking.history[-1] == kept
 
 
-@pytest.mark.xfail(strict=True)
 def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> None:
     trajectory = Trajectory(redaction=TO_TEXT)
 
@@ -597,7 +591,6 @@ def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> 
         pytest.param(
             CALM,
             MASKED_CALM,
-            marks=pytest.mark.xfail(strict=True),
             id="rationale",
         ),
         pytest.param(
@@ -617,7 +610,6 @@ def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> 
                     cause=Truncated(text="<reasoning>It dials ###-####"),
                 ),
             ),
-            marks=pytest.mark.xfail(strict=True),
             id="truncated",
         ),
         pytest.param(
@@ -637,10 +629,8 @@ def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> 
                     cause=Refused(explanation="Rating ###-#### is not allowed."),
                 ),
             ),
-            marks=pytest.mark.xfail(strict=True),
             id="refused",
         ),
-        # Passes before redaction exists: the score holds no text a redaction changes.
         pytest.param(
             SuspicionScore(
                 value=1.0,
@@ -671,7 +661,6 @@ def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> 
                 explanation="It looks up ###-####.",
                 evidence=Composite(parts=(MASKED_CALM,)),
             ),
-            marks=pytest.mark.xfail(strict=True),
             id="composite",
         ),
     ],
@@ -696,7 +685,6 @@ def test_an_attached_score_is_kept_redacted(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("decision", "history", "ratings", "record"),
     [
@@ -833,8 +821,6 @@ def test_a_recorded_decision_is_kept_redacted(
     )
 
 
-# Passes before redaction exists, as nothing is then redacted; a record redacted apart from its
-# history entry fails it.
 def test_a_decision_recorded_under_a_redaction_that_differs_on_each_call_loads_back() -> None:
     trajectory = Trajectory(redaction=build_pseudonyms())
     trajectory.observe(TASK)
@@ -852,7 +838,6 @@ def test_a_decision_recorded_under_a_redaction_that_differs_on_each_call_loads_b
     assert loaded.dump() == stored
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_subagent_keeps_its_entries_redacted_as_its_delegator_does(masking: Trajectory) -> None:
     masking.act(ASKING)
 
@@ -869,7 +854,6 @@ def test_a_subagent_keeps_its_entries_redacted_as_its_delegator_does(masking: Tr
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "select",
     [
@@ -895,7 +879,6 @@ def test_a_split_copy_keeps_its_entries_redacted(
     assert copy.history[-1] == MASKED_TASK
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "build",
     [
@@ -943,7 +926,6 @@ def test_a_trajectory_built_with_a_redaction_keeps_its_entries_redacted(
     assert trajectory.history == (MASKED_TASK,)
 
 
-# Passes before redaction exists, as nothing is then redacted; an answer redacted fails it.
 def test_a_black_box_runs_answer_is_returned_as_written() -> None:
     run = Trajectory.from_run(
         "Call Ana on 555-0100.",
@@ -954,7 +936,6 @@ def test_a_black_box_runs_answer_is_returned_as_written() -> None:
     assert run.answer.parts == (TextPart(text="Called 555-0100."),)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_dump_with_a_redaction_writes_the_content_redacted() -> None:
     trajectory = build_stored_trajectory()
 
@@ -963,8 +944,6 @@ def test_a_dump_with_a_redaction_writes_the_content_redacted() -> None:
     assert stored == MASKED_STORED
 
 
-# Passes before redaction exists, as nothing is then redacted; a dump that redacts the
-# trajectory in place fails it.
 def test_a_dump_with_a_redaction_leaves_the_trajectory_unchanged() -> None:
     trajectory = build_stored_trajectory()
 
@@ -973,8 +952,6 @@ def test_a_dump_with_a_redaction_leaves_the_trajectory_unchanged() -> None:
     assert trajectory.dump() == STORED
 
 
-# Passes before redaction exists, as nothing is then redacted; a dump that redacts a record's
-# action apart from its history entry fails it.
 def test_a_dump_with_a_redaction_that_differs_on_each_call_loads_back() -> None:
     stored = build_stored_trajectory().dump(redaction=build_pseudonyms())
 
@@ -991,7 +968,6 @@ def test_a_dump_under_changing_pseudonyms_writes_a_rating_and_its_proposal_one_s
     assert loaded.ratings[0].score == loaded.records[0].proposals[0].score
 
 
-@pytest.mark.xfail(strict=True)
 def test_loading_with_a_redaction_keeps_what_it_loads_redacted() -> None:
     loaded = Trajectory.load(
         STORED,
@@ -1001,7 +977,6 @@ def test_loading_with_a_redaction_keeps_what_it_loads_redacted() -> None:
     assert loaded.dump() == MASKED_STORED
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "select",
     [
@@ -1025,8 +1000,6 @@ def test_a_trajectory_loaded_with_a_redaction_keeps_later_entries_redacted(
     assert loaded.history[-1] == MASKED_TASK
 
 
-# Passes before redaction exists, as nothing is then redacted; a load that redacts a record's
-# action apart from its history entry fails it.
 def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> None:
     loaded = Trajectory.load(
         STORED,

@@ -366,6 +366,68 @@ print(f"{sent['value']} {sent['metadata']}")
 1.0 {'failed_closed': True, 'cause': 'Unavailable', 'model': 'trusted-1'}
 ```
 
+## A redaction masks the comment
+
+A report given a `redaction` sends the explanation through the redaction's text function as the
+comment. The score the monitor returns, its span and the metadata stay as they are, and a
+redaction that raises is logged as a failed report. [Redacting what leaves the
+process](redacting-what-leaves-the-process.md) covers each point where a trajectory's content
+leaves:
+
+```python
+import re
+
+from hyoshigi import MediaPart, Redaction, TextPart
+
+
+def mask_phone_numbers(text: str) -> str:
+    """Put a mask of the same shape in place of each phone number."""
+    return re.sub(
+        r"[0-9]{3}-[0-9]{4}",
+        "###-####",
+        text,
+    )
+
+
+def replace_media(part: MediaPart) -> TextPart:
+    """Put a placeholder in place of the media."""
+    return TextPart(text="[media removed]")
+
+
+langfuse_received.clear()
+masked = ReportedMonitor(
+    monitor=LLMMonitor(
+        model=script(
+            Generation(
+                text="<reasoning>The booking texts its receipt to 555-0100.</reasoning>\n"
+                "<score>3</score>",
+            ),
+        ),
+    ),
+    reports=(
+        LangfuseScores(
+            client=langfuse,
+            redaction=Redaction(
+                text=mask_phone_numbers,
+                media=replace_media,
+            ),
+        ),
+    ),
+)
+score = masked.rate(
+    answer,
+    trajectory=trajectory,
+)
+langfuse.flush()
+print(score.explanation)
+print(langfuse_received[0]["comment"])
+```
+
+```text
+The booking texts its receipt to 555-0100.
+The booking texts its receipt to ###-####.
+```
+
 ## Langfuse queues the score and the LangSmith report waits
 
 `LangfuseScores` hands the score to Langfuse's client, which queues it and sends it in the

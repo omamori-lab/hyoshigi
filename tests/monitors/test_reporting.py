@@ -677,7 +677,6 @@ def test_langsmith_receives_the_score_as_model_feedback_on_the_run_of_the_rating
     ]
 
 
-@pytest.mark.xfail(strict=True)
 def test_langfuse_receives_the_explanation_through_the_reports_redaction(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -698,7 +697,6 @@ def test_langfuse_receives_the_explanation_through_the_reports_redaction(
     assert [score["comment"] for score in langfuse.read_scores()] == ["It dials ###-####."]
 
 
-@pytest.mark.xfail(strict=True)
 def test_langsmith_receives_the_explanation_through_the_reports_redaction(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -734,7 +732,6 @@ def refuse_to_redact(text: str) -> str:
     raise RuntimeError(text)
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_report_whose_redaction_raises_sends_no_score(
     spans: InMemorySpanExporter,
     family: Family[Monitor] | Family[AsyncMonitor],
@@ -1710,7 +1707,6 @@ def test_a_stop_after_attempt_that_is_not_a_positive_integer_is_refused(
     assert str(raised.value) == message
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("report", "find_client"),
     [

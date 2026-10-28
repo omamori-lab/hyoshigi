@@ -32,6 +32,29 @@ minor version.
   the label's kind fails the rating closed as `Unreadable`. `samples` is
   checked and not used on this path, and `HardLabelWarning` is raised only when
   the monitor samples. A model that declares 0 is sampled as before.
+- `Redaction`, a text function and a media function, redacts a
+  trajectory's content where it leaves the process: text parts, thoughts,
+  tool-call arguments, observations and their sources, media and their
+  descriptions, a score's explanation and the reply text in its cause, the
+  proposals in records, and a block's or a halt's reason. Ids, tool names,
+  authors, values and positions stay as they are. Each point where content
+  leaves takes it as its own option, off unless set.
+- `Trajectory(redaction=...)`, and the same option on `from_run`,
+  `from_anthropic`, `from_openai_chat`, `from_open_responses` and `load`,
+  keeps each entry, rating and record redacted before it is appended. Split
+  copies and subagents keep the redaction, a record's action stays its
+  history entry, and a monitor reads an action rated against the trajectory
+  through the same redaction.
+- `View(redaction=...)` redacts the history and the rated action a monitor's
+  model reads, after the trajectory's own, and media lifted from a tool
+  call's arguments passes through both media functions. Media the model
+  cannot perceive still fails the rating closed.
+- `Trajectory.dump(redaction=...)` writes the trajectory, its ratings,
+  records and subagents redacted, and leaves the trajectory unchanged.
+  `load(data, redaction=...)` redacts what it reads. The stored format is
+  unchanged.
+- `LangfuseScores`, `LangSmithFeedback` and `AsyncLangSmithFeedback` take
+  `redaction`, and send the explanation through it as the comment.
 
 ## [0.4.0] - 2026-10-28
 
