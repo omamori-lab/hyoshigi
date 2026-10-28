@@ -34,6 +34,7 @@ from hyoshigi import (
     Replace,
     Run,
     Step,
+    StoredContent,
     SuspicionScore,
     TextPart,
     ToolCall,
@@ -988,6 +989,14 @@ def test_loading_with_a_redaction_keeps_what_it_loads_redacted() -> None:
 
 
 @pytest.mark.parametrize(
+    "content",
+    [
+        StoredContent.RAW,
+        StoredContent.REDACTED,
+    ],
+    ids=["raw", "redacted"],
+)
+@pytest.mark.parametrize(
     "select",
     [
         lambda loaded: loaded,
@@ -997,17 +1006,32 @@ def test_loading_with_a_redaction_keeps_what_it_loads_redacted() -> None:
 )
 def test_a_trajectory_loaded_with_a_redaction_keeps_later_entries_redacted(
     select: Callable[[Trajectory], Trajectory],
+    content: StoredContent,
 ) -> None:
     loaded = select(
         Trajectory.load(
             STORED,
             redaction=MASKED,
+            content=content,
         ),
     )
 
     loaded.observe(TASK)
 
     assert loaded.history[-1] == MASKED_TASK
+
+
+@pytest.mark.xfail(strict=True)
+def test_loading_content_stored_redacted_keeps_it_as_stored() -> None:
+    loaded = Trajectory.load(
+        MASKED_STORED,
+        redaction=build_pseudonyms(),
+        content=StoredContent.REDACTED,
+    )
+
+    stored = loaded.dump()
+
+    assert stored == MASKED_STORED
 
 
 def test_loading_under_changing_pseudonyms_keeps_each_record_on_its_entry() -> None:
@@ -1214,4 +1238,47 @@ def test_loading_with_what_is_not_a_redaction_raises_before_reading_the_data() -
     ) == (
         ConfigurationError,
         "redaction must be a Redaction, got an instance of functools.partial",
+    )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        pytest.param(
+            {
+                "redaction": MASKED,
+                "content": "redacted",
+            },
+            "content must be a StoredContent, got an instance of str",
+            id="a-string",
+        ),
+        pytest.param(
+            {"content": StoredContent.REDACTED},
+            "content=StoredContent.REDACTED takes the redaction for the entries added later",
+            id="redacted-without-a-redaction",
+        ),
+    ],
+)
+def test_loading_with_a_content_that_cannot_work_raises_before_reading_the_data(
+    options: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(
+        (
+            ConfigurationError,
+            FormatError,
+        ),
+    ) as raised:
+        Trajectory.load(
+            {},
+            **options,  # ty: ignore[invalid-argument-type]
+        )
+
+    assert (
+        type(raised.value),
+        str(raised.value),
+    ) == (
+        ConfigurationError,
+        message,
     )

@@ -28,7 +28,7 @@ from hyoshigi.trajectory.formats.authorship import Authorship, by_role
 from hyoshigi.trajectory.history import Action, Event, Observation, build_feedback
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
-from hyoshigi.trajectory.redaction import Redaction, Redactor, check_redaction
+from hyoshigi.trajectory.redaction import Redaction, Redactor, StoredContent, check_redaction
 from hyoshigi.trajectory.storage.events import dump_event
 from hyoshigi.trajectory.storage.records import dump_record
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score
@@ -612,6 +612,7 @@ class Trajectory:
         data: JSON,
         *,
         redaction: Redaction | None = None,
+        content: StoredContent = StoredContent.RAW,
     ) -> Self:
         """Rebuild a trajectory from what dump returned.
 
