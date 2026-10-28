@@ -15,7 +15,9 @@ from hyoshigi import (
     Action,
     AsyncGenerativeModel,
     AsyncLLMMonitor,
+    Author,
     Channel,
+    Description,
     FailedClosed,
     Generation,
     GenerationOutcome,
@@ -70,6 +72,22 @@ TO_TEXT = Redaction(
 PLACEHOLDER = Redaction(
     text=str,
     media=lambda part: TextPart(text="a card for 555-0100"),
+)
+# Each phone number masked; media given a description written by the scaffold, which holds a
+# phone number.
+DESCRIBED = Redaction(
+    text=partial(
+        re.sub,
+        "[0-9]{3}-[0-9]{4}",
+        "###-####",
+    ),
+    media=partial(
+        replace,
+        description=Description(
+            text="A card for 555-0100",
+            author=Author.SCAFFOLD,
+        ),
+    ),
 )
 # The eight bytes every PNG file starts with (RFC 2083, section 3.1), in base64 iVBORw0KGgo=.
 PNG = MediaPart(
@@ -427,5 +445,29 @@ def test_the_hidden_reasoning_names_media_in_the_thought_a_redaction_turned_into
         evidence=Rationale(
             model=MODEL_NAME,
             hidden_reasoning=("image/png",),
+        ),
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_media_lifted_from_the_history_keeps_its_ref_when_a_redaction_describes_it(
+    rate: Rate,
+) -> None:
+    script = Script(perceives=TEXT_ONLY)
+
+    rate(
+        script,
+        action=DIALLING,
+        trajectory=build_upload(DESCRIBED),
+        view=View(),
+    )
+
+    assert script.received[0].content == (
+        TextPart(
+            text="<user>Call Ana on ###-####.</user>\n"
+            '<tool_call id="call_1" name="upload">{"image": "[media 1]"}'
+            '<media type="image/png" description_author="scaffold" ref="1">A card for ###-####'
+            "</media></tool_call>|<agent>Dialling ###-####.</agent>\n"
+            '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>',
         ),
     )
