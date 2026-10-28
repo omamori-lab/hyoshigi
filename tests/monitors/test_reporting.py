@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from inspect import signature
@@ -22,6 +23,7 @@ import httpx
 import pytest
 from langfuse import Langfuse
 from langsmith import AsyncClient, Client
+from langsmith.utils import LangSmithAuthError
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -54,6 +56,7 @@ from hyoshigi import (
     Refused,
     RepeatedMonitor,
     ReportedMonitor,
+    ReviewFlag,
     SuspicionScore,
     TextPart,
     Trajectory,
@@ -125,6 +128,13 @@ MASKED = Redaction(
     ),
 )
 DIALLING_REPLY = Generation(text="<reasoning>It dials 555-0100.</reasoning><score>3</score>")
+# A review flag whose threshold the score of FLAGGED_SCORE reaches exactly.
+FLAGGING = ReviewFlag(threshold=0.6)
+FLAGGED_SCORE = SuspicionScore(
+    value=0.6,
+    explanation="calm",
+    evidence=Rationale(model=MODEL_NAME),
+)
 
 
 class Script:
@@ -369,6 +379,75 @@ def rate(monitor: Monitor | AsyncMonitor) -> SuspicionScore:
             assert_never(unreachable)
 
 
+def send_score(
+    report: LangfuseScores | LangSmithFeedback | AsyncLangSmithFeedback,
+    score: SuspicionScore,
+) -> None:
+    """Send the score for the step TRACE_HEX, SPAN_HEX and RUN_ID name, awaiting an async report
+    on a new loop.
+    """
+    match report:
+        case LangfuseScores():
+            report.send(
+                score,
+                trace_id=TRACE_HEX,
+                observation_id=SPAN_HEX,
+            )
+        case LangSmithFeedback():
+            report.send(
+                score,
+                run_id=RUN_ID,
+            )
+        case AsyncLangSmithFeedback():
+            asyncio.run(
+                report.send(
+                    score,
+                    run_id=RUN_ID,
+                ),
+            )
+        case unreachable:
+            assert_never(unreachable)
+
+
+def flag_step(report: LangfuseScores | LangSmithFeedback | AsyncLangSmithFeedback) -> None:
+    """Flag the step TRACE_HEX, SPAN_HEX and RUN_ID name, awaiting an async report on a new loop."""
+    match report:
+        case LangfuseScores():
+            report.flag(
+                trace_id=TRACE_HEX,
+                observation_id=SPAN_HEX,
+            )
+        case LangSmithFeedback():
+            report.flag(run_id=RUN_ID)
+        case AsyncLangSmithFeedback():
+            asyncio.run(report.flag(run_id=RUN_ID))
+        case unreachable:
+            assert_never(unreachable)
+
+
+def build_score(value: float) -> SuspicionScore:
+    return SuspicionScore(
+        value=value,
+        explanation="calm",
+        evidence=Rationale(model=MODEL_NAME),
+    )
+
+
+def read_feedback_field(
+    langsmith: LangSmithServer,
+    field: str,
+) -> list[JSON]:
+    """The field of each feedback body LangSmith received, in the order received."""
+    return [
+        body[field]
+        for _, body in langsmith.received
+        if isinstance(
+            body,
+            dict,
+        )
+    ]
+
+
 @dataclass(
     frozen=True,
     slots=True,
@@ -399,6 +478,8 @@ class Family[Rater]:
     feedback: Callable[[str], LangSmithFeedback | AsyncLangSmithFeedback]
     rate_with_a_worker: Callable[[LangSmithServer], WorkerRating]
     rate_and_cancel_the_send: Callable[[LangSmithServer], None]
+    send_flagged_with_a_worker: Callable[[LangSmithServer], list[int]]
+    flag_with_a_worker: Callable[[LangSmithServer], None]
 
 
 def build_synchronous_llm(
@@ -507,6 +588,74 @@ def rate_and_cancel_on_an_executor(langsmith: LangSmithServer) -> None:
         busy.set()
 
 
+def send_flagged_on_an_executor(langsmith: LangSmithServer) -> list[int]:
+    """Send a score that reaches the review flag's threshold with the report posting on an
+    executor, release LangSmith's answers once send returns, then shut the executor down. Return
+    the statuses LangSmith had answered when send returned.
+    """
+    with ThreadPoolExecutor() as executor:
+        report = replace(
+            build_feedback(langsmith.url),
+            executor=executor,
+            review_flag=FLAGGING,
+        )
+        report.send(
+            FLAGGED_SCORE,
+            run_id=RUN_ID,
+        )
+        answered = list(langsmith.answered)
+        langsmith.release.set()
+    return answered
+
+
+def send_flagged_in_a_task_group(langsmith: LangSmithServer) -> list[int]:
+    """Send a score that reaches the review flag's threshold with the report posting in a task
+    group, release LangSmith's answers once send returns, then leave the group. Return the
+    statuses LangSmith had answered when send returned.
+    """
+
+    async def send_in_the_group() -> list[int]:
+        async with asyncio.TaskGroup() as group:
+            report = replace(
+                build_async_feedback(langsmith.url),
+                task_group=group,
+                review_flag=FLAGGING,
+            )
+            await report.send(
+                FLAGGED_SCORE,
+                run_id=RUN_ID,
+            )
+            answered = list(langsmith.answered)
+            langsmith.release.set()
+        return answered
+
+    return asyncio.run(send_in_the_group())
+
+
+def flag_on_an_executor(langsmith: LangSmithServer) -> None:
+    """Flag a step with the report posting on an executor, then shut the executor down."""
+    with ThreadPoolExecutor() as executor:
+        replace(
+            build_feedback(langsmith.url),
+            executor=executor,
+            review_flag=FLAGGING,
+        ).flag(run_id=RUN_ID)
+
+
+def flag_in_a_task_group(langsmith: LangSmithServer) -> None:
+    """Flag a step with the report posting in a task group, then leave the group."""
+
+    async def flag_in_the_group() -> None:
+        async with asyncio.TaskGroup() as group:
+            await replace(
+                build_async_feedback(langsmith.url),
+                task_group=group,
+                review_flag=FLAGGING,
+            ).flag(run_id=RUN_ID)
+
+    asyncio.run(flag_in_the_group())
+
+
 class CallerError(Exception):
     """An error in the caller's own code inside its task group, which cancels the group's tasks."""
 
@@ -546,6 +695,8 @@ SYNCHRONOUS = Family(
     feedback=build_feedback,
     rate_with_a_worker=rate_on_an_executor,
     rate_and_cancel_the_send=rate_and_cancel_on_an_executor,
+    send_flagged_with_a_worker=send_flagged_on_an_executor,
+    flag_with_a_worker=flag_on_an_executor,
 )
 ASYNCHRONOUS = Family(
     llm=build_asynchronous_llm,
@@ -556,6 +707,8 @@ ASYNCHRONOUS = Family(
     feedback=build_async_feedback,
     rate_with_a_worker=rate_in_a_task_group,
     rate_and_cancel_the_send=rate_and_cancel_in_a_task_group,
+    send_flagged_with_a_worker=send_flagged_in_a_task_group,
+    flag_with_a_worker=flag_in_a_task_group,
 )
 
 
@@ -1786,3 +1939,496 @@ def test_a_redaction_that_is_not_a_redaction_is_refused(
     assert (
         str(raised.value) == "redaction must be a Redaction, got an instance of functools.partial"
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        (
+            "",
+            "name must be a non-blank string, got ''",
+        ),
+        (
+            " ",
+            "name must be a non-blank string, got ' '",
+        ),
+        (
+            None,
+            "name must be a non-blank string, got None",
+        ),
+    ],
+    ids=["empty", "blank", "none"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_review_flag_name_that_is_not_a_non_blank_string_is_refused(
+    name: object,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        ReviewFlag(name=name)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.parametrize(
+    ("threshold", "message"),
+    [
+        (
+            True,
+            "threshold must be a number between 0 and 1, got True",
+        ),
+        (
+            "0.6",
+            "threshold must be a number between 0 and 1, got '0.6'",
+        ),
+        (
+            float("nan"),
+            "threshold must be between 0 and 1, got nan",
+        ),
+        (
+            1.5,
+            "threshold must be between 0 and 1, got 1.5",
+        ),
+        (
+            -0.1,
+            "threshold must be between 0 and 1, got -0.1",
+        ),
+    ],
+    ids=["bool", "string", "nan", "above-one", "below-zero"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_review_flag_threshold_that_is_not_a_number_from_0_to_1_is_refused(
+    threshold: object,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        ReviewFlag(threshold=threshold)  # ty: ignore[invalid-argument-type]
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_review_flag_threshold_is_kept_as_a_float() -> None:
+    review_flag = ReviewFlag(threshold=Fraction(3, 5))  # ty: ignore[invalid-argument-type]
+
+    assert review_flag.threshold == 0.6
+
+
+@pytest.mark.parametrize(
+    ("report", "find_client"),
+    [
+        (
+            LangfuseScores,
+            lambda langfuse: langfuse.client,
+        ),
+        (
+            partial(
+                LangSmithFeedback,
+                project_id=PROJECT_ID,
+            ),
+            lambda langfuse: build_client(),
+        ),
+        (
+            partial(
+                AsyncLangSmithFeedback,
+                project_id=PROJECT_ID,
+            ),
+            lambda langfuse: build_async_client(),
+        ),
+    ],
+    ids=["langfuse", "langsmith", "async-langsmith"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_review_flag_that_is_not_a_review_flag_is_refused(
+    langfuse: LangfuseStandIn,
+    report: Callable[..., object],
+    find_client: Callable[[LangfuseStandIn], object],
+) -> None:
+    client = find_client(langfuse)
+
+    with pytest.raises(ConfigurationError) as raised:
+        report(
+            client=client,
+            review_flag="flagged",
+        )
+
+    assert str(raised.value) == "review_flag must be a ReviewFlag, got an instance of str"
+
+
+@pytest.mark.parametrize(
+    "build_report",
+    [
+        lambda langfuse, langsmith: LangfuseScores(client=langfuse.client),
+        lambda langfuse, langsmith: build_feedback(langsmith.url),
+        lambda langfuse, langsmith: build_async_feedback(langsmith.url),
+    ],
+    ids=["langfuse", "langsmith", "async-langsmith"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_report_without_a_review_flag_refuses_to_flag_and_sends_nothing(
+    langfuse: LangfuseStandIn,
+    langsmith: LangSmithServer,
+    build_report: Callable[..., LangfuseScores | LangSmithFeedback | AsyncLangSmithFeedback],
+) -> None:
+    report = build_report(
+        langfuse,
+        langsmith,
+    )
+
+    with pytest.raises(ConfigurationError) as raised:
+        flag_step(report)
+
+    assert str(raised.value) == (
+        "flag needs a ReviewFlag: build the report with review_flag=ReviewFlag(...)"
+    )
+    assert langfuse.read_scores() == []
+    assert langsmith.received == []
+
+
+# A score, the review flag of the report that sends it, and the names of what the report sends,
+# the flag before the score.
+SEND_CASES = [
+    pytest.param(
+        0.6,
+        ReviewFlag(threshold=0.6),
+        [
+            "flagged",
+            "suspicion",
+        ],
+        marks=pytest.mark.xfail(strict=True),
+        id="at-the-threshold",
+    ),
+    pytest.param(
+        0.9,
+        ReviewFlag(threshold=0.6),
+        [
+            "flagged",
+            "suspicion",
+        ],
+        marks=pytest.mark.xfail(strict=True),
+        id="above-the-threshold",
+    ),
+    pytest.param(
+        0.5,
+        ReviewFlag(threshold=0.6),
+        ["suspicion"],
+        id="below-the-threshold",
+    ),
+    pytest.param(
+        0.9,
+        ReviewFlag(),
+        ["suspicion"],
+        id="no-threshold",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("value", "review_flag", "names"),
+    SEND_CASES,
+)
+def test_langfuse_receives_a_flag_before_the_score_when_the_score_reaches_the_threshold(
+    langfuse: LangfuseStandIn,
+    value: float,
+    review_flag: ReviewFlag,
+    names: list[str],
+) -> None:
+    report = LangfuseScores(
+        client=langfuse.client,
+        review_flag=review_flag,
+    )
+
+    send_score(
+        report,
+        build_score(value),
+    )
+
+    assert [score["name"] for score in langfuse.read_scores()] == names
+
+
+@pytest.mark.parametrize(
+    ("value", "review_flag", "names"),
+    SEND_CASES,
+)
+def test_langsmith_receives_a_flag_before_the_score_when_the_score_reaches_the_threshold(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    value: float,
+    review_flag: ReviewFlag,
+    names: list[str],
+) -> None:
+    report = replace(
+        family.feedback(langsmith.url),
+        review_flag=review_flag,
+    )
+
+    send_score(
+        report,
+        build_score(value),
+    )
+
+    assert (
+        read_feedback_field(
+            langsmith,
+            "key",
+        )
+        == names
+    )
+
+
+@pytest.mark.xfail(strict=True)
+def test_langfuse_receives_the_flag_on_the_trace_and_observation_of_the_ratings_span(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langfuse: LangfuseStandIn,
+) -> None:
+    monitor = family.reported(
+        monitor=build_calm_llm(family),
+        reports=(
+            LangfuseScores(
+                client=langfuse.client,
+                review_flag=ReviewFlag(threshold=0.3),
+            ),
+        ),
+    )
+
+    rate(monitor)
+
+    assert {
+        score["name"]: (
+            score["traceId"],
+            score["observationId"],
+        )
+        for score in langfuse.read_scores()
+    } == {
+        "flagged": (
+            TRACE_HEX,
+            SPAN_HEX,
+        ),
+        "suspicion": (
+            TRACE_HEX,
+            SPAN_HEX,
+        ),
+    }
+
+
+@pytest.mark.xfail(strict=True)
+def test_langsmith_receives_the_flag_on_the_run_of_the_ratings_span(
+    spans: InMemorySpanExporter,
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    monitor = family.reported(
+        monitor=build_calm_llm(family),
+        reports=(
+            replace(
+                family.feedback(langsmith.url),
+                review_flag=ReviewFlag(threshold=0.3),
+            ),
+        ),
+    )
+
+    rate(monitor)
+
+    assert read_feedback_field(
+        langsmith,
+        "key",
+    ) == [
+        "flagged",
+        "suspicion",
+    ]
+    assert read_feedback_field(
+        langsmith,
+        "run_id",
+    ) == [
+        RUN_ID,
+        RUN_ID,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("review_flag", "name"),
+    [
+        (
+            ReviewFlag(),
+            "flagged",
+        ),
+        (
+            ReviewFlag(name="needs-review"),
+            "needs-review",
+        ),
+    ],
+    ids=["default-name", "named"],
+)
+@pytest.mark.xfail(strict=True)
+def test_langfuse_receives_a_flag_as_a_boolean_score_with_no_comment(
+    langfuse: LangfuseStandIn,
+    review_flag: ReviewFlag,
+    name: str,
+) -> None:
+    report = LangfuseScores(
+        client=langfuse.client,
+        review_flag=review_flag,
+    )
+
+    flag_step(report)
+
+    # The body of POST /api/public/scores (langfuse.api.scores, CreateScoresRequest), as the
+    # score of a rating is, without a comment or metadata. The client turns the value 1 into 1.0
+    # (Langfuse.create_score).
+    assert langfuse.read_scores() == [
+        {
+            "id": ANY,
+            "traceId": TRACE_HEX,
+            "observationId": SPAN_HEX,
+            "name": name,
+            "value": 1.0,
+            "dataType": "BOOLEAN",
+            "timestamp": ANY,
+        },
+    ]
+
+
+@pytest.mark.parametrize(
+    ("review_flag", "name"),
+    [
+        (
+            ReviewFlag(),
+            "flagged",
+        ),
+        (
+            ReviewFlag(name="needs-review"),
+            "needs-review",
+        ),
+    ],
+    ids=["default-name", "named"],
+)
+@pytest.mark.xfail(strict=True)
+def test_langsmith_receives_a_flag_as_boolean_model_feedback_with_no_comment(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    review_flag: ReviewFlag,
+    name: str,
+) -> None:
+    report = replace(
+        family.feedback(langsmith.url),
+        review_flag=review_flag,
+    )
+
+    flag_step(report)
+
+    assert langsmith.received == [
+        (
+            "/feedback",
+            {
+                "id": ANY,
+                "created_at": ANY,
+                "modified_at": ANY,
+                "run_id": RUN_ID,
+                "key": name,
+                "score": True,
+                "feedback_source": {
+                    "type": "model",
+                    "metadata": {},
+                },
+                "session_id": PROJECT_ID,
+                "extend_trace_retention": False,
+            },
+        ),
+    ]
+    # True equals 1, so the comparison above does not tell a boolean from a number.
+    assert (
+        read_feedback_field(
+            langsmith,
+            "score",
+        )[0]
+        is True
+    )
+
+
+def test_a_flagged_score_is_sent_with_a_worker_before_langsmith_answers(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    langsmith.release.clear()
+
+    answered = family.send_flagged_with_a_worker(langsmith)
+
+    assert answered == []
+
+
+@pytest.mark.xfail(strict=True)
+def test_langsmith_receives_the_flag_and_the_score_a_worker_sends_once_the_worker_finishes(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    family.send_flagged_with_a_worker(langsmith)
+
+    # Sorted: the worker may run the two posts in either order.
+    assert sorted(
+        read_feedback_field(
+            langsmith,
+            "key",
+        ),
+        key=str,
+    ) == [
+        "flagged",
+        "suspicion",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("family", "report"),
+    [
+        (
+            SYNCHRONOUS,
+            "LangSmithFeedback",
+        ),
+        (
+            ASYNCHRONOUS,
+            "AsyncLangSmithFeedback",
+        ),
+    ],
+    ids=["sync", "async"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_flag_that_fails_on_a_worker_is_logged_as_a_flag_by_the_reports_class_and_error_type(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    caplog: pytest.LogCaptureFixture,
+    report: str,
+) -> None:
+    langsmith.status = 401
+
+    family.flag_with_a_worker(langsmith)
+
+    assert [record for record in caplog.record_tuples if record[0].startswith("hyoshigi")] == [
+        (
+            "hyoshigi.monitors.reporting",
+            logging.WARNING,
+            f"{report} did not send the flag: LangSmithAuthError.",
+        ),
+    ]
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_score_is_not_posted_when_langsmith_rejects_the_flag_sent_before_it(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+) -> None:
+    langsmith.status = 401
+    report = replace(
+        family.feedback(langsmith.url),
+        review_flag=FLAGGING,
+    )
+
+    with pytest.raises(LangSmithAuthError):
+        send_score(
+            report,
+            FLAGGED_SCORE,
+        )
+
+    assert read_feedback_field(
+        langsmith,
+        "key",
+    ) == ["flagged"]

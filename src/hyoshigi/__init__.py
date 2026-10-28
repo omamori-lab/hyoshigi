@@ -46,7 +46,12 @@ from hyoshigi.monitors.llm import AsyncLLMMonitor, LLMMonitor
 from hyoshigi.monitors.monitor import AsyncMonitor, Monitor
 from hyoshigi.monitors.prompts import DEFAULT_PROMPT, MonitorPrompt
 from hyoshigi.monitors.reporting import AsyncReportedMonitor, ReportedMonitor
-from hyoshigi.monitors.reports import AsyncLangSmithFeedback, LangfuseScores, LangSmithFeedback
+from hyoshigi.monitors.reports import (
+    AsyncLangSmithFeedback,
+    LangfuseScores,
+    LangSmithFeedback,
+    ReviewFlag,
+)
 from hyoshigi.monitors.score import (
     Cause,
     Composite,
@@ -171,6 +176,7 @@ __all__ = [
     "ReportedMonitor",
     "Resample",
     "Resampling",
+    "ReviewFlag",
     "Run",
     "StatementDecision",
     "Step",
