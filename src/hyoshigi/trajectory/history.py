@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from hyoshigi.options import check_instance
 from hyoshigi.trajectory.json_data import JSON
-from hyoshigi.trajectory.parts import Author, Part, check_parts
+from hyoshigi.trajectory.parts import Author, Part, TextPart, check_parts
 
 
 def _create_action_id() -> str:
@@ -205,3 +205,28 @@ class ToolObservation(Observation):
 # OpenHands calls actions and observations events (Wang et al., "OpenHands", ICLR 2025,
 # section 2.1).
 type Event = Action | Observation
+
+
+def build_feedback(
+    action: Action,
+    *,
+    reason: str,
+) -> list[Observation]:
+    """The monitor's reason for blocking an action: an error answering each of its tool calls, in
+    order, or one observation when it made none.
+    """
+    parts = (TextPart(text=reason),)
+    return [
+        ToolObservation(
+            call_id=call.id,
+            is_error=True,
+            author=Author.MONITOR,
+            parts=parts,
+        )
+        for call in action.tool_calls
+    ] or [
+        Observation(
+            author=Author.MONITOR,
+            parts=parts,
+        ),
+    ]
