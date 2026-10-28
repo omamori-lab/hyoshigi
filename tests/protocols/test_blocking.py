@@ -479,6 +479,12 @@ def reload(trajectory: Trajectory) -> Trajectory:
     return Trajectory.load(trajectory.dump())
 
 
+def split_off_a_later_action(trajectory: Trajectory) -> Trajectory:
+    """Act one more action, and return the trajectory before it that split_latest_step returns."""
+    trajectory.act(build_action("later"))
+    return trajectory.split_latest_step().trajectory
+
+
 @pytest.fixture
 def split_at_the_limit() -> Trajectory:
     """The trajectory before the latest action of a delegator that delegated a subagent, was
@@ -493,8 +499,7 @@ def split_at_the_limit() -> Trajectory:
             BLOCK("a3"),
         ),
     )
-    trajectory.act(build_action("later"))
-    return trajectory.split_latest_step().trajectory
+    return split_off_a_later_action(trajectory)
 
 
 @pytest.mark.parametrize(
@@ -763,6 +768,10 @@ def test_the_reset_applies_over_the_runs_records_in_the_order_they_were_recorded
             reload,
             id="loaded-from-a-dump",
         ),
+        pytest.param(
+            split_off_a_later_action,
+            id="copied-by-a-split",
+        ),
     ],
 )
 def test_a_subagents_split_copy_leaves_out_the_records_at_the_position_it_drops(
@@ -845,8 +854,7 @@ def test_a_subagent_kept_by_a_split_copy_counts_the_copys_blocks(
     trajectory = build_trajectory()
     subagent = start_subagent(trajectory)
     start_subagent(subagent)
-    subagent.act(build_action("later"))
-    earlier = subagent.split_latest_step().trajectory
+    earlier = split_off_a_later_action(subagent)
     record_steps(
         earlier,
         (
@@ -908,8 +916,7 @@ def test_a_subagent_two_levels_below_a_split_copy_counts_the_copys_blocks(
 ) -> None:
     trajectory = build_trajectory()
     start_subagent(start_subagent(trajectory))
-    trajectory.act(build_action("later"))
-    earlier = trajectory.split_latest_step().trajectory
+    earlier = split_off_a_later_action(trajectory)
     record_steps(
         earlier,
         (
@@ -962,9 +969,8 @@ def test_a_block_on_a_split_copys_subagent_stays_out_of_the_original_runs_total(
         trajectory,
         (BLOCK("a2"),),
     )
-    trajectory.act(build_action("later"))
     record_steps(
-        trajectory.split_latest_step().trajectory.subagents["call_1"],
+        split_off_a_later_action(trajectory).subagents["call_1"],
         (BLOCK("s1"),),
     )
     script = Script(build_reply(2))
