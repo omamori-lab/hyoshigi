@@ -115,7 +115,6 @@ REJECTED_SCORE = SuspicionScore(
     ),
 )
 IGNORE_HARD_LABELS = pytest.mark.filterwarnings("ignore::hyoshigi.monitors.guard.HardLabelWarning")
-NOT_YET = pytest.mark.xfail(strict=True)
 # A policy that asks for violation or no_violation on its last line.
 VIOLATION_LABELS = GuardLabels(
     suspicious=frozenset({"violation"}),
@@ -891,7 +890,6 @@ def test_the_async_monitor_asks_every_sample_at_once() -> None:
     ) == (5, 1.0)
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("labels", "outcome", "value"),
     [
@@ -1016,6 +1014,53 @@ def test_the_async_monitor_asks_every_sample_at_once() -> None:
             0.9,
             id="a-label-written-first-before-category-codes",
         ),
+        pytest.param(
+            VIOLATION_LABELS,
+            build_reply(
+                build_position(REASONING),
+                build_position(
+                    "v",
+                    {
+                        "v": 0.9,
+                        "n": 0.1,
+                    },
+                ),
+                build_position("iolation"),
+            ),
+            0.9,
+            id="a-label-that-starts-at-the-last-character-of-a-token",
+        ),
+        pytest.param(
+            VIOLATION_LABELS,
+            build_reply(
+                build_position(REASONING),
+                build_position(
+                    "__viol",
+                    {
+                        "__viol": 0.9,
+                        "__no": 0.1,
+                    },
+                ),
+                build_position("ation"),
+                build_position("__"),
+            ),
+            0.9,
+            id="underscores-the-token-carries-before-the-label",
+        ),
+        pytest.param(
+            LABELS,
+            build_reply(
+                build_position(
+                    "safe\n",
+                    {
+                        "safe\n": 0.9,
+                        "unsafe\n": 0.1,
+                    },
+                ),
+            ),
+            0.1,
+            id="a-label-token-with-trailing-whitespace",
+        ),
     ],
 )
 def test_the_value_is_the_probability_of_the_suspicious_labels_at_the_labels_first_token(
@@ -1040,7 +1085,6 @@ def test_the_value_is_the_probability_of_the_suspicious_labels_at_the_labels_fir
     )
 
 
-@NOT_YET
 def test_a_keyed_label_is_scored_with_every_suspicious_label_of_the_guard(rate: Rate) -> None:
     script = build_reporting_script(
         build_reply(
@@ -1066,7 +1110,6 @@ def test_a_keyed_label_is_scored_with_every_suspicious_label_of_the_guard(rate: 
     assert score.value == pytest.approx(0.8)
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("top_log_probabilities", "options"),
     [
@@ -1140,7 +1183,6 @@ def test_a_model_that_reports_no_alternatives_is_sampled_whatever_its_replies_ca
     )
 
 
-@NOT_YET
 def test_the_evidence_of_a_log_probability_score_holds_the_label_the_guard_wrote(
     rate: Rate,
 ) -> None:
@@ -1175,7 +1217,6 @@ def test_the_evidence_of_a_log_probability_score_holds_the_label_the_guard_wrote
     )
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("written", "rest", "probabilities", "value", "explanation"),
     [
@@ -1313,7 +1354,6 @@ def test_the_explanation_states_the_band_of_the_probability_with_no_number(
     )
 
 
-@NOT_YET
 def test_a_probability_of_exactly_one_in_a_thousand_is_uncertain_not_safe(rate: Rate) -> None:
     # The log-probabilities of 1/1024 and 999/1024, whose exponentials are exactly those
     # fractions: the share of the first is exactly 1/1000.
@@ -1354,7 +1394,6 @@ def test_a_probability_of_exactly_one_in_a_thousand_is_uncertain_not_safe(rate: 
     )
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("labels", "written", "rest", "probabilities", "explanation"),
     [
@@ -1416,7 +1455,6 @@ def test_the_explanation_names_the_likeliest_label_of_the_kind_the_share_gives(
     assert score.explanation == explanation
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("labels", "outcome"),
     [
@@ -1553,7 +1591,6 @@ def test_log_probabilities_that_cannot_give_a_score_fail_the_score_closed_as_unr
     )
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("outcome", "expected"),
     [
@@ -1795,7 +1832,6 @@ def test_more_than_one_sample_builds_without_a_warning(
     assert caught == []
 
 
-@NOT_YET
 def test_one_sample_builds_without_a_warning_when_the_model_reports_log_probabilities(
     build_reporting: Callable[..., GuardMonitor | AsyncGuardMonitor],
 ) -> None:

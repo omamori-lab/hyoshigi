@@ -102,13 +102,19 @@ DECISIONS = st.builds(
 )
 
 
-# Pieces of the labels valid and invalid, markup and blanks, so that tokens often spell a label.
-TOKENS = st.sampled_from(
-    ["valid", "invalid", "inv", "val", "alid", "\n", " ", "", "_", "Label: ", "(inv"],
-) | st.text(max_size=3)
+# Pieces of the labels valid and invalid, with markup and blanks, so that tokens often begin one.
+LABEL_TOKENS = st.sampled_from(
+    ["valid", "invalid", " valid", " invalid", "Invalid", "inv", "val", "alid", "(inv", "__inv"],
+)
+TOKENS = LABEL_TOKENS | st.sampled_from(["\n", " ", "", "_", "Label: "]) | st.text(max_size=3)
 LOG_PROBABILITIES = st.floats(
     max_value=0.0,
     allow_nan=False,
+)
+# Log-probabilities of 0.05 and more, so that the alternatives at a token can sum past 1.
+LIKELY = st.floats(
+    min_value=-3.0,
+    max_value=0.0,
 )
 POSITIONS = st.builds(
     TokenLogProbability,
@@ -123,7 +129,41 @@ POSITIONS = st.builds(
         max_size=4,
     ).map(tuple),
 )
-# A reply whose text is its tokens in order, or whose text is unrelated to them.
+LABEL_POSITIONS = st.builds(
+    TokenLogProbability,
+    token=st.sampled_from(["valid", "invalid"]),
+    log_probability=LIKELY,
+    alternatives=st.lists(
+        st.builds(
+            AlternativeToken,
+            token=LABEL_TOKENS,
+            log_probability=LIKELY,
+        ),
+        min_size=1,
+        max_size=5,
+    ).map(tuple),
+)
+
+
+def build_reply_ending_in(
+    lead: str,
+    label: TokenLogProbability,
+) -> Generation:
+    """A reply of a lead and a label token, whose alternatives are mostly labels."""
+    return Generation(
+        text=lead + label.token,
+        log_probabilities=(
+            TokenLogProbability(
+                token=lead,
+                log_probability=0.0,
+            ),
+            label,
+        ),
+    )
+
+
+# A reply whose text is its tokens in order, one that ends in a label, or one whose text is
+# unrelated to its tokens.
 REPORTED_REPLIES = st.one_of(
     st.lists(
         POSITIONS,
@@ -133,6 +173,11 @@ REPORTED_REPLIES = st.one_of(
             text="".join(position.token for position in positions),
             log_probabilities=tuple(positions),
         ),
+    ),
+    st.builds(
+        build_reply_ending_in,
+        lead=st.sampled_from(["", "It reads q3.md.\n", "Label: "]),
+        label=LABEL_POSITIONS,
     ),
     st.builds(
         Generation,

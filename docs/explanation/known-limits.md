@@ -77,8 +77,9 @@ al.'s trained monitor to accept an agent's read of a sensitive `.env` file
 ## Scores and thresholds
 
 Integer scores tie. The LLM monitor's default scale holds eleven integers, and
-a guard monitor's score is a share of its `samples`, so many actions share a
-score and a threshold falls inside a group of them. Monitors that score from
+a guard monitor's score is a share of its `samples` unless its model reports
+log-probabilities, so many actions share a score and a threshold falls inside
+a group of them. Monitors that score from
 0 to 10 do poorly at very low false positive rates without ensembling, and
 averaging a few calls of one model raised its resolution enough to match a
 stronger model there [@kaufman2025basharena, sec. 4.3]. `RepeatedMonitor`

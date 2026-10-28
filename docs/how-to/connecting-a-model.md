@@ -119,9 +119,9 @@ five samples wait five times as long. A shorter `timeout` and fewer retries shor
 
 ## A function connects any other model
 
-`GenerativeModel(name=..., generate=..., perceives=...)` connects any other provider or a local
-model. `generate` takes a `Prompt`, which holds the monitor's instructions in `system` and the
-content to rate in `content`, and returns an outcome. `DecisionModel(name=..., decide=...,
+`GenerativeModel(name=..., generate=..., perceives=..., top_log_probabilities=...)` connects any
+other provider or a local model. `generate` takes a `Prompt`, which holds the monitor's
+instructions in `system` and the content to rate in `content`, and returns an outcome. `DecisionModel(name=..., decide=...,
 perceives=...)` takes a function from a `Question`, a `statement` and the `state` it is about, to a
 `Decision`, `Refused`, `Rejected` or `Unavailable`. A `Decision` holds the probability that the statement holds,
 and a confidence if the model gives one, each a number from 0 to 1; any other value raises
@@ -130,6 +130,14 @@ string, a function that is not callable and a `perceives` that is not a `MediaTy
 `ConfigurationError` when the model is built. A function that returns anything other than an
 outcome, such as the reply's text, raises `ConfigurationError` at the rating, and the message names
 the type it returned.
+
+`top_log_probabilities` is the number of likeliest alternative tokens the function returns with each
+generated token's log-probability, in the `Generation`'s `log_probabilities`. It is 0, the default,
+for a function that returns none, and a whole number from 0 up otherwise. A `GuardMonitor` over a
+model that declares more than 0 asks once and scores the probability of its label
+([how](choosing-a-monitor.md#a-guard-monitor-scores-a-models-log-probabilities-in-one-call)). A
+function that declares it asks its provider for them on every call and returns them on every
+`Generation`. Any other value raises `ConfigurationError` when the model is built.
 
 A rating that cannot be made fails closed: its score is 1.0, so the action counts as the most
 suspicious ([why](../explanation/failing-closed.md)). The function reports a failure by returning
@@ -330,7 +338,7 @@ monitor after its fast one.
 | Monitor | Calls to the function per rating | In flight at once, async |
 |---|---|---|
 | `LLMMonitor` | 1, and up to `max_parse_retries` more after an unreadable or cut-off reply: 3 at most by default | 1 |
-| `GuardMonitor` | `samples`, 5 by default, all asked even when one is refused | `samples` |
+| `GuardMonitor` | `samples`, 5 by default, all asked even when one is refused; one when the model reports log-probabilities | `samples`, or 1 with log-probabilities |
 | `DecisionMonitor` | one per statement, 1 by default, all asked even when one is refused | the number of statements |
 | `RepeatedMonitor` | `ensemble_size` times the wrapped monitor's | `ensemble_size` times the wrapped monitor's |
 | `CascadeMonitor` | the fast monitor's, and the careful monitor's when the fast score reaches `escalation_threshold` | the larger of the two monitors' |

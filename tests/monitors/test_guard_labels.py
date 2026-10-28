@@ -13,8 +13,6 @@ from hyoshigi.monitors.guard_labels import (
 )
 from hyoshigi.monitors.score import Unreadable
 
-NOT_YET = pytest.mark.xfail(strict=True)
-
 # The labels of a policy that asks for violation or no_violation on the last line.
 POLICY_LABELS = GuardLabels(
     suspicious=frozenset({"violation"}),
@@ -1100,7 +1098,6 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
                 offset=19,
             ),
             id="on-the-last-line",
-            marks=NOT_YET,
         ),
         pytest.param(
             "Label: violation",
@@ -1110,7 +1107,6 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
                 offset=7,
             ),
             id="after-a-key",
-            marks=NOT_YET,
         ),
         pytest.param(
             "**Label**: __violation__",
@@ -1120,7 +1116,6 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
                 offset=13,
             ),
             id="in-markup-after-a-key-in-markup",
-            marks=NOT_YET,
         ),
         pytest.param(
             "\n\nunsafe\nS14",
@@ -1133,7 +1128,6 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
                 offset=2,
             ),
             id="first-before-category-codes-after-blank-lines",
-            marks=NOT_YET,
         ),
         pytest.param(
             "Safety: Unsafe\nCategories: Violent",
@@ -1143,7 +1137,15 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
                 offset=8,
             ),
             id="as-the-value-of-a-key",
-            marks=NOT_YET,
+        ),
+        pytest.param(
+            "Reasoning first.\nSafety: Unsafe",
+            QWEN3GUARD,
+            LabelMatch(
+                label="unsafe",
+                offset=25,
+            ),
+            id="as-the-value-of-a-key-after-another-line",
         ),
         pytest.param(
             "I cannot decide.",

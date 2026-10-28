@@ -24,8 +24,6 @@ from hyoshigi import (
     TokenLogProbability,
 )
 
-NOT_YET = pytest.mark.xfail(strict=True)
-
 
 async def build_refusal(prompt_or_question: Prompt | Question) -> Refused:
     return Refused()
@@ -409,7 +407,6 @@ class ArrayInteger:
 numbers.Integral.register(ArrayInteger)
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("kind", "fields", "message"),
     [
@@ -433,9 +430,9 @@ numbers.Integral.register(ArrayInteger)
             AlternativeToken,
             {
                 "token": "a",
-                "log_probability": True,
+                "log_probability": False,
             },
-            "log_probability must be a number of at most 0, got True",
+            "log_probability must be a number of at most 0, got False",
         ),
         (
             TokenLogProbability,
@@ -535,13 +532,11 @@ def test_a_log_probability_field_of_the_wrong_type_or_value_raises_naming_the_fi
             0,
             "0.0",
             id="an-integer-zero",
-            marks=NOT_YET,
         ),
         pytest.param(
             Fraction(-1, 2),
             "-0.5",
             id="a-fraction",
-            marks=NOT_YET,
         ),
         pytest.param(
             -math.inf,
@@ -552,7 +547,6 @@ def test_a_log_probability_field_of_the_wrong_type_or_value_raises_naming_the_fi
             -(10**400),
             "-inf",
             id="an-integer-too-small-for-a-float",
-            marks=NOT_YET,
         ),
     ],
 )
@@ -569,7 +563,6 @@ def test_a_log_probability_at_most_zero_is_kept_as_a_float(
     assert repr(held.log_probability) == kept
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     ("kind", "value", "message"),
     [
@@ -606,7 +599,6 @@ def test_alternatives_that_are_not_a_count_raise_naming_the_field_when_a_model_i
     assert str(raised.value) == message
 
 
-@NOT_YET
 @pytest.mark.parametrize(
     "kind",
     [

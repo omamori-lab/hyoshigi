@@ -38,7 +38,9 @@ def average_values(values: Iterable[float]) -> float:
     kw_only=True,
 )
 class Unreadable:
-    """The model's replies held no readable score or label, after any retries."""
+    """The model's replies held no readable score or label, after any retries, or a guard's
+    log-probabilities could not score its label.
+    """
 
 
 @dataclass(
@@ -120,9 +122,9 @@ class Decisions:
     kw_only=True,
 )
 class Labels:
-    """The label a guard model gave in each sampled reply, in order, the samples that got no
-    answer, in order, and the rated action's hidden reasoning, which the monitor names only when
-    its view shows thoughts.
+    """The label a guard model gave in each sampled reply, in order, or in the one reply scored
+    from log-probabilities, the samples that got no answer, in order, and the rated action's hidden
+    reasoning, which the monitor names only when its view shows thoughts.
     """
 
     model: str
