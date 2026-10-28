@@ -548,6 +548,12 @@ def test_a_log_probability_field_of_the_wrong_type_or_value_raises_naming_the_fi
             "-inf",
             id="minus-infinity",
         ),
+        pytest.param(
+            -(10**400),
+            "-inf",
+            id="an-integer-too-small-for-a-float",
+            marks=NOT_YET,
+        ),
     ],
 )
 def test_a_log_probability_at_most_zero_is_kept_as_a_float(
