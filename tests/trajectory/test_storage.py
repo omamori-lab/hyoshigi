@@ -1995,6 +1995,7 @@ REASON = "Deleting q3.csv is outside the task."
                 "proposal": 0,
                 "proposals": [STORED_PROPOSED_DELETE],
                 "position": 4,
+                "sequence": 0,
             },
             id="flag",
         ),
