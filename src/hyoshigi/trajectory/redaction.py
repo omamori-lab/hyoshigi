@@ -75,7 +75,11 @@ class Redaction:
 
 
 class StoredContent(StrEnum):
-    """A stub: what a stored trajectory holds, raw or redacted."""
+    """What a stored trajectory holds: RAW content, which Trajectory.load redacts through its
+    redaction, or content already REDACTED, which it keeps as it was stored.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
+    """
 
     RAW = "raw"
     REDACTED = "redacted"

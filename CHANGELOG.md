@@ -71,6 +71,13 @@ minor version.
   raised too for a call that is not in the trajectory or that delegated a
   subagent already, and for a tree that would reach past 32 levels below
   the root. The stored format is unchanged.
+- `Trajectory.load` takes `content`, a `StoredContent`, which is exported.
+  `RAW`, the default, redacts everything loaded through the redaction, as
+  before. `REDACTED` loads content stored redacted as it is and keeps the
+  redaction for the entries added later, so a redaction that changes its
+  own output does not compound. A `content` that is not a `StoredContent`,
+  and `REDACTED` without a redaction, raise `ConfigurationError` before the
+  data is read.
 
 ## [0.4.0] - 2026-10-28
 

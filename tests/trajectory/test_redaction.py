@@ -1021,7 +1021,6 @@ def test_a_trajectory_loaded_with_a_redaction_keeps_later_entries_redacted(
     assert loaded.history[-1] == MASKED_TASK
 
 
-@pytest.mark.xfail(strict=True)
 def test_loading_content_stored_redacted_keeps_it_as_stored() -> None:
     loaded = Trajectory.load(
         MASKED_STORED,
@@ -1241,7 +1240,6 @@ def test_loading_with_what_is_not_a_redaction_raises_before_reading_the_data() -
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("options", "message"),
     [

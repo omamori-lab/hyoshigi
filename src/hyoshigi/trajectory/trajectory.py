@@ -621,17 +621,28 @@ class Trajectory:
         subagents nested more than 32 levels deep, and on a record's sequence number that
         is not a whole number of at least 0, greater than the one before it, that no other
         record in the run has. Keys dump does not write are ignored. Records recorded after
-        loading take numbers past the largest loaded. With a redaction, the trajectory is the
-        load of what dump writes through it, and it and its subagents keep the redaction, as
-        Trajectory(redaction=...) does; a redaction that is not a Redaction raises
-        ConfigurationError.
+        loading take numbers past the largest loaded. With a redaction, the trajectory and its
+        subagents keep it for later entries, as Trajectory(redaction=...) does, and content
+        StoredContent.RAW, the default, is the load of what dump writes through it; content
+        StoredContent.REDACTED is loaded as it was stored. A redaction that is not a Redaction,
+        content that is not a StoredContent, and REDACTED without a redaction raise
+        ConfigurationError before the data is read.
         """
         # Imported here because the reader builds trajectories: a top-level import would be a
         # cycle.
         from hyoshigi.trajectory.storage import trajectories  # lanorme: ignore[IMPORT-001]
 
         check_redaction(redaction)
-        if redaction is not None:
+        check_instance(
+            content,
+            expected=StoredContent,
+            name="content",
+        )
+        if content is StoredContent.REDACTED and redaction is None:
+            raise ConfigurationError(
+                "content=StoredContent.REDACTED takes the redaction for the entries added later",
+            )
+        if content is StoredContent.RAW and redaction is not None:
             data = cls.load(data).dump(redaction=redaction)
         seen: set[int] = set()
         trajectory = trajectories.load_trajectory(

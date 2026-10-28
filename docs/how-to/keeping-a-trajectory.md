@@ -402,7 +402,9 @@ is `action`, `observation` or `tool_observation`; `ratings`, each an `action_id`
 `records`, each a control protocol's decision with the proposals it weighed and its `sequence`, the
 record's number in the order the run recorded it; and `subagents`, the dump of each subagent under
 its call id. Media bytes are written in base64. `dump(redaction=...)` writes the content redacted,
-and `load(data, redaction=...)` redacts what it reads, in the same format
+and `load(data, redaction=...)` redacts what it reads, in the same format. With
+`content=StoredContent.REDACTED`, `load` keeps content stored redacted as it is and redacts only
+the entries added later
 ([A dump stores redacted content](redacting-what-leaves-the-process.md#a-dump-stores-redacted-content-and-a-load-redacts-what-it-reads)).
 
 ```python
