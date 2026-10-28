@@ -45,6 +45,18 @@ logger = logging.getLogger("hyoshigi.monitors.reporting")
     slots=True,
     kw_only=True,
 )
+class ReviewFlag:
+    """The mark a report puts on a step for a person to review."""
+
+    name: str = "flagged"
+    threshold: float | None = None
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class LangfuseScores:
     """Sends a score to Langfuse as a numeric score on one observation of a trace.
 
@@ -58,6 +70,7 @@ class LangfuseScores:
 
     client: Langfuse
     name: str = EVALUATION_NAME
+    review_flag: ReviewFlag | None = None
     redaction: Redaction | None = None
 
     def __post_init__(self) -> None:
@@ -94,6 +107,16 @@ class LangfuseScores:
             observation_id=observation_id,
         )
 
+    def flag(
+        self,
+        *,
+        trace_id: str,
+        observation_id: str,
+    ) -> None:
+        """Queue a boolean score named by the review flag on the observation of the trace, with no
+        comment; raises ConfigurationError when the report has no `review_flag`.
+        """
+
 
 @dataclass(
     frozen=True,
@@ -125,6 +148,7 @@ class LangSmithFeedback:
     client: Client
     project_id: str
     name: str = EVALUATION_NAME
+    review_flag: ReviewFlag | None = None
     stop_after_attempt: int = 10
     executor: Executor | None = None
     redaction: Redaction | None = None
@@ -189,6 +213,16 @@ class LangSmithFeedback:
                 ),
             )
 
+    def flag(
+        self,
+        *,
+        run_id: str,
+    ) -> None:
+        """Post the review flag as boolean feedback on the run, a UUID string, with no comment;
+        with an executor, submit the post to it. Raises ConfigurationError when the report has no
+        `review_flag`.
+        """
+
 
 @dataclass(
     frozen=True,
@@ -211,6 +245,7 @@ class AsyncLangSmithFeedback:
     client: AsyncClient
     project_id: str
     name: str = EVALUATION_NAME
+    review_flag: ReviewFlag | None = None
     stop_after_attempt: int = 10
     task_group: asyncio.TaskGroup | None = None
     redaction: Redaction | None = None
@@ -279,6 +314,16 @@ class AsyncLangSmithFeedback:
                     report=self,
                 ),
             )
+
+    async def flag(
+        self,
+        *,
+        run_id: str,
+    ) -> None:
+        """Post the review flag as boolean feedback on the run, a UUID string, with no comment;
+        with a task group, create a task for the post in it. Raises ConfigurationError when the
+        report has no `review_flag`.
+        """
 
 
 async def _await_logging_failure(
