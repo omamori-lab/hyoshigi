@@ -1997,7 +1997,6 @@ def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFa
             ),
             "the request asks for resample 3, but max_resamples is 2",
             id="a-resample-after-all-the-resamples",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {},
@@ -2008,7 +2007,6 @@ def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFa
             ),
             "the request asks for resample 3, but max_resamples is 2",
             id="a-resample-of-more-than-the-rest",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {"max_resamples": 0},
@@ -2019,7 +2017,6 @@ def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFa
             ),
             "the request asks for resample 1, but max_resamples is 0",
             id="a-resample-of-a-protocol-with-no-resamples",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2033,7 +2030,6 @@ def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFa
             ),
             "the request asks for resample 1, but max_resamples is 0",
             id="a-resample-under-flag",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             {
@@ -2046,7 +2042,6 @@ def test_a_trusted_step_answered_with_no_action_is_held_under_hold(family: AnyFa
             ),
             "on_audit FLAG never asks for a TrustedStep",
             id="a-trusted-step-under-flag",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )
@@ -2191,7 +2186,6 @@ def test_on_audit_flag_leaves_a_block_and_a_run_for_an_unavailable_rating_alone(
             "on_audit FLAG needs on_unavailable other than TRUSTED_STEP, since trusted "
             "monitoring has no trusted model",
             id="flag-with-a-trusted-step-for-an-unavailable-rating",
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
 )

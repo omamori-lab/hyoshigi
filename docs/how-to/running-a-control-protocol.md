@@ -402,8 +402,10 @@ True
 
 A request holds its position, the length of the history when the protocol asked. The resamples
 answer the same history as the proposal they compete with, so `resume` refuses a request whose
-trajectory has grown since, with `ConfigurationError`. The program holds back anything new, such as
-a message from the user, until it has recorded the step:
+trajectory has grown since, with `ConfigurationError`. It also refuses a request the protocol never
+asks for: a `Resample` that draws more than `max_resamples` resamples in all, or a `TrustedStep`
+under `on_audit=FLAG`. The program holds back anything new, such as a message from the user, until
+it has recorded the step:
 
 ```python
 from hyoshigi import ConfigurationError
@@ -518,7 +520,7 @@ says, `AUDIT` by default:
 |---|---|
 | `AUDIT` | `Audit`: a person decides, or a `Flag` under `on_audit=AuditResponse.FLAG` |
 | `BLOCK` | `Block`, with the score's explanation as the reason |
-| `TRUSTED_STEP` | a `TrustedStep` request; `BlockAndFeedBack` refuses this value when it is built, since it asks for no proposals |
+| `TRUSTED_STEP` | a `TrustedStep` request; `BlockAndFeedBack` and `DeferToResample` with `on_audit=FLAG` refuse this value when they are built, since they ask for no proposals |
 | `RUN` | `Run`: the action runs with no verdict from the monitor, and `record` attaches its failed score |
 
 `RUN` lets an action whose rating got no answer run without a verdict. An agent that can exhaust
@@ -580,12 +582,12 @@ Refused under RUN: Audit
 `on_audit=AuditResponse.FLAG` turns each `Audit` of trusted monitoring into a `Flag`, which is
 detection only: an intrusion detection system alerts without blocking. The program runs the action,
 as it runs a `Run`, and queues the `Flag` for a person to audit afterwards. `FLAG` needs
-`max_resamples=0` and equal thresholds, and any other settings raise `ConfigurationError` when the
-protocol is built. Every audited action runs, including an attack, an action whose rating failed and
-an action whose monitor got no answer, and each reaches a person only afterwards. `carry_out` above
-runs a `Flag` and adds it to `review_queue`. The first proposal here scores below the threshold and
-runs as a `Run`, the second is flagged, and the third's rating gets no answer, so `on_unavailable`,
-`AUDIT` by default, makes it a `Flag` as well:
+`max_resamples=0`, equal thresholds and an `on_unavailable` other than `TRUSTED_STEP`, and any other
+settings raise `ConfigurationError` when the protocol is built. Every audited action runs, including
+an attack, an action whose rating failed and an action whose monitor got no answer, and each reaches
+a person only afterwards. `carry_out` above runs a `Flag` and adds it to `review_queue`. The first
+proposal here scores below the threshold and runs as a `Run`, the second is flagged, and the third's
+rating gets no answer, so `on_unavailable`, `AUDIT` by default, makes it a `Flag` as well:
 
 ```python
 from hyoshigi import AuditResponse

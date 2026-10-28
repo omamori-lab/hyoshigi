@@ -20,14 +20,20 @@ minor version.
   returns `Flag`, a new decision, wherever the protocol would return
   `Audit`, with the same action and proposals: the action runs, and a person
   audits the step afterwards, which is detection only. `FLAG` is allowed
-  only for trusted monitoring, with `max_resamples=0` and equal thresholds,
-  and any other settings raise `ConfigurationError` when the protocol is
-  built. `Trajectory.record` adds a `Flag`'s action and its score to the
-  history, as for `Run`, and a `Flag` ends a run of blocks. The stored
-  records gain the kind `flag`; 0.3.0 cannot read a file that holds a flag.
+  only for trusted monitoring, with `max_resamples=0`, equal thresholds and
+  an `on_unavailable` other than `TRUSTED_STEP`, and any other settings
+  raise `ConfigurationError` when the protocol is built. `Trajectory.record`
+  adds a `Flag`'s action and its score to the history, as for `Run`, and a
+  `Flag` ends a run of blocks. The stored records gain the kind `flag`;
+  0.3.0 cannot read a file that holds a flag.
 
 ### Changed
 
+- `resume` raises `ConfigurationError` for a request the protocol never asks
+  for: a `Resample` that draws more than `max_resamples` resamples in all,
+  and a `TrustedStep` under `on_audit=AuditResponse.FLAG`. This is a
+  breaking change: 0.3.0 rated the resamples of a `Resample` built past
+  `max_resamples`.
 - `Flag` joins `ProtocolDecision`, and `Trajectory.record` names it in the
   `ConfigurationError` for a decision of another type. This is a breaking
   change: an exhaustive `match` over a `ProtocolDecision` that ends in

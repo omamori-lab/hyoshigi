@@ -101,14 +101,16 @@ the action is detection only. With `on_audit=AuditResponse.FLAG`, `DeferToResamp
 wherever it would return `Audit`, with the same action and proposals. The action runs, and a person
 audits the step afterwards.
 
-`FLAG` is allowed only for trusted monitoring, with `max_resamples=0` and equal thresholds. Under
-defer to trusted and defer to resample, `Audit` names the agent's most suspicious proposal. Take
-`defer_threshold=0.5`, `audit_threshold=0.8` and no resamples. A proposal scored 0.6 is a
-`TrustedStep`, so T's action runs in its place. A proposal scored 0.9 is `Audit` of the agent's own
-proposal, and under `FLAG` that proposal would run. The more suspicious band would then be protected
-less than the band below it. With equal thresholds no score falls between them, so a `Flag` never
-stands in for a deferral to T. `BlockAndFeedBack` has no `on_audit`, since a `Flag` at its limit
-would let the agent through the limit.
+`FLAG` is allowed only for trusted monitoring, with `max_resamples=0`, equal thresholds and an
+`on_unavailable` other than `TRUSTED_STEP`. Under defer to trusted and defer to resample, `Audit`
+names the agent's most suspicious proposal. Take `defer_threshold=0.5`, `audit_threshold=0.8` and no
+resamples. A proposal scored 0.6 is a `TrustedStep`, so T's action runs in its place. A proposal
+scored 0.9 is `Audit` of the agent's own proposal, and under `FLAG` that proposal would run. The
+more suspicious band would then be protected less than the band below it. With equal thresholds no
+score falls between them, and trusted monitoring has no T, so `FLAG` refuses
+`on_unavailable=TRUSTED_STEP`. A `Flag` therefore never stands in for a deferral to T.
+`BlockAndFeedBack` has no `on_audit`, since a `Flag` at its limit would let the agent through the
+limit.
 
 Under `FLAG`, every audited action runs. That includes an attack, an action whose rating failed and
 an action whose monitor got no answer, and each reaches a person only after it has run.
