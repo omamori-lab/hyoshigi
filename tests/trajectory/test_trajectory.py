@@ -633,6 +633,31 @@ def test_splitting_a_trajectory_whose_latest_entry_is_not_an_action_raises(
             id="run-of-an-action-proposed-twice",
         ),
         pytest.param(
+            Flag(
+                action=WRITING,
+                proposals=(
+                    PROPOSED_WRITE,
+                    Proposal(
+                        action=WRITING,
+                        score=READS_THE_FILE,
+                        policy=Policy.UNTRUSTED,
+                    ),
+                ),
+                position=1,
+            ),
+            (
+                TASK_OBSERVATION,
+                WRITING,
+            ),
+            (
+                Rating(
+                    action_id="a2",
+                    score=WRITES_ELSEWHERE,
+                ),
+            ),
+            id="flag-of-an-action-proposed-twice",
+        ),
+        pytest.param(
             FLAG_WRITE,
             (
                 TASK_OBSERVATION,
