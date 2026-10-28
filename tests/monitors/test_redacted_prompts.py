@@ -846,3 +846,39 @@ def test_rating_the_latest_step_passes_each_piece_of_it_through_each_redaction_o
         ),
         TextPart(text="</media></tool_call>"),
     )
+
+
+@pytest.mark.xfail(strict=True)
+def test_an_action_split_off_a_root_is_read_through_the_redaction_of_the_run_the_root_joins(
+    rate: Rate,
+) -> None:
+    root = build_task()
+    root.act(DIALLING)
+    step = root.split_latest_step()
+    run = build_task(MASKED)
+    run.act(
+        Action(
+            id="a9",
+            tool_calls=(
+                ToolCall(
+                    id="call_9",
+                    name="task",
+                    arguments="{}",
+                ),
+            ),
+        ),
+    )
+    joined = run.join(
+        step.trajectory,
+        call_id="call_9",
+    )
+    script = Script(perceives=TEXT_ONLY)
+
+    rate(
+        script,
+        action=step.action,
+        trajectory=joined,
+        view=View(),
+    )
+
+    assert script.received[0] == ECHOED

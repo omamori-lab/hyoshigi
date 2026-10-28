@@ -22,6 +22,7 @@ from families import (
 )
 
 from hyoshigi import (
+    JSON,
     Action,
     AsyncBlockAndFeedBack,
     Audit,
@@ -647,27 +648,28 @@ def test_the_total_counts_the_blocks_of_subagents_nested_two_levels_deep(
     assert decided == build_audit(position)
 
 
+DELEGATING_TWICE = Action(
+    id="delegating",
+    tool_calls=(
+        ToolCall(
+            id="call_1",
+            name="delegate",
+            arguments='{"task": "Find the q3 revenue"}',
+        ),
+        ToolCall(
+            id="call_2",
+            name="delegate",
+            arguments='{"task": "Find the q4 revenue"}',
+        ),
+    ),
+)
+
+
 def test_subagents_of_one_action_are_counted_in_the_order_their_records_were_recorded(
     family: AnyFamily,
 ) -> None:
     trajectory = build_trajectory()
-    trajectory.act(
-        Action(
-            id="delegating",
-            tool_calls=(
-                ToolCall(
-                    id="call_1",
-                    name="delegate",
-                    arguments='{"task": "Find the q3 revenue"}',
-                ),
-                ToolCall(
-                    id="call_2",
-                    name="delegate",
-                    arguments='{"task": "Find the q4 revenue"}',
-                ),
-            ),
-        ),
-    )
+    trajectory.act(DELEGATING_TWICE)
     first = trajectory.delegate(
         INSTRUCTION,
         call_id="call_1",
@@ -1110,6 +1112,187 @@ def test_a_loaded_runs_new_records_follow_its_stored_ones(
     )
 
     assert decided == build_run(2)
+
+
+def work_apart(
+    stored: JSON,
+    *,
+    call_id: str,
+    steps: tuple[Step, ...],
+) -> Trajectory:
+    """Load the stored run, as a process of its own does, record the steps on the subagent the
+    call delegates there, and return that subagent loaded from its dump.
+    """
+    subagent = Trajectory.load(stored).delegate(
+        INSTRUCTION,
+        call_id=call_id,
+    )
+    record_steps(
+        subagent,
+        steps,
+    )
+    return Trajectory.load(subagent.dump())
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "outcome"),
+    [
+        pytest.param(
+            "call_1",
+            "call_2",
+            build_audit(2),
+            id="call-1-then-call-2",
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            "call_2",
+            "call_1",
+            build_run(2),
+            id="call-2-then-call-1",
+        ),
+    ],
+)
+def test_parallel_subagents_replay_in_the_order_they_were_joined(
+    family: AnyFamily,
+    first: str,
+    second: str,
+    outcome: ProtocolDecision,
+) -> None:
+    trajectory = build_trajectory()
+    trajectory.act(DELEGATING_TWICE)
+    stored = trajectory.dump()
+    apart = {
+        "call_1": work_apart(
+            stored,
+            call_id="call_1",
+            steps=(
+                BLOCK("f1"),
+                AUDIT("f2"),
+                RUN("f2"),
+            ),
+        ),
+        "call_2": work_apart(
+            stored,
+            call_id="call_2",
+            steps=(
+                AUDIT("s1"),
+                BLOCK("s1"),
+            ),
+        ),
+    }
+    trajectory.join(
+        apart[first],
+        call_id=first,
+    )
+    trajectory.join(
+        apart[second],
+        call_id=second,
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == outcome
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("deciding", "position"),
+    [
+        pytest.param(
+            lambda delegator, joined: delegator,
+            4,
+            id="the-delegator",
+        ),
+        pytest.param(
+            lambda delegator, joined: joined,
+            3,
+            id="the-joined-subagent",
+        ),
+    ],
+)
+def test_a_joined_subagents_blocks_count_in_its_runs_total(
+    family: AnyFamily,
+    deciding: Callable[
+        [
+            Trajectory,
+            Trajectory,
+        ],
+        Trajectory,
+    ],
+    position: int,
+) -> None:
+    trajectory = build_trajectory()
+    record_steps(
+        trajectory,
+        (BLOCK("a1"),),
+    )
+    trajectory.act(DELEGATING)
+    joined = trajectory.join(
+        work_apart(
+            trajectory.dump(),
+            call_id="call_1",
+            steps=(BLOCK("s1"),),
+        ),
+        call_id="call_1",
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=deciding(
+            trajectory,
+            joined,
+        ),
+        blocks_in_total=2,
+    )
+
+    assert decided == build_audit(position)
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_joined_runs_records_replay_in_the_order_they_were_recorded_across_its_subagents(
+    family: AnyFamily,
+) -> None:
+    trajectory = build_trajectory()
+    trajectory.act(DELEGATING)
+    subagent = Trajectory.load(trajectory.dump()).delegate(
+        INSTRUCTION,
+        call_id="call_1",
+    )
+    nested = start_subagent(subagent)
+    record_steps(
+        subagent,
+        (BLOCK("s1"),),
+    )
+    record_steps(
+        nested,
+        (AUDIT("n1"),),
+    )
+    record_steps(
+        subagent,
+        (BLOCK("s2"),),
+    )
+    trajectory.join(
+        Trajectory.load(subagent.dump()),
+        call_id="call_1",
+    )
+    script = Script(build_reply(2))
+
+    decided = family.decide_blocking(
+        script,
+        proposed=PROPOSED,
+        trajectory=trajectory,
+        blocks_in_total=2,
+    )
+
+    assert decided == build_audit(2)
 
 
 @pytest.mark.parametrize(

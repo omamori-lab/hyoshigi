@@ -1,8 +1,12 @@
-"""The trajectory: a black-box run, acting, observing and delegating."""
+"""The trajectory: a black-box run, acting, observing, delegating and joining."""
+
+from collections.abc import Callable
+from typing import NamedTuple
 
 import pytest
 
 from hyoshigi import (
+    JSON,
     Action,
     Audit,
     Author,
@@ -404,6 +408,290 @@ def test_delegating_from_a_subagent_32_levels_deep_raises_naming_the_limit(
         )
 
     assert str(raised.value) == "subagents are nested at most 32 deep"
+
+
+def build_joining(depth: int) -> Trajectory:
+    """Return a trajectory `depth` levels below the root of a new run, whose action made call_7."""
+    joining = delegate_a_chain(
+        Trajectory(),
+        depth=depth,
+    )
+    joining.act(
+        Action(
+            id="a1",
+            tool_calls=(DELEGATE,),
+        ),
+    )
+    return joining
+
+
+def build_chain(depth: int) -> Trajectory:
+    """Return the root of a new run, with a chain of subagents `depth` levels below it."""
+    root = Trajectory()
+    delegate_a_chain(
+        root,
+        depth=depth,
+    )
+    return root
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("joining_depth", "chain_depth"),
+    [
+        pytest.param(
+            0,
+            0,
+            id="a-lone-trajectory",
+        ),
+        pytest.param(
+            0,
+            31,
+            id="a-chain-whose-deepest-is-32-below-the-root",
+        ),
+        pytest.param(
+            16,
+            15,
+            id="a-chain-joined-16-deep-whose-deepest-is-32-below-the-root",
+        ),
+    ],
+)
+def test_a_joined_trajectory_is_held_under_the_call_that_delegated_it(
+    joining_depth: int,
+    chain_depth: int,
+) -> None:
+    joining = build_joining(joining_depth)
+
+    joined = joining.join(
+        build_chain(chain_depth),
+        call_id="call_7",
+    )
+
+    assert joining.subagents.get("call_7") is joined
+
+
+class Joining(NamedTuple):
+    """A trajectory, and what it is given to join under its call_7."""
+
+    trajectory: Trajectory
+    subagent: object
+
+
+def build_delegated_joining() -> Joining:
+    """A trajectory whose call_7 delegated a subagent already, given a new trajectory."""
+    joining = build_joining(0)
+    joining.delegate(
+        INSTRUCTION,
+        call_id="call_7",
+    )
+    return Joining(
+        trajectory=joining,
+        subagent=Trajectory(),
+    )
+
+
+def build_root_joining() -> Joining:
+    """A subagent given the root of its own run."""
+    root = Trajectory()
+    joining = delegate_a_chain(
+        root,
+        depth=1,
+    )
+    joining.act(
+        Action(
+            id="a1",
+            tool_calls=(DELEGATE,),
+        ),
+    )
+    return Joining(
+        trajectory=joining,
+        subagent=root,
+    )
+
+
+def build_split_copy_joining() -> Joining:
+    """A subagent given the trajectory split from the root of its own run before its call."""
+    root = Trajectory()
+    root.observe(TASK_OBSERVATION)
+    joining = delegate_a_chain(
+        root,
+        depth=1,
+    )
+    joining.act(
+        Action(
+            id="a1",
+            tool_calls=(DELEGATE,),
+        ),
+    )
+    return Joining(
+        trajectory=joining,
+        subagent=root.split_latest_step().trajectory,
+    )
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("arrange", "message"),
+    [
+        pytest.param(
+            lambda: Joining(
+                trajectory=build_joining(0),
+                subagent=Trajectory().dump(),
+            ),
+            "subagent must be a Trajectory, got an instance of dict",
+            id="a-dump",
+        ),
+        pytest.param(
+            lambda: Joining(
+                trajectory=Trajectory(),
+                subagent=Trajectory(),
+            ),
+            "join takes the id of a tool call in this trajectory",
+            id="a-call-not-in-the-trajectory",
+        ),
+        pytest.param(
+            build_delegated_joining,
+            "a subagent is already delegated by this call",
+            id="a-call-that-delegated-already",
+        ),
+        pytest.param(
+            lambda: Joining(
+                trajectory=build_joining(0),
+                subagent=delegate_a_chain(
+                    Trajectory(),
+                    depth=1,
+                ),
+            ),
+            "join takes the root of a run apart from this one",
+            id="a-subagent-of-another-run",
+        ),
+        pytest.param(
+            build_root_joining,
+            "join takes the root of a run apart from this one",
+            id="the-root-of-this-run",
+        ),
+        pytest.param(
+            build_split_copy_joining,
+            "join takes the root of a run apart from this one",
+            id="a-copy-split-from-this-run",
+        ),
+        pytest.param(
+            lambda: Joining(
+                trajectory=build_joining(0),
+                subagent=build_chain(32),
+            ),
+            "subagents are nested at most 32 deep",
+            id="a-chain-whose-deepest-is-33-below-the-root",
+        ),
+        pytest.param(
+            lambda: Joining(
+                trajectory=build_joining(16),
+                subagent=build_chain(16),
+            ),
+            "subagents are nested at most 32 deep",
+            id="a-chain-joined-16-deep-whose-deepest-is-33-below-the-root",
+        ),
+    ],
+)
+def test_joining_what_cannot_join_raises_naming_why(
+    arrange: Callable[[], Joining],
+    message: str,
+) -> None:
+    arranged = arrange()
+
+    with pytest.raises(ConfigurationError) as raised:
+        arranged.trajectory.join(
+            arranged.subagent,  # ty: ignore[invalid-argument-type]
+            call_id="call_7",
+        )
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_refused_join_leaves_both_runs_unchanged() -> None:
+    joining = build_joining(16)
+    taken = build_chain(16)
+    joining_stored = joining.dump()
+    taken_stored = taken.dump()
+
+    with pytest.raises(ConfigurationError):
+        joining.join(
+            taken,
+            call_id="call_7",
+        )
+
+    assert (
+        joining.dump(),
+        taken.dump(),
+    ) == (
+        joining_stored,
+        taken_stored,
+    )
+
+
+def record_an_audit(trajectory: Trajectory) -> None:
+    """Record an audit of WRITING at the length of the history."""
+    trajectory.record(
+        Audit(
+            action=WRITING,
+            proposals=(PROPOSED_WRITE,),
+            position=len(trajectory.history),
+        ),
+    )
+
+
+def work_apart(
+    stored: dict[str, JSON],
+    *,
+    call_id: str,
+) -> Trajectory:
+    """Load the stored run, as a process of its own does, record an audit on the subagent the call
+    delegates there, and return that subagent loaded from its dump.
+    """
+    subagent = Trajectory.load(stored).delegate(
+        INSTRUCTION,
+        call_id=call_id,
+    )
+    record_an_audit(subagent)
+    return Trajectory.load(subagent.dump())
+
+
+def test_a_run_with_joined_subagents_loads_back_unchanged(trajectory: Trajectory) -> None:
+    trajectory.act(
+        Action(
+            id="a1",
+            tool_calls=(
+                DELEGATE,
+                READ,
+            ),
+        ),
+    )
+    record_an_audit(trajectory)
+    stored = trajectory.dump()
+    first = work_apart(
+        stored,
+        call_id="call_7",
+    )
+    second = work_apart(
+        stored,
+        call_id="call_1",
+    )
+    record_an_audit(trajectory)
+    joined = trajectory.join(
+        first,
+        call_id="call_7",
+    )
+    trajectory.join(
+        second,
+        call_id="call_1",
+    )
+    record_an_audit(trajectory)
+    record_an_audit(joined)
+
+    loaded = Trajectory.load(trajectory.dump())
+
+    assert loaded.dump() == trajectory.dump()
 
 
 def test_a_new_trajectory_has_no_ratings(trajectory: Trajectory) -> None:
