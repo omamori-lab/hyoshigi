@@ -449,7 +449,6 @@ def test_the_hidden_reasoning_names_media_in_the_thought_a_redaction_turned_into
     )
 
 
-@pytest.mark.xfail(strict=True)
 def test_media_lifted_from_the_history_keeps_its_ref_when_a_redaction_describes_it(
     rate: Rate,
 ) -> None:

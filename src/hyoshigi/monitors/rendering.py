@@ -465,7 +465,8 @@ def _describe_media(
     """Render media the model is not given as its description, or else as a mark.
 
     The agent's own description is its claim about the media, so the media stays unseen.
-    Media lifted from a tool call's arguments has no description.
+    Media lifted from a tool call's arguments has a description only when a redaction gave it
+    one, and keeps its ref either way.
     """
     if part.description is not None:
         description = _escape(part.description.text)
@@ -479,6 +480,7 @@ def _describe_media(
             content=description,
             type=part.media_type,
             description_author=part.description.author.value,
+            ref=ref,
         )
     return _mark_unseen(
         "omitted_media",
