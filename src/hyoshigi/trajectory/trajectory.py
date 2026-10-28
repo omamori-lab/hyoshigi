@@ -29,10 +29,9 @@ from hyoshigi.trajectory.history import Action, Event, Observation, build_feedba
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.redaction import Redaction, Redactor, check_redaction
-from hyoshigi.trajectory.storage.events import dump_event, load_event
-from hyoshigi.trajectory.storage.paths import select_member
-from hyoshigi.trajectory.storage.records import dump_record, load_records, read_sequence_numbers
-from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score, load_score
+from hyoshigi.trajectory.storage.events import dump_event
+from hyoshigi.trajectory.storage.records import dump_record
+from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score
 
 FORMAT = "hyoshigi.trajectory"
 VERSION = 3
@@ -561,12 +560,17 @@ class Trajectory:
         Trajectory(redaction=...) does; a redaction that is not a Redaction raises
         ConfigurationError.
         """
+        # Imported here because the reader builds trajectories: a top-level import would be a
+        # cycle.
+        from hyoshigi.trajectory.storage import trajectories  # lanorme: ignore[IMPORT-001]
+
         check_redaction(redaction)
         if redaction is not None:
             data = cls.load(data).dump(redaction=redaction)
         seen: set[int] = set()
-        trajectory = cls._load(
+        trajectory = trajectories.load_trajectory(
             data,
+            kind=cls,
             path="$",
             depth=0,
             seen=seen,
@@ -582,110 +586,6 @@ class Trajectory:
             member._sequence = sequence
             member._redaction = redaction
         return trajectory
-
-    @classmethod
-    def _load(
-        cls,
-        data: JSON,
-        *,
-        path: str,
-        depth: int,
-        seen: set[int],
-    ) -> Self:
-        match data:
-            case {
-                "format": "hyoshigi.trajectory",
-                "version": int(version),
-                "history": list(history),
-                "ratings": list(ratings),
-                "records": list(records),
-                "subagents": dict(subagents),
-            } if version == VERSION and not isinstance(
-                version,
-                bool,
-            ):
-                trajectory = cls()
-                trajectory._load_history(
-                    history,
-                    path=f"{path}.history",
-                )
-                trajectory._load_ratings(
-                    ratings,
-                    path=f"{path}.ratings",
-                )
-                trajectory._records = load_records(
-                    records,
-                    path=f"{path}.records",
-                    history=trajectory._history,
-                )
-                trajectory._sequence_numbers = read_sequence_numbers(
-                    records,
-                    path=f"{path}.records",
-                    seen=seen,
-                )
-                trajectory._load_subagents(
-                    subagents,
-                    path=f"{path}.subagents",
-                    depth=depth,
-                    seen=seen,
-                )
-                return trajectory
-            case _:
-                raise FormatError(
-                    path=path,
-                    expected=f"a {FORMAT}, format version {VERSION}",
-                )
-
-    def _load_history(
-        self,
-        history: list[JSON],
-        *,
-        path: str,
-    ) -> None:
-        for index, data in enumerate(history):
-            event_path = f"{path}[{index}]"
-            self._add_event(
-                load_event(
-                    data,
-                    path=event_path,
-                ),
-                path=event_path,
-            )
-
-    def _load_ratings(
-        self,
-        ratings: list[JSON],
-        *,
-        path: str,
-    ) -> None:
-        for index, data in enumerate(ratings):
-            rating_path = f"{path}[{index}]"
-            match data:
-                case {
-                    "action_id": str(action_id),
-                    "score": dict() as score,
-                }:
-                    if action_id not in self._action_ids:
-                        raise FormatError(
-                            path=f"{rating_path}.action_id",
-                            expected="the id of an action in the history",
-                        )
-                    loaded = load_score(
-                        score,
-                        path=f"{rating_path}.score",
-                        depth=0,
-                    )
-                    self._ratings.append(
-                        Rating(
-                            action_id=action_id,
-                            score=loaded,
-                        ),
-                    )
-                case _:
-                    raise FormatError(
-                        path=rating_path,
-                        expected="a rating with an action id and a score",
-                    )
 
     def _add_event(
         self,
@@ -707,51 +607,6 @@ class Trajectory:
                 self.observe(event)
             case unreachable:
                 assert_never(unreachable)
-
-    def _load_subagents(
-        self,
-        subagents: dict[str, JSON],
-        *,
-        path: str,
-        depth: int,
-        seen: set[int],
-    ) -> None:
-        """Load the subagents of a trajectory `depth` levels deep, adding their records'
-        sequence numbers to `seen`. A subagent deeper than NESTING_LIMIT raises FormatError.
-        """
-        for call_id, data in subagents.items():
-            match call_id:
-                case str():
-                    subagent_path = select_member(
-                        call_id,
-                        path=path,
-                    )
-                case _:
-                    raise FormatError(
-                        path=path,
-                        expected="subagents keyed by tool call id",
-                    )
-            if call_id not in self._call_ids:
-                raise FormatError(
-                    path=subagent_path,
-                    expected="a subagent under a tool call in the history",
-                )
-            if depth == NESTING_LIMIT:
-                raise FormatError(
-                    path=subagent_path,
-                    expected=f"subagents nested at most {NESTING_LIMIT} deep",
-                )
-            subagent = Trajectory._load(
-                data,
-                path=subagent_path,
-                depth=depth + 1,
-                seen=seen,
-            )
-            subagent._delegation = Delegation(
-                parent=self,
-                call_id=call_id,
-            )
-            self._subagents[call_id] = subagent
 
 
 def trace_path(trajectory: Trajectory) -> list[Trajectory]:
