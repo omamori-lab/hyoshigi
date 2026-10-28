@@ -25,7 +25,7 @@ from hyoshigi.protocols.decisions import (
 )
 from hyoshigi.trajectory.formats import anthropic, open_responses, openai_chat
 from hyoshigi.trajectory.formats.authorship import Authorship, by_role
-from hyoshigi.trajectory.history import Action, Event, Observation, ToolObservation
+from hyoshigi.trajectory.history import Action, Event, Observation, build_feedback
 from hyoshigi.trajectory.json_data import JSON
 from hyoshigi.trajectory.parts import Author, TextPart
 from hyoshigi.trajectory.redaction import Redaction, Redactor, check_redaction
@@ -789,28 +789,3 @@ def list_run_records(trajectory: Trajectory) -> tuple[ProtocolDecision, ...]:
         key=itemgetter(0),
     )
     return tuple(record for _, record in numbered)
-
-
-def build_feedback(
-    action: Action,
-    *,
-    reason: str,
-) -> list[Observation]:
-    """The monitor's reason for blocking an action: an error answering each of its tool calls, in
-    order, or one observation when it made none.
-    """
-    parts = (TextPart(text=reason),)
-    return [
-        ToolObservation(
-            call_id=call.id,
-            is_error=True,
-            author=Author.MONITOR,
-            parts=parts,
-        )
-        for call in action.tool_calls
-    ] or [
-        Observation(
-            author=Author.MONITOR,
-            parts=parts,
-        ),
-    ]
