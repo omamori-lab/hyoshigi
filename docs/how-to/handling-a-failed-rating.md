@@ -229,8 +229,8 @@ The adapters read a provider's refusal as `Refused`: Anthropic's `refusal` stop 
 and OpenRouter a refusal part in the reply, a reply stopped by a content filter or an error whose
 code names a refusal, and on OpenRouter every 403. On LiteLLM it is a refusal in the reply's message,
 a reply stopped by the content filter, an error whose code names a refusal and LiteLLM's content
-policy, guardrail and blocked-entity errors. An `LLMMonitor` fails closed on it at once, and a
-second model can rate the action.
+policy, rejected-request, guardrail and blocked-entity errors. An `LLMMonitor` fails closed on it at
+once, and a second model can rate the action.
 
 A `CascadeMonitor` puts a careful monitor behind a fast one, as Claude Code's auto mode puts a
 reasoning classifier behind a fast filter

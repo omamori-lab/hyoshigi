@@ -34,10 +34,12 @@ from hyoshigi.options import describe_type, read_count
 # BlockedPiiEntityError and BudgetExceededError subclass Exception. The classes are found in that
 # module, and never by their names alone.
 _EXCEPTIONS_MODULE = "litellm.exceptions"
-# Errors whose content a policy declined: a content policy violation, a guardrail's block and a
-# blocked entity of personal information.
+# Errors whose content a policy declined: a content policy violation, a request that the proxy's
+# pre-call hook rejected (litellm/proxy/utils.py at v1.106.5, process_pre_call_hook_response), a
+# guardrail's block and a blocked entity of personal information.
 _REFUSALS = (
     "ContentPolicyViolationError",
+    "RejectedRequestError",
     "GuardrailRaisedException",
     "BlockedPiiEntityError",
 )
