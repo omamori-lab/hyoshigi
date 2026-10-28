@@ -1517,6 +1517,13 @@ class ImageFetchError(openai.BadRequestError):
     """Shaped as litellm.ImageFetchError (exceptions.py, line 270): status 400."""
 
 
+class RejectedRequestError(openai.BadRequestError):
+    """Shaped as litellm.RejectedRequestError (exceptions.py, line 625): status 400, no code. The
+    proxy raises it when a pre-call hook, such as a guardrail, returns a rejection for a
+    completion (litellm/proxy/utils.py, process_pre_call_hook_response, line 2150).
+    """
+
+
 class GuardrailRaisedException(Exception):
     """Shaped as litellm.GuardrailRaisedException (exceptions.py, line 1128): not an OpenAI
     error.
@@ -1588,6 +1595,7 @@ def litellm_exceptions(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
             "ContextWindowExceededError": ContextWindowExceededError,
             "ContentPolicyViolationError": ContentPolicyViolationError,
             "ImageFetchError": ImageFetchError,
+            "RejectedRequestError": RejectedRequestError,
             "GuardrailRaisedException": GuardrailRaisedException,
             "BlockedPiiEntityError": BlockedPiiEntityError,
             "BudgetExceededError": BudgetExceededError,
@@ -1832,6 +1840,16 @@ def test_a_prompt_the_api_cannot_use_is_rejected_with_its_status(
             ContentPolicyViolationError,
             400,
         ),
+        pytest.param(
+            fail(
+                RejectedRequestError,
+                400,
+            ),
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="a RejectedRequestError is read as a 400 that raises",
+            ),
+        ),
         GuardrailRaisedException("blocked"),
         BlockedPiiEntityError("blocked"),
     ],
@@ -1839,6 +1857,7 @@ def test_a_prompt_the_api_cannot_use_is_rejected_with_its_status(
         "policy-code",
         "refusal-code",
         "content-policy-violation-error",
+        "rejected-request-error",
         "guardrail-raised-exception",
         "blocked-pii-entity-error",
     ],
