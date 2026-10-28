@@ -1355,28 +1355,15 @@ def test_the_explanation_states_the_band_of_the_probability_with_no_number(
 
 
 def test_a_probability_of_exactly_one_in_a_thousand_is_uncertain_not_safe(rate: Rate) -> None:
-    # The log-probabilities of 1/1024 and 999/1024, whose exponentials are exactly those
-    # fractions: the share of the first is exactly 1/1000.
+    # exp(0.0) is exactly 1.0 on every platform, so one suspicious token against 999 safe
+    # tokens, each read as "no", gives the share 1.0 / 1000.0, the float of 0.001.
     script = build_reporting_script(
-        Generation(
-            text="violation",
-            log_probabilities=(
-                TokenLogProbability(
-                    token="viol",
-                    log_probability=-6.931471805599453,
-                    alternatives=(
-                        AlternativeToken(
-                            token="viol",
-                            log_probability=-6.931471805599453,
-                        ),
-                        AlternativeToken(
-                            token=" No",
-                            log_probability=-0.024717026950899574,
-                        ),
-                    ),
-                ),
-                build_position("ation"),
+        build_reply(
+            build_position(
+                "viol",
+                {"viol": 1.0} | {" " * count + "no": 1.0 for count in range(1, 1000)},
             ),
+            build_position("ation"),
         ),
     )
 
