@@ -480,6 +480,7 @@ class Family[Rater]:
     rate_and_cancel_the_send: Callable[[LangSmithServer], None]
     send_flagged_with_a_worker: Callable[[LangSmithServer], list[int]]
     flag_with_a_worker: Callable[[LangSmithServer], None]
+    flag_and_cancel_the_post: Callable[[LangSmithServer], None]
 
 
 def build_synchronous_llm(
@@ -686,6 +687,46 @@ def rate_and_cancel_in_a_task_group(langsmith: LangSmithServer) -> None:
         asyncio.run(rate_then_raise())
 
 
+def flag_and_cancel_on_an_executor(langsmith: LangSmithServer) -> None:
+    """Flag a step with the report posting on an executor whose one thread is busy, then shut the
+    executor down, cancelling the post before it starts.
+    """
+    busy = threading.Event()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(
+            busy.wait,
+            ANSWER_HOLD_SECONDS,
+        )
+        replace(
+            build_feedback(langsmith.url),
+            executor=executor,
+            review_flag=FLAGGING,
+        ).flag(run_id=RUN_ID)
+        executor.shutdown(
+            wait=False,
+            cancel_futures=True,
+        )
+        busy.set()
+
+
+def flag_and_cancel_in_a_task_group(langsmith: LangSmithServer) -> None:
+    """Flag a step with the report posting in a task group whose body then raises CallerError,
+    which cancels the post.
+    """
+
+    async def flag_then_raise() -> None:
+        async with asyncio.TaskGroup() as group:
+            await replace(
+                build_async_feedback(langsmith.url),
+                task_group=group,
+                review_flag=FLAGGING,
+            ).flag(run_id=RUN_ID)
+            raise CallerError
+
+    with contextlib.suppress(CallerError):
+        asyncio.run(flag_then_raise())
+
+
 SYNCHRONOUS = Family(
     llm=build_synchronous_llm,
     repeated=RepeatedMonitor,
@@ -697,6 +738,7 @@ SYNCHRONOUS = Family(
     rate_and_cancel_the_send=rate_and_cancel_on_an_executor,
     send_flagged_with_a_worker=send_flagged_on_an_executor,
     flag_with_a_worker=flag_on_an_executor,
+    flag_and_cancel_the_post=flag_and_cancel_on_an_executor,
 )
 ASYNCHRONOUS = Family(
     llm=build_asynchronous_llm,
@@ -709,6 +751,7 @@ ASYNCHRONOUS = Family(
     rate_and_cancel_the_send=rate_and_cancel_in_a_task_group,
     send_flagged_with_a_worker=send_flagged_in_a_task_group,
     flag_with_a_worker=flag_in_a_task_group,
+    flag_and_cancel_the_post=flag_and_cancel_in_a_task_group,
 )
 
 
@@ -2432,3 +2475,35 @@ def test_a_score_is_not_posted_when_langsmith_rejects_the_flag_sent_before_it(
         langsmith,
         "key",
     ) == ["flagged"]
+
+
+@pytest.mark.parametrize(
+    ("family", "report"),
+    [
+        (
+            SYNCHRONOUS,
+            "LangSmithFeedback",
+        ),
+        (
+            ASYNCHRONOUS,
+            "AsyncLangSmithFeedback",
+        ),
+    ],
+    ids=["sync", "async"],
+)
+@pytest.mark.xfail(strict=True)
+def test_a_flag_cancelled_on_its_worker_is_logged_as_a_cancelled_flag(
+    family: Family[Monitor] | Family[AsyncMonitor],
+    langsmith: LangSmithServer,
+    caplog: pytest.LogCaptureFixture,
+    report: str,
+) -> None:
+    family.flag_and_cancel_the_post(langsmith)
+
+    assert [record for record in caplog.record_tuples if record[0].startswith("hyoshigi")] == [
+        (
+            "hyoshigi.monitors.reporting",
+            logging.WARNING,
+            f"{report} did not send the flag: CancelledError.",
+        ),
+    ]
