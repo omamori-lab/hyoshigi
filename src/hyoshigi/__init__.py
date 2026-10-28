@@ -2,6 +2,7 @@
 
 from hyoshigi.errors import ConfigurationError, FormatError
 from hyoshigi.models.model import (
+    AlternativeToken,
     AsyncDecisionModel,
     AsyncGenerativeModel,
     Decision,
@@ -16,6 +17,7 @@ from hyoshigi.models.model import (
     Question,
     Refused,
     Rejected,
+    TokenLogProbability,
     Truncated,
     Unavailable,
 )
@@ -93,6 +95,7 @@ __all__ = [
     "QWEN3GUARD",
     "Action",
     "Aggregation",
+    "AlternativeToken",
     "AsyncBlockAndFeedBack",
     "AsyncCalibratedMonitor",
     "AsyncCascadeMonitor",
@@ -171,6 +174,7 @@ __all__ = [
     "Step",
     "SuspicionScore",
     "TextPart",
+    "TokenLogProbability",
     "ToolCall",
     "ToolObservation",
     "Trajectory",

@@ -131,10 +131,36 @@ class Question:
     slots=True,
     kw_only=True,
 )
+class AlternativeToken:
+    """A token a model could have written at a position, with its log-probability."""
+
+    token: str
+    log_probability: float
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
+class TokenLogProbability:
+    """A generated token with its log-probability and the likeliest alternatives to it."""
+
+    token: str
+    log_probability: float
+    alternatives: tuple[AlternativeToken, ...] = ()
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+    kw_only=True,
+)
 class Generation:
-    """A complete reply."""
+    """A complete reply, with the log-probability of each generated token if the model gave them."""
 
     text: str
+    log_probabilities: tuple[TokenLogProbability, ...] = ()
 
 
 @dataclass(
@@ -337,6 +363,7 @@ class GenerativeModel:
     name: str
     generate: Callable[[Prompt], GenerationOutcome]
     perceives: MediaTypes = TEXT_ONLY
+    top_log_probabilities: int = 0
 
     def __post_init__(self) -> None:
         check_model(
@@ -440,6 +467,7 @@ class AsyncGenerativeModel:
     name: str
     generate: Callable[[Prompt], Awaitable[GenerationOutcome]]
     perceives: MediaTypes = TEXT_ONLY
+    top_log_probabilities: int = 0
 
     def __post_init__(self) -> None:
         check_model(

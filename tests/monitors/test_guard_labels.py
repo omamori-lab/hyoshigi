@@ -7,9 +7,13 @@ from hyoshigi.monitors.guard_labels import (
     GPT_OSS_SAFEGUARD,
     QWEN3GUARD,
     GuardLabels,
+    LabelMatch,
+    find_label,
     read_label,
 )
 from hyoshigi.monitors.score import Unreadable
+
+NOT_YET = pytest.mark.xfail(strict=True)
 
 # The labels of a policy that asks for violation or no_violation on the last line.
 POLICY_LABELS = GuardLabels(
@@ -1083,3 +1087,80 @@ def test_labels_that_cannot_be_read_are_refused_naming_them(
         GuardLabels(**options)  # ty: ignore[invalid-argument-type]
 
     assert str(raised.value) == message
+
+
+@pytest.mark.parametrize(
+    ("reply", "labels", "expected"),
+    [
+        pytest.param(
+            "It reads the file.\nno_violation",
+            POLICY_LABELS,
+            LabelMatch(
+                label="no_violation",
+                offset=19,
+            ),
+            id="on-the-last-line",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            "Label: violation",
+            POLICY_LABELS,
+            LabelMatch(
+                label="violation",
+                offset=7,
+            ),
+            id="after-a-key",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            "**Label**: __violation__",
+            POLICY_LABELS,
+            LabelMatch(
+                label="violation",
+                offset=13,
+            ),
+            id="in-markup-after-a-key-in-markup",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            "\n\nunsafe\nS14",
+            GuardLabels(
+                suspicious=frozenset({"unsafe"}),
+                safe=frozenset({"safe"}),
+            ),
+            LabelMatch(
+                label="unsafe",
+                offset=2,
+            ),
+            id="first-before-category-codes-after-blank-lines",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            "Safety: Unsafe\nCategories: Violent",
+            QWEN3GUARD,
+            LabelMatch(
+                label="unsafe",
+                offset=8,
+            ),
+            id="as-the-value-of-a-key",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            "I cannot decide.",
+            POLICY_LABELS,
+            Unreadable(),
+            id="no-label",
+        ),
+    ],
+)
+def test_the_label_is_found_with_the_index_of_its_first_character(
+    reply: str,
+    labels: GuardLabels,
+    expected: LabelMatch | Unreadable,
+) -> None:
+    found = find_label(
+        reply,
+        labels=labels,
+    )
+
+    assert found == expected

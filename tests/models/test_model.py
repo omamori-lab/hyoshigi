@@ -1,24 +1,30 @@
 """The models a monitor asks: their media, prompts, questions, decisions and names."""
 
 import math
+import numbers
 from decimal import Decimal
 from fractions import Fraction
 
 import pytest
 
 from hyoshigi import (
+    AlternativeToken,
     AsyncDecisionModel,
     AsyncGenerativeModel,
     ConfigurationError,
     Decision,
     DecisionModel,
+    Generation,
     GenerativeModel,
     MediaTypes,
     OpaquePart,
     Prompt,
     Question,
     Refused,
+    TokenLogProbability,
 )
+
+NOT_YET = pytest.mark.xfail(strict=True)
 
 
 async def build_refusal(prompt_or_question: Prompt | Question) -> Refused:
@@ -385,3 +391,235 @@ def test_a_model_field_of_the_wrong_type_raises_naming_the_field_when_built(
         kind(**fields)
 
     assert str(raised.value) == message
+
+
+class ArrayInteger:
+    """Stands in for numpy's integers: registered as integral, but not a subclass of int."""
+
+    def __init__(
+        self,
+        value: int,
+    ) -> None:
+        self.value = value
+
+    def __index__(self) -> int:
+        return self.value
+
+
+numbers.Integral.register(ArrayInteger)
+
+
+@NOT_YET
+@pytest.mark.parametrize(
+    ("kind", "fields", "message"),
+    [
+        (
+            AlternativeToken,
+            {
+                "token": 1,
+                "log_probability": -1.0,
+            },
+            "token must be a str, got an instance of int",
+        ),
+        (
+            AlternativeToken,
+            {
+                "token": "a",
+                "log_probability": 0.5,
+            },
+            "log_probability must be a number of at most 0, got 0.5",
+        ),
+        (
+            AlternativeToken,
+            {
+                "token": "a",
+                "log_probability": True,
+            },
+            "log_probability must be a number of at most 0, got True",
+        ),
+        (
+            TokenLogProbability,
+            {
+                "token": None,
+                "log_probability": -1.0,
+            },
+            "token must be a str, got None",
+        ),
+        (
+            TokenLogProbability,
+            {
+                "token": "a",
+                "log_probability": math.nan,
+            },
+            "log_probability must be a number of at most 0, got nan",
+        ),
+        (
+            TokenLogProbability,
+            {
+                "token": "a",
+                "log_probability": "-1",
+            },
+            "log_probability must be a number of at most 0, got '-1'",
+        ),
+        (
+            TokenLogProbability,
+            {
+                "token": "a",
+                "log_probability": -1.0,
+                "alternatives": [],
+            },
+            "alternatives must be a tuple, got an instance of list",
+        ),
+        (
+            TokenLogProbability,
+            {
+                "token": "a",
+                "log_probability": -1.0,
+                "alternatives": ({"token": "b"},),
+            },
+            "alternatives[0] must be an AlternativeToken, got an instance of dict",
+        ),
+        (
+            Generation,
+            {
+                "text": "a",
+                "log_probabilities": [],
+            },
+            "log_probabilities must be a tuple, got an instance of list",
+        ),
+        (
+            Generation,
+            {
+                "text": "a",
+                "log_probabilities": ("a",),
+            },
+            "log_probabilities[0] must be a TokenLogProbability, got an instance of str",
+        ),
+    ],
+    ids=[
+        "alternative-token-not-a-string",
+        "alternative-log-probability-above-zero",
+        "alternative-log-probability-bool",
+        "position-token-none",
+        "position-log-probability-not-a-number",
+        "position-log-probability-string",
+        "position-alternatives-a-list",
+        "position-alternative-a-dict",
+        "generation-log-probabilities-a-list",
+        "generation-log-probability-a-string",
+    ],
+)
+def test_a_log_probability_field_of_the_wrong_type_or_value_raises_naming_the_field(
+    kind: type,
+    fields: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        kind(**fields)
+
+    assert str(raised.value) == message
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        AlternativeToken,
+        TokenLogProbability,
+    ],
+    ids=["alternative-token", "position"],
+)
+@pytest.mark.parametrize(
+    ("log_probability", "kept"),
+    [
+        pytest.param(
+            0,
+            "0.0",
+            id="an-integer-zero",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            Fraction(-1, 2),
+            "-0.5",
+            id="a-fraction",
+            marks=NOT_YET,
+        ),
+        pytest.param(
+            -math.inf,
+            "-inf",
+            id="minus-infinity",
+        ),
+    ],
+)
+def test_a_log_probability_at_most_zero_is_kept_as_a_float(
+    kind: type,
+    log_probability: object,
+    kept: str,
+) -> None:
+    held = kind(
+        token="a",
+        log_probability=log_probability,
+    )
+
+    assert repr(held.log_probability) == kept
+
+
+@NOT_YET
+@pytest.mark.parametrize(
+    ("kind", "value", "message"),
+    [
+        (
+            GenerativeModel,
+            -1,
+            "top_log_probabilities must be at least 0, got -1",
+        ),
+        (
+            AsyncGenerativeModel,
+            1.5,
+            "top_log_probabilities must be a whole number of at least 0, got 1.5",
+        ),
+        (
+            GenerativeModel,
+            True,
+            "top_log_probabilities must be a whole number of at least 0, got True",
+        ),
+    ],
+    ids=["negative", "float", "bool"],
+)
+def test_alternatives_that_are_not_a_count_raise_naming_the_field_when_a_model_is_built(
+    kind: type,
+    value: object,
+    message: str,
+) -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        kind(
+            name="m",
+            generate=build_refusal,
+            top_log_probabilities=value,
+        )
+
+    assert str(raised.value) == message
+
+
+@NOT_YET
+@pytest.mark.parametrize(
+    "kind",
+    [
+        GenerativeModel,
+        AsyncGenerativeModel,
+    ],
+    ids=["generative", "async-generative"],
+)
+def test_a_whole_number_of_alternatives_that_is_not_an_int_is_kept_as_an_int(kind: type) -> None:
+    model = kind(
+        name="m",
+        generate=build_refusal,
+        top_log_probabilities=ArrayInteger(3),
+    )
+
+    assert (
+        type(model.top_log_probabilities),
+        model.top_log_probabilities,
+    ) == (
+        int,
+        3,
+    )
