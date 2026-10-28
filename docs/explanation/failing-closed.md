@@ -83,7 +83,7 @@ that is not in its format, and returns a score for every other failure.
   request no retry can fix, such as one with a bad key or an unknown model.
   That is an HTTP 4xx other than 408, 409 and 429 that is neither a refusal
   nor a rejection of what the prompt holds. `Trajectory.act`, `observe`,
-  `attach` and `delegate` raise it for arguments that cannot work.
+  `attach`, `delegate` and `join` raise it for arguments that cannot work.
 - `FormatError` comes only from the readers of a payload:
   `Trajectory.from_anthropic`, `from_openai_chat` and `from_open_responses`,
   their `Action.from_*` twins, and `Trajectory.load`. It names where in the

@@ -354,8 +354,8 @@ use](handling-a-failed-rating.md#a-prompt-the-provider-cannot-use-is-rejected) s
 
 ## `delegation_tools` turns a tool's results into subagent reports
 
-A result is a subagent report when its call was recorded with `Trajectory.delegate`, or when the
-tool that made the call is named in `delegation_tools`. A trajectory read from a provider's request
+A result is a subagent report when its call was recorded with `Trajectory.delegate` or
+`Trajectory.join`, or when the tool that made the call is named in `delegation_tools`. A trajectory read from a provider's request
 records no delegation, so a harness's delegating tool is named there. A monitor that rates the
 parent's action reads the report and none of the subagent's own entries.
 

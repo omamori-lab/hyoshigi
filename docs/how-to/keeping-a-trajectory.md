@@ -472,8 +472,9 @@ run's next numbers, in the order of their own, so two subagents that ran at once
 the other, in the order they were joined
 ([Block and feed back follows Claude Code's auto mode](../explanation/control-protocols.md#block-and-feed-back-follows-claude-codes-auto-mode)).
 The subagent must be the root of a run apart from this one, such as a trajectory loaded from a
-dump, the call one an action made that delegated no subagent yet, and the joined tree at most 32
-levels below the root. Anything else raises `ConfigurationError` and changes neither trajectory:
+dump. The call must be one an action made that delegated no subagent yet, and the joined tree must
+reach at most 32 levels below the root. Anything else raises `ConfigurationError` and changes
+neither trajectory:
 
 ```python
 orchestrator = Trajectory()
