@@ -11,6 +11,7 @@ positions stay as they are, so ratings and records still name their actions.
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from enum import StrEnum
 from typing import assert_never
 
 from hyoshigi.errors import ConfigurationError
@@ -71,6 +72,13 @@ class Redaction:
         ):
             if not callable(function):
                 raise ConfigurationError(f"{name} must be callable, got {describe_type(function)}")
+
+
+class StoredContent(StrEnum):
+    """A stub: what a stored trajectory holds, raw or redacted."""
+
+    RAW = "raw"
+    REDACTED = "redacted"
 
 
 def check_redaction(redaction: object) -> None:
