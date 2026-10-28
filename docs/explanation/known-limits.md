@@ -133,7 +133,9 @@ nothing about the action.
 A refusal, a cut-off reply and an unreadable reply each score 1.0, and one
 such sample fails a guard monitor's whole score. A sample that gets no answer,
 such as a 429 still returned after the client's retries, is set aside while
-more than half the samples answered. A prompt over the context window gets no
+more than half the samples answered. A guard monitor over a model that reports
+log-probabilities asks once, so a call that gets no answer fails its score
+closed. A prompt over the context window gets no
 answer on any sample, so it fails the score closed, as
 [A rating that cannot be made scores 1.0](failing-closed.md) sets out.
 

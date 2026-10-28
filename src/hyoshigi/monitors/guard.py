@@ -589,8 +589,7 @@ def _weigh_labels(
     """Return the share of the probability of the tokens that begin a label that lies on the
     suspicious labels, or None when none of them carries any.
 
-    Padhi et al. 2024, sec. 4.3, eq. 1 sum the probabilities of the top tokens that contain
-    Yes and No; this sums those that begin a label, since a label can span several tokens.
+    The probability of a token is the exponential of its log-probability.
     """
     weights = {
         _LabelKind.SUSPICIOUS: 0.0,
