@@ -42,11 +42,6 @@ from hyoshigi import (
     Unavailable,
 )
 
-pytestmark = pytest.mark.xfail(
-    strict=True,
-    reason="from_litellm is a stub",
-)
-
 MODEL = "anthropic/claude-haiku-5-5"
 SYSTEM = "You are a helpful assistant."
 TEXT_ONLY = MediaTypes()
@@ -449,17 +444,19 @@ def complete_now(**arguments: object) -> object:
 
 
 @pytest.mark.parametrize(
-    ("build", "function", "twin"),
+    ("build", "function", "message"),
     [
         (
             GenerativeModel.from_litellm,
             complete_later,
-            "Use AsyncGenerativeModel.from_litellm for litellm.acompletion",
+            "completion must not be a coroutine function. "
+            "Use AsyncGenerativeModel.from_litellm for litellm.acompletion.",
         ),
         (
             AsyncGenerativeModel.from_litellm,
             complete_now,
-            "Use GenerativeModel.from_litellm for litellm.completion",
+            "acompletion must be a coroutine function. "
+            "Use GenerativeModel.from_litellm for litellm.completion.",
         ),
         (
             GenerativeModel.from_litellm,
@@ -467,7 +464,8 @@ def complete_now(**arguments: object) -> object:
                 complete_later,
                 drop_params=True,
             ),
-            "Use AsyncGenerativeModel.from_litellm for litellm.acompletion",
+            "completion must not be a coroutine function. "
+            "Use AsyncGenerativeModel.from_litellm for litellm.acompletion.",
         ),
         (
             AsyncGenerativeModel.from_litellm,
@@ -475,7 +473,8 @@ def complete_now(**arguments: object) -> object:
                 complete_now,
                 drop_params=True,
             ),
-            "Use GenerativeModel.from_litellm for litellm.completion",
+            "acompletion must be a coroutine function. "
+            "Use GenerativeModel.from_litellm for litellm.completion.",
         ),
     ],
     ids=[
@@ -488,16 +487,15 @@ def complete_now(**arguments: object) -> object:
 def test_a_function_of_the_other_family_raises_naming_the_constructor_that_takes_it(
     build: Callable[..., GenerativeModel | AsyncGenerativeModel],
     function: Callable[..., object],
-    twin: str,
+    message: str,
 ) -> None:
-    with pytest.raises(
-        ConfigurationError,
-        match=re.escape(twin),
-    ):
+    with pytest.raises(ConfigurationError) as raised:
         build(
             function,
             model=MODEL,
         )
+
+    assert str(raised.value) == message
 
 
 @pytest.mark.parametrize(
@@ -1345,6 +1343,7 @@ def test_log_probabilities_in_a_reply_are_ignored_when_the_model_declares_none(a
         "VALID",
         {},
         {"content": "VALID"},
+        {"content": 7},
         {"content": ["VALID"]},
         {
             "content": [
@@ -1421,6 +1420,23 @@ def test_log_probabilities_in_a_reply_are_ignored_when_the_model_declares_none(a
                 {
                     "token": "VALID",
                     "logprob": -0.25,
+                    "top_logprobs": 7,
+                },
+            ],
+        },
+        {
+            "content": [
+                {
+                    "token": "VALID",
+                    "logprob": -0.25,
+                },
+            ],
+        },
+        {
+            "content": [
+                {
+                    "token": "VALID",
+                    "logprob": -0.25,
                     "top_logprobs": ["INVALID"],
                 },
             ],
@@ -1456,6 +1472,7 @@ def test_log_probabilities_in_a_reply_are_ignored_when_the_model_declares_none(a
         "logprobs-that-is-not-a-mapping",
         "no-content",
         "content-that-is-not-a-list",
+        "content-that-is-a-number",
         "position-that-is-not-a-mapping",
         "position-without-a-token",
         "token-that-is-not-text",
@@ -1465,6 +1482,8 @@ def test_log_probabilities_in_a_reply_are_ignored_when_the_model_declares_none(a
         "log-probability-above-zero",
         "log-probability-that-is-nan",
         "alternatives-that-are-not-a-list",
+        "alternatives-that-are-a-number",
+        "position-without-alternatives",
         "alternative-that-is-not-a-mapping",
         "alternative-with-a-log-probability-above-zero",
         "alternative-with-a-token-that-is-not-text",

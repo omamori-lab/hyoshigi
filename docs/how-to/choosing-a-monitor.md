@@ -199,7 +199,9 @@ position. OpenRouter's Responses API returns the token, its log-probability and 
 alternatives in this form, with each token's bytes besides
 [@openrouter2026openapi, {Section} "ResponseOutputText"]. Its `top_logprobs` parameter takes 0 to
 20 [@openrouter2026parameters, {Section} "Top Logprobs"]. A `GuardMonitor` over such a model asks
-once and does not use `samples`.
+once and does not use `samples`. `GenerativeModel.from_litellm` builds such a model on LiteLLM's
+`completion`, and its `top_log_probabilities` sends `logprobs` and `top_logprobs`
+([how](connecting-a-model.md#litellms-functions-go-in-from_litellm)).
 
 A model sets `top_log_probabilities` only when every provider that can serve it returns
 log-probabilities, since otherwise some of its replies fail closed as `Unreadable`. On OpenRouter,

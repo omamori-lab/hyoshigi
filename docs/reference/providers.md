@@ -1,10 +1,11 @@
 # Provider adapters
 
-Six adapters connect a monitor to a provider. Each makes at most one call to the caller's SDK client
-each time it is asked, which the client may retry, and returns an outcome. A generative model
-returns `Generation`, `Truncated`, `Refused`, `Rejected` or `Unavailable`, and a decision model
-`Decision`, `Refused`, `Rejected` or `Unavailable`. The client holds the key, the timeout and the
-retries, so an outcome is what remains after the client's retries.
+Seven adapters connect a monitor to a provider. Each makes at most one call each time it is asked, to
+the caller's SDK client, or for LiteLLM the caller's function, which may retry, and returns an
+outcome. A generative model returns `Generation`, `Truncated`, `Refused`, `Rejected` or
+`Unavailable`, and a decision model `Decision`, `Refused`, `Rejected` or `Unavailable`. The client
+holds the key, the timeout and the retries, so an outcome is what remains after the client's
+retries.
 [Connecting a model](../how-to/connecting-a-model.md) builds the clients.
 
 | Adapter | Constructor | Extra | Clients | Call | Endpoint |
@@ -15,18 +16,22 @@ retries, so an outcome is what remains after the client's retries.
 | OpenRouter Responses | `GenerativeModel.from_openrouter` | `openrouter` | `OpenRouter` | `responses.send`, `responses.send_async` | `POST /api/v1/responses` |
 | OpenRouter Decisions | `DecisionModel.from_openrouter` | `openrouter` | `OpenRouter` | `alpha.decisions.create`, `alpha.decisions.create_async` | `POST /api/alpha/decisions` |
 | TypeSafe | `DecisionModel.from_typesafe` | `typesafe` | `TypeSafeClient`, `AsyncTypeSafeClient` | `system_one` | `POST /v1/systemone` |
+| LiteLLM chat completions | `GenerativeModel.from_litellm` | none | `litellm.completion`, `litellm.acompletion` | the function itself | the chat completions endpoint of the provider the model id names |
 
 Each constructor has an async twin, such as `AsyncGenerativeModel.from_anthropic`, which takes the
-async client, or the one `OpenRouter` client, and awaits the async form of the call. A model's name
-is the provider and the model id, such as `anthropic:claude-haiku-5-5`. Building a model raises
-`ConfigurationError` for a client of the other family, naming the constructor that takes it, for an
-empty model id, and for a `perceives` that is not a `MediaTypes` or names media the API cannot
-carry.
+async client, the one `OpenRouter` client, or `litellm.acompletion`, and awaits the async form of the
+call. A model's name is the provider and the model id, such as `anthropic:claude-haiku-5-5`.
+Building a model raises `ConfigurationError` for a client of the other family, or for LiteLLM a
+function of the other family, naming the constructor that takes it, for an empty model id, and for a
+`perceives` that is not a `MediaTypes` or names media the API cannot carry.
 
-## The adapters declare no log-probabilities
+## Only the LiteLLM adapter declares log-probabilities
 
-The adapters build models with `top_log_probabilities` at 0 and return a `Generation` with no
-`log_probabilities`, so a `GuardMonitor` over an adapter samples. A model that reports
+The Anthropic, OpenAI, OpenRouter and TypeSafe adapters build models with `top_log_probabilities`
+at 0 and return a `Generation` with no `log_probabilities`, so a `GuardMonitor` over one of them
+samples. `from_litellm` takes `top_log_probabilities`, 0 by default, and above 0 the model declares
+it, asks for the log-probabilities on every call and returns them
+([LiteLLM chat completions](#litellm-chat-completions)). A model on another provider that reports
 log-probabilities comes from `GenerativeModel(name=..., generate=..., top_log_probabilities=...)`
 around the caller's own client ([Connecting a model](../how-to/connecting-a-model.md)).
 
@@ -56,8 +61,8 @@ so none of them answers, and the rating fails closed.
 
 ## A client error raises unless it blames the prompt
 
-On OpenAI and OpenRouter, an error whose code is a refusal or names a policy is `Refused` at any
-status, and on OpenRouter so is every 403. Otherwise the four providers' adapters read an HTTP error
+On OpenAI, OpenRouter and LiteLLM, an error whose code is a refusal or names a policy is `Refused`
+at any status, and on OpenRouter so is every 403. Otherwise the five adapters read an HTTP error
 status the same way:
 
 - 408 (request timeout), 409 (conflict) and 429 (too many requests) are `Unavailable` with the
@@ -392,3 +397,116 @@ error type, for a state that holds an image, is `Rejected(status=400)`; a 400 th
 error type, or one for a text-only state, breaks one of the request rules, which the client and
 the adapter keep, and raises. The TypeSafe adapter has no
 `Refused` outcome.
+
+## LiteLLM chat completions
+
+LiteLLM's `completion` and `acompletion` accept the parameters of OpenAI's chat completions request
+and translate them for each provider [@litellm2026input, {Section} "Common Params"]. A response has
+one format for every model [@litellm2026output, {Section} "Format"]. The adapter follows LiteLLM
+1.106.5 [@litellm2026source]. The caller binds the key, the retries and the other options of the
+call to the function with `functools.partial`
+([Connecting a model](../how-to/connecting-a-model.md#litellms-functions-go-in-from_litellm)).
+
+### Request
+
+| Prompt or option | Request |
+|---|---|
+| `Prompt.system` | the first message, with the role `system` |
+| the content | the second message, with the role `user` and the parts in order as its content |
+| a text part | `{"type": "text", "text": ...}`, blank text included |
+| `image/*` media | `{"type": "image_url", "image_url": {"url": ...}}`: a URL as given, bytes as a base64 data URL |
+| `application/pdf` media at a URL | `{"type": "file", "file": {"file_id": URL, "format": "application/pdf"}}` |
+| `application/pdf` bytes | `{"type": "file", "file": {"file_data": data URL, "filename": "attachment.pdf", "format": "application/pdf"}}` |
+| `audio/wav` bytes | `{"type": "input_audio", "input_audio": {"data": base64, "format": "wav"}}` |
+| `model` | `model` |
+| `top_log_probabilities`, when above 0 | `logprobs`: `true`, and `top_logprobs`: the count |
+
+The blocks are those of LiteLLM's pages on images, PDF files and audio
+[@litellm2026vision, {Section} "Spec"; @litellm2026documents, {Section} "url"; @litellm2026audio, {Section} "Audio Input to a model"].
+LiteLLM's `file` object takes a `filename` besides `file_data` and `file_id`
+[@litellm2026source, {}litellm/types/llms/openai.py], and the adapter sends `attachment.pdf`, the
+name the OpenAI models give file data. With `top_log_probabilities` at 0, neither `logprobs` nor
+`top_logprobs` is sent.
+
+`perceives` may name `image/*`, `application/pdf`, `audio/wav` and the types under `image/*`.
+Before any request, bytes typed with a media range such as `image/*`, which no data URL can name,
+audio at a URL, since the input audio block takes base64 data, and text with no UTF-8 form, such as
+a lone surrogate, return `Unavailable()`. Media of any other type, text media among them, raises
+`ConfigurationError` naming it.
+
+LiteLLM documents `top_logprobs` as an integer from 0 to 5
+[@litellm2026input, {Section} "Input Params"]. The adapter sets no maximum, so a count that a
+provider refuses is a 400 and raises `ConfigurationError` at the first rating. By default LiteLLM
+raises for a parameter that a provider does not support, and `drop_params` drops it instead
+[@litellm2026input, {Section} "Common Params"]. A model that declares log-probabilities
+and gets none returns a `Generation` with none, which fails a guard closed
+([how](../how-to/choosing-a-monitor.md#a-guard-monitor-scores-a-models-log-probabilities-in-one-call)).
+
+### Replies
+
+The adapter reads `reply.model_dump()`, the mapping that a LiteLLM `ModelResponse` gives of itself
+with the fields that were never set left out [@litellm2026source, {}litellm/types/utils.py]. Its
+first choice decides:
+
+| The choice | Outcome |
+|---|---|
+| `finish_reason` `length` | `Truncated` with the message's content so far, `""` when it is null |
+| `finish_reason` `content_filter`, or a refusal of at least one character | `Refused`, with the refusal as its explanation when there is one |
+| `finish_reason` `stop` | `Generation` of the message's content, `""` when it is null, with the log-probabilities when `top_log_probabilities` is above 0 |
+| any other `finish_reason` string, such as `tool_calls`, `function_call` or one added later | `Truncated` with the text so far |
+| `logprobs` that is null, or has a null `content`, when `top_log_probabilities` is above 0 | `Generation` with no `log_probabilities` |
+| `logprobs` that holds an entry without a string `token`, a `logprob` that is not a number or is above 0 or NaN, or a `top_logprobs` that is neither null nor a list of such entries | `Unavailable()` |
+| no choice, a choice or message that is not a mapping, a `finish_reason` that is not a string, or content that is neither a string nor null | `Unavailable()` |
+| a reply with no `model_dump`, such as a stream | `Unavailable()` |
+
+Log-probabilities are read from `choices[0].logprobs.content`, a list with an entry for each
+generated token of its `token`, its `logprob` and its `top_logprobs`, a list of `token` and
+`logprob`. The entry's `bytes` are not read. LiteLLM turns a null `top_logprobs` into an empty list
+[@litellm2026source, {}litellm/types/utils.py], and so does the adapter. A reply cut off at the
+output limit is `Truncated` even when it holds a refusal.
+
+OpenAI's message has a `refusal`, a string or null
+[@openai2026chatcompletions, {Section} "ChatCompletionMessage"]. LiteLLM's `Message` declares no
+such field, and a message key outside its fields moves to `provider_specific_fields`
+[@litellm2026source, {}litellm/litellm_core_utils/llm_response_utils/convert_dict_to_response.py].
+So the adapter reads a refusal from `message.refusal` and from
+`message.provider_specific_fields.refusal`.
+
+LiteLLM maps each provider's finish reason to `stop`, `length`, `tool_calls`, `function_call` or
+`content_filter`, and keeps the original in `provider_specific_fields["native_finish_reason"]`
+[@litellm2026output, {Section} "Native Finish Reason"]. A reason that LiteLLM does not map becomes
+`stop` [@litellm2026source, {}litellm/litellm_core_utils/core_helpers.py]. The adapter reads the
+mapped reason and does not read the original. A provider's malformed function call that LiteLLM
+maps to `stop` is therefore a `Generation`, which a monitor reads as unreadable when it holds no
+text.
+
+### Errors
+
+| Error | Outcome |
+|---|---|
+| `ContentPolicyViolationError`, `GuardrailRaisedException` or `BlockedPiiEntityError` | `Refused()` |
+| an error with a `code` that is `refusal` or contains `policy`, at any status | `Refused()` |
+| `ContextWindowExceededError` or `ImageFetchError` | `Rejected(status=400)` |
+| 413, or a `code` that says the prompt cannot be used, as for OpenAI Responses | `Rejected` with the status |
+| 408, 409, 429 or a 5xx | `Unavailable` with the status |
+| `BudgetExceededError` | `Unavailable()` |
+| `APIConnectionError`, `Timeout`, `APIResponseValidationError`, or text that the function cannot encode as UTF-8 | `Unavailable()` |
+| `APIError`, which LiteLLM raises for a status it does not map | as its status |
+| any other 4xx, among them 400, 401, 402, 403, 404, 422 and `UnsupportedParamsError` | `ConfigurationError` naming LiteLLM and the status |
+| an exception of no LiteLLM or SDK class, such as a `ValueError` | raised as it is |
+
+LiteLLM's exceptions inherit from OpenAI's, and a status error carries its status in `status_code`
+[@litellm2026exceptions, {Section} "LiteLLM Exceptions"]. The adapter catches the SDK's `APIError`.
+`GuardrailRaisedException`, `BlockedPiiEntityError` and `BudgetExceededError` inherit from
+`Exception` instead [@litellm2026source, {}litellm/exceptions.py], and the adapter finds them, and
+the classes it reads by class, in the module `litellm.exceptions` once LiteLLM is imported. An
+instance of one of these classes can exist only once its module is loaded, so hyoshigi imports
+LiteLLM no sooner. A `Timeout`, an `APIConnectionError` and an `APIResponseValidationError` carry a
+status that LiteLLM sets, 408 or 500, which the adapter does not read, since no answer came.
+LiteLLM raises an `APIConnectionError` for an error it does not map
+[@litellm2026exceptions, {Section} "LiteLLM Exceptions"], so that error is `Unavailable()`.
+
+Two rules differ from the other adapters. LiteLLM maps Anthropic's 413 to a `BadRequestError` with
+the status 400 [@litellm2026source, {}litellm/litellm_core_utils/exception_mapping_utils.py], so a
+request too large raises `ConfigurationError` where the OpenAI adapter gives `Rejected(status=413)`.
+A 403 raises as well, where OpenRouter's adapter gives `Refused`.

@@ -117,6 +117,115 @@ server that accepts a request and never answers holds one call for up to
 thirty minutes, and the action waits as long. A sync `GuardMonitor` asks its samples in turn, so
 five samples wait five times as long. A shorter `timeout` and fewer retries shorten the wait.
 
+## LiteLLM's functions go in `from_litellm`
+
+`GenerativeModel.from_litellm` takes the caller's `litellm.completion`, and
+`AsyncGenerativeModel.from_litellm` the caller's `litellm.acompletion`. hyoshigi never imports,
+installs or pins LiteLLM, so the constructor has no extra and the caller chooses the version. The
+adapter follows LiteLLM 1.106.5, read from its source at that tag and from its documentation
+[@litellm2026source]. No test installs LiteLLM or runs its code.
+[Provider adapters](../reference/providers.md#litellm-chat-completions) gives the request and what
+each reply becomes.
+
+The function holds what a provider's client holds: the key, the timeout and the retries. The
+caller binds them, and any other option of the call, with `functools.partial`. `api_key`, `timeout`,
+`max_completion_tokens` and `reasoning_effort` are arguments of `completion`
+[@litellm2026input, {Section} "Optional Fields"], and so are `num_retries` and `drop_params`
+[@litellm2026input, {Section} "litellm-specific params"]. A stand-in for `litellm.completion` with
+two bound options receives them with the request:
+
+```python
+from functools import partial
+
+from hyoshigi import GenerativeModel, Prompt, TextPart
+
+
+class Response:
+    """Stands in for the response litellm.completion returns, which gives itself as a mapping."""
+
+    def model_dump(self) -> dict[str, object]:
+        return {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "VALID",
+                    },
+                },
+            ],
+        }
+
+
+def complete(**arguments: object) -> Response:
+    """Stands in for litellm.completion and prints the keyword arguments it gets."""
+    for name, value in arguments.items():
+        print(f"{name}: {value}")
+    return Response()
+
+
+litellm_model = GenerativeModel.from_litellm(
+    partial(
+        complete,
+        max_completion_tokens=64,
+        drop_params=True,
+    ),
+    model="anthropic/claude-haiku-5-5",
+)
+print(litellm_model.name)
+print(
+    litellm_model.generate(
+        Prompt(
+            system="Label the action VALID or INVALID.",
+            content=(TextPart(text="ls"),),
+        ),
+    ),
+)
+```
+
+```text
+litellm:anthropic/claude-haiku-5-5
+max_completion_tokens: 64
+drop_params: True
+model: anthropic/claude-haiku-5-5
+messages: [{'role': 'system', 'content': 'Label the action VALID or INVALID.'}, {'role': 'user', 'content': [{'type': 'text', 'text': 'ls'}]}]
+Generation(text='VALID', log_probabilities=())
+```
+
+The model's name is `litellm:` and the model id. `from_litellm` raises `ConfigurationError` for a
+function of the other family: a coroutine function given to the sync constructor, and any other
+function given to the async one. `litellm.acompletion`, an `async def` and a `functools.partial` of
+either count as coroutine functions. A plain function that returns a coroutine does not.
+
+`top_log_probabilities` above 0 sends `logprobs` and `top_logprobs` with the request, and the model
+returns the log-probabilities LiteLLM gives, which a `GuardMonitor` scores in one call
+([how](choosing-a-monitor.md#a-guard-monitor-scores-a-models-log-probabilities-in-one-call)).
+LiteLLM documents `top_logprobs` as an integer from 0 to 5
+[@litellm2026input, {Section} "Optional Fields"], and the adapter sets no maximum. By default
+LiteLLM raises when a provider does not support a parameter it is passed
+[@litellm2026input, {Section} "Translated OpenAI params"], which reaches the program as a
+`ConfigurationError` at the first rating. With `drop_params=True` bound, LiteLLM drops the
+parameter, the reply holds no log-probabilities and the guard fails the rating closed as
+`Unreadable`. A model sets `top_log_probabilities` only when every provider that can serve it
+returns log-probabilities.
+
+LiteLLM 1.106.5 requires `openai>=2.20.0,<3.0.0` [@litellm2026source, {}pyproject.toml], while
+`hyoshigi[openai]` requires openai 3.33.0 or later. The two cannot share an environment, so hyoshigi
+installs without the `openai` extra beside LiteLLM. The LiteLLM adapter imports three exception
+classes from `openai`, which openai 2.54.0 and openai 3.35.1 both define.
+
+Versions 1.82.7, 1.82.8 and 1.107.0 of LiteLLM on PyPI carried malicious code that runs at every
+interpreter start, and the advisory does not list 1.106.5 [@osv2026litellm]. A lockfile that pins
+the version and the hash of each file keeps a later upload from replacing what was locked.
+`uv export` writes each locked version with its hashes unless `--no-hashes` is given
+[@uv2026cli, {Section} "uv export"], and `pip install --require-hashes` refuses a requirement that
+is unpinned or has no matching hash [@pypa2026secureinstalls, {Section} "Hash-checking Mode"]:
+
+```console
+uv export --format requirements.txt --output-file requirements.txt
+pip install --require-hashes --requirement requirements.txt
+```
+
 ## A function connects any other model
 
 `GenerativeModel(name=..., generate=..., perceives=..., top_log_probabilities=...)` connects any
@@ -322,8 +431,9 @@ covers how media in the history differs from media in the rated action.
 ## Reasoning options belong to the generative adapters
 
 `from_anthropic` takes `thinking` and a required `max_tokens`. `from_openai` and `from_openrouter`
-take `reasoning_effort` and an optional `max_output_tokens`. Each is sent only when given. The
-decision constructors take neither. [Rating with an LLM
+take `reasoning_effort` and an optional `max_output_tokens`. Each is sent only when given.
+`from_litellm` takes neither, since the caller binds `max_completion_tokens` and `reasoning_effort`
+to LiteLLM's function. The decision constructors take none of them. [Rating with an LLM
 monitor](rating-with-an-llm-monitor.md#reasoning-options-are-arguments-of-the-provider-model) covers
 the values the providers accept, and [why a model that thinks needs room under its output
 limit](rating-with-an-llm-monitor.md#a-model-that-thinks-needs-room-under-its-output-limit).

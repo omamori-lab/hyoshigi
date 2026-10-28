@@ -78,6 +78,16 @@ minor version.
   own output does not compound. A `content` that is not a `StoredContent`,
   and `REDACTED` without a redaction, raise `ConfigurationError` before the
   data is read.
+- `GenerativeModel.from_litellm` and `AsyncGenerativeModel.from_litellm` build
+  a model on the caller's `litellm.completion` or `litellm.acompletion`, with
+  `perceives` and `top_log_probabilities`. Above 0 the request asks for the
+  log-probabilities and the model returns them, so a `GuardMonitor` scores in
+  one call. The caller binds the key, the retries and the other options of the
+  call with `functools.partial`. hyoshigi never imports or installs LiteLLM,
+  and the adapter follows version 1.106.5. LiteLLM's content-policy,
+  guardrail and blocked-entity errors are `Refused`, its context-window and
+  image-fetch errors are `Rejected(status=400)`, and a client error that
+  blames the request raises `ConfigurationError` naming LiteLLM and the status.
 
 ## [0.4.0] - 2026-10-28
 
