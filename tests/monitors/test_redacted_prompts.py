@@ -1,5 +1,5 @@
-"""What a monitor's model reads under a redaction: the trajectory's, then the view's, and that
-the rating still fails closed on what the model cannot perceive.
+"""What each kind of monitor's model reads under a redaction: the trajectory's, then the view's,
+and that the rating still fails closed on what the model cannot perceive.
 """
 
 import asyncio
@@ -12,22 +12,32 @@ from typing import Protocol
 import pytest
 
 from hyoshigi import (
+    QWEN3GUARD,
     Action,
+    AsyncDecisionModel,
+    AsyncDecisionMonitor,
     AsyncGenerativeModel,
+    AsyncGuardMonitor,
     AsyncLLMMonitor,
     Author,
     Channel,
+    Decision,
+    DecisionModel,
+    DecisionMonitor,
+    DecisionOutcome,
     Description,
     FailedClosed,
     Generation,
     GenerationOutcome,
     GenerativeModel,
+    GuardMonitor,
     LLMMonitor,
     MediaPart,
     MediaTypes,
     MonitorPrompt,
     Prompt,
     PromptPart,
+    Question,
     Rationale,
     Redaction,
     SuspicionScore,
@@ -127,7 +137,10 @@ UNPERCEIVABLE_SCORE = SuspicionScore(
 
 
 class Script:
-    """A model that perceives the given media, keeps each prompt and gives a score of 3."""
+    """A model that perceives the given media and keeps the parts it reads: a generative model's
+    prompt content, with a score of 3 as its reply, or a decision model's state, with a
+    probability of 0.3.
+    """
 
     def __init__(
         self,
@@ -135,13 +148,13 @@ class Script:
         perceives: MediaTypes,
     ) -> None:
         self.perceives = perceives
-        self.received: list[Prompt] = []
+        self.received: list[tuple[PromptPart, ...]] = []
 
     def generate(
         self,
         prompt: Prompt,
     ) -> GenerationOutcome:
-        self.received.append(prompt)
+        self.received.append(prompt.content)
         return Generation(text="<reasoning>It dials the number.</reasoning><score>3</score>")
 
     async def generate_asynchronously(
@@ -149,6 +162,19 @@ class Script:
         prompt: Prompt,
     ) -> GenerationOutcome:
         return self.generate(prompt)
+
+    def decide(
+        self,
+        question: Question,
+    ) -> DecisionOutcome:
+        self.received.append(question.state)
+        return Decision(probability=0.3)
+
+    async def decide_asynchronously(
+        self,
+        question: Question,
+    ) -> DecisionOutcome:
+        return self.decide(question)
 
 
 class Rate(Protocol):
@@ -208,6 +234,100 @@ def rate_asynchronously(
     )
 
 
+def rate_with_guard(
+    script: Script,
+    *,
+    action: Action,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = GuardMonitor(
+        model=GenerativeModel(
+            name=MODEL_NAME,
+            generate=script.generate,
+            perceives=script.perceives,
+        ),
+        prompt=ECHO,
+        labels=QWEN3GUARD,
+        samples=2,
+        view=view,
+    )
+    return monitor.rate(
+        action,
+        trajectory=trajectory,
+    )
+
+
+def rate_with_async_guard(
+    script: Script,
+    *,
+    action: Action,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = AsyncGuardMonitor(
+        model=AsyncGenerativeModel(
+            name=MODEL_NAME,
+            generate=script.generate_asynchronously,
+            perceives=script.perceives,
+        ),
+        prompt=ECHO,
+        labels=QWEN3GUARD,
+        samples=2,
+        view=view,
+    )
+    return asyncio.run(
+        monitor.rate(
+            action,
+            trajectory=trajectory,
+        ),
+    )
+
+
+def rate_with_decision_model(
+    script: Script,
+    *,
+    action: Action,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = DecisionMonitor(
+        model=DecisionModel(
+            name=MODEL_NAME,
+            decide=script.decide,
+            perceives=script.perceives,
+        ),
+        view=view,
+    )
+    return monitor.rate(
+        action,
+        trajectory=trajectory,
+    )
+
+
+def rate_with_async_decision_model(
+    script: Script,
+    *,
+    action: Action,
+    trajectory: Trajectory,
+    view: View,
+) -> SuspicionScore:
+    monitor = AsyncDecisionMonitor(
+        model=AsyncDecisionModel(
+            name=MODEL_NAME,
+            decide=script.decide_asynchronously,
+            perceives=script.perceives,
+        ),
+        view=view,
+    )
+    return asyncio.run(
+        monitor.rate(
+            action,
+            trajectory=trajectory,
+        ),
+    )
+
+
 @pytest.fixture(
     params=[
         rate_synchronously,
@@ -217,6 +337,23 @@ def rate_asynchronously(
 )
 def rate(request: pytest.FixtureRequest) -> Rate:
     return request.param
+
+
+# What the model reads of the task and DIALLING, masked: ECHO's request for a generative model, and
+# the state a decision monitor asks about for a decision model.
+ECHOED = (
+    TextPart(
+        text="<user>Call Ana on ###-####.</user>|<agent>Dialling ###-####.</agent>\n"
+        '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>',
+    ),
+)
+STATED = (
+    TextPart(
+        text="<trajectory>\n<user>Call Ana on ###-####.</user>\n</trajectory>\n<proposed_action>\n"
+        "<agent>Dialling ###-####.</agent>\n"
+        '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>\n</proposed_action>',
+    ),
+)
 
 
 def build_task(redaction: Redaction | None = None) -> Trajectory:
@@ -236,6 +373,36 @@ def build_upload(redaction: Redaction | None = None) -> Trajectory:
 
 
 @pytest.mark.parametrize(
+    ("rate_with", "read"),
+    [
+        (
+            rate_synchronously,
+            ECHOED,
+        ),
+        (
+            rate_asynchronously,
+            ECHOED,
+        ),
+        (
+            rate_with_guard,
+            ECHOED,
+        ),
+        (
+            rate_with_async_guard,
+            ECHOED,
+        ),
+        (
+            rate_with_decision_model,
+            STATED,
+        ),
+        (
+            rate_with_async_decision_model,
+            STATED,
+        ),
+    ],
+    ids=["llm", "async-llm", "guard", "async-guard", "decision", "async-decision"],
+)
+@pytest.mark.parametrize(
     ("build", "view"),
     [
         (
@@ -253,25 +420,21 @@ def build_upload(redaction: Redaction | None = None) -> Trajectory:
     ids=["the-views", "the-trajectorys"],
 )
 def test_the_model_reads_the_history_and_the_proposed_action_redacted(
-    rate: Rate,
+    rate_with: Rate,
+    read: tuple[PromptPart, ...],
     build: Callable[[], Trajectory],
     view: View,
 ) -> None:
     script = Script(perceives=TEXT_ONLY)
 
-    rate(
+    rate_with(
         script,
         action=DIALLING,
         trajectory=build(),
         view=view,
     )
 
-    assert script.received[0].content == (
-        TextPart(
-            text="<user>Call Ana on ###-####.</user>|<agent>Dialling ###-####.</agent>\n"
-            '<tool_call id="call_2" name="dial">{"number": "###-####"}</tool_call>',
-        ),
-    )
+    assert script.received[0] == read
 
 
 @pytest.mark.parametrize(
@@ -376,7 +539,7 @@ def test_media_lifted_from_a_tool_calls_arguments_reaches_the_model_redacted(
         view=view,
     )
 
-    assert script.received[0].content == content
+    assert script.received[0] == content
 
 
 @pytest.mark.parametrize(
@@ -461,7 +624,7 @@ def test_media_lifted_from_the_history_keeps_its_ref_when_a_redaction_describes_
         view=View(),
     )
 
-    assert script.received[0].content == (
+    assert script.received[0] == (
         TextPart(
             text="<user>Call Ana on ###-####.</user>\n"
             '<tool_call id="call_1" name="upload">{"image": "[media 1]"}'
