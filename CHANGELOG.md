@@ -18,15 +18,15 @@ minor version.
 - `Redaction`'s `media` is optional. Left out, it puts
   `OpaquePart(kind=media_type)` in place of each media part, so a redaction
   that only masks text keeps and sends no media part, and the rating of an
-  action with media fails closed. Media in a tool call's arguments is text,
-  which only `text` reaches. Pass `media=lambda part: part` to keep media as
-  it is.
+  action whose parts or tool calls hold media fails closed. Media in a tool
+  call's arguments is text, which only `text` reaches. Pass
+  `media=lambda part: part` to keep media as it is.
 
 ### Fixed
 
 - A monitor fails the rating closed on an `OpaquePart` that a redaction puts
-  in the rated action, as on one the action holds. A model that perceives the
-  media it replaced rated the placeholder.
+  in the rated action's parts or tool calls, as on one the action holds. A
+  model that perceives the media it replaced rated the placeholder.
 
 ## [0.5.0] - 2026-10-28
 
