@@ -377,7 +377,7 @@ leaves:
 ```python
 import re
 
-from hyoshigi import MediaPart, Redaction, TextPart
+from hyoshigi import Redaction
 
 
 def mask_phone_numbers(text: str) -> str:
@@ -387,11 +387,6 @@ def mask_phone_numbers(text: str) -> str:
         "###-####",
         text,
     )
-
-
-def replace_media(part: MediaPart) -> TextPart:
-    """Put a placeholder in place of the media."""
-    return TextPart(text="[media removed]")
 
 
 langfuse_received.clear()
@@ -407,10 +402,7 @@ masked = ReportedMonitor(
     reports=(
         LangfuseScores(
             client=langfuse,
-            redaction=Redaction(
-                text=mask_phone_numbers,
-                media=replace_media,
-            ),
+            redaction=Redaction(text=mask_phone_numbers),
         ),
     ),
 )

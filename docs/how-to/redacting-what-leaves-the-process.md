@@ -116,8 +116,9 @@ def read_prompt() -> str:
 media blurred, a `TextPart` in its place, or the part as it was. The text in the part that `media`
 returns then passes through `text`: a `TextPart`'s text, a description, and the bytes of text media
 (a `text/*` type) as UTF-8 text, a data URL's payload included. Bytes that are not UTF-8 stay as
-`media` left them, and text media given by URL is `media`'s alone. Both functions are required, so
-no media passes for want of a function. A function that is not callable raises
+`media` left them, and text media given by URL is `media`'s alone. `text` is required. Left out,
+`media` puts `OpaquePart(kind=media_type)` in place of the media, so no media passes for want of a
+function, and the rating of an action kept so fails closed. A function that is not callable raises
 `ConfigurationError` when the `Redaction` is built, and one that returns another type raises it
 where the redaction is applied.
 

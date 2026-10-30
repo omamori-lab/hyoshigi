@@ -13,6 +13,14 @@ minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- `Redaction`'s `media` is optional. Left out, it puts
+  `OpaquePart(kind=media_type)` in place of each media part, so a redaction
+  that only masks text keeps and sends no image, audio, video or file, and the
+  rating of an action kept so fails closed. Pass `media=lambda part: part` to
+  keep media as it is.
+
 ## [0.5.0] - 2026-10-28
 
 ### Added

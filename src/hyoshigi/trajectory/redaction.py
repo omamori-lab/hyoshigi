@@ -39,9 +39,9 @@ from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.parts import MediaPart, OpaquePart, Part, TextPart, read_text
 
 
-def remove_media(part: MediaPart) -> Part:
+def remove_media(part: MediaPart) -> OpaquePart:
     """Return an OpaquePart of the media type in place of the media."""
-    return part
+    return OpaquePart(kind=part.media_type)
 
 
 @dataclass(

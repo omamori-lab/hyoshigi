@@ -578,7 +578,6 @@ def test_an_observation_is_kept_redacted_with_its_author_and_call(
     assert masking.history[-1] == kept
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_redaction_with_no_media_function_keeps_an_opaque_part_of_the_media_type() -> None:
     trajectory = Trajectory(redaction=Redaction(text=str))
 
