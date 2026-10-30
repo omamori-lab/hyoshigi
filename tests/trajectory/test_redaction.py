@@ -578,6 +578,25 @@ def test_an_observation_is_kept_redacted_with_its_author_and_call(
     assert masking.history[-1] == kept
 
 
+@pytest.mark.xfail(strict=True)
+def test_a_redaction_with_no_media_function_keeps_an_opaque_part_of_the_media_type() -> None:
+    trajectory = Trajectory(redaction=Redaction(text=str))
+
+    trajectory.observe(
+        ToolObservation(
+            call_id="call_1",
+            parts=(PNG,),
+        ),
+    )
+
+    assert trajectory.history == (
+        ToolObservation(
+            call_id="call_1",
+            parts=(OpaquePart(kind="image/png"),),
+        ),
+    )
+
+
 def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> None:
     trajectory = Trajectory(redaction=TO_TEXT)
 

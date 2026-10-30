@@ -39,6 +39,11 @@ from hyoshigi.trajectory.history import Action, Event, Observation
 from hyoshigi.trajectory.parts import MediaPart, OpaquePart, Part, TextPart, read_text
 
 
+def remove_media(part: MediaPart) -> Part:
+    """Return an OpaquePart of the media type in place of the media."""
+    return part
+
+
 @dataclass(
     frozen=True,
     slots=True,
@@ -49,7 +54,8 @@ class Redaction:
 
     `text` maps a str to a str. `media` maps a MediaPart to a part, such as the media blurred
     or a TextPart in its place, and the text in the part it returns then passes through `text`:
-    a TextPart's text, a description, and the bytes of text media that are UTF-8.
+    a TextPart's text, a description, and the bytes of text media that are UTF-8. By default,
+    `media` puts OpaquePart(kind=media_type) in place of the media.
     Each is callable, or ConfigurationError is raised when the redaction is built; a function
     that returns another type raises it where the redaction is applied.
 
@@ -57,7 +63,7 @@ class Redaction:
     """
 
     text: Callable[[str], str]
-    media: Callable[[MediaPart], Part]
+    media: Callable[[MediaPart], Part] = remove_media
 
     def __post_init__(self) -> None:
         for function, name in (
