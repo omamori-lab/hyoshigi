@@ -117,10 +117,10 @@ media blurred, a `TextPart` in its place, or the part as it was. The text in the
 returns then passes through `text`: a `TextPart`'s text, a description, and the bytes of text media
 (a `text/*` type) as UTF-8 text, a data URL's payload included. Bytes that are not UTF-8 stay as
 `media` left them, and text media given by URL is `media`'s alone. `text` is required. Left out,
-`media` puts `OpaquePart(kind=media_type)` in place of the media, so no media passes for want of a
-function, and the rating of an action kept so fails closed. A function that is not callable raises
-`ConfigurationError` when the `Redaction` is built, and one that returns another type raises it
-where the redaction is applied.
+`media` puts `OpaquePart(kind=media_type)` in place of the media, so no media part passes for want
+of a function, and the rating of an action with media fails closed. A function that is not callable
+raises `ConfigurationError` when the `Redaction` is built, and one that returns another type raises
+it where the redaction is applied.
 
 A redaction reaches every piece of content: text parts, thoughts, tool-call arguments, observations
 and their `source`, media, their descriptions and the text of text media, a score's explanation,
@@ -292,9 +292,10 @@ text function that rewrites a data URL leaves nothing for the rendering to lift.
 A rating fails closed when the model cannot perceive media in the rated action
 ([Handling a failed rating](handling-a-failed-rating.md)). The monitor finds what it cannot
 perceive, and the hidden reasoning it names, in the action before any redaction. A redaction that
-puts text in an image's place therefore leaves the failure as it was, and never makes a monitor
-more permissive about content it cannot see. `model` reads text only, and the image is replaced by
-its placeholder:
+puts text in an image's place therefore leaves the failure as it was, and never makes a monitor more
+permissive about content it cannot see. When the action holds nothing the model cannot perceive, an
+opaque part a redaction put in the media's place fails the rating closed, whatever the model
+perceives. `model` reads text only, and the image is replaced by its placeholder:
 
 ```python
 score = LLMMonitor(
@@ -329,9 +330,9 @@ passes through each redaction once. An image replaced by text at entry is rated 
 ## A monitor cannot judge what a redaction removed
 
 The monitor's model reads the redaction's output. A masked phone number cannot be checked against
-the number the user gave, and an image replaced by a placeholder cannot be checked at all, so a
-redaction that removes what a monitor needs leaves the monitor blind to it. A view that redacts
-only the monitor's reading, with the trajectory kept whole, leaves the stored record complete for a
+the number the user gave, and an image replaced by a text placeholder cannot be checked at all, so a
+redaction that removes what a monitor needs leaves the monitor blind to it. A view that redacts only
+the monitor's reading, with the trajectory kept whole, leaves the stored record complete for a
 person's audit.
 
 ## A dump stores redacted content and a load redacts what it reads
