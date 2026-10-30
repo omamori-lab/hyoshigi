@@ -118,9 +118,9 @@ returns then passes through `text`: a `TextPart`'s text, a description, and the 
 (a `text/*` type) as UTF-8 text, a data URL's payload included. Bytes that are not UTF-8 stay as
 `media` left them, and text media given by URL is `media`'s alone. `text` is required. Left out,
 `media` puts `OpaquePart(kind=media_type)` in place of the media, so no media part passes for want
-of a function, and the rating of an action with media fails closed. A function that is not callable
-raises `ConfigurationError` when the `Redaction` is built, and one that returns another type raises
-it where the redaction is applied.
+of a function, and the rating of an action whose parts or tool calls hold media fails closed. A
+function that is not callable raises `ConfigurationError` when the `Redaction` is built, and one
+that returns another type raises it where the redaction is applied.
 
 A redaction reaches every piece of content: text parts, thoughts, tool-call arguments, observations
 and their `source`, media, their descriptions and the text of text media, a score's explanation,
@@ -294,8 +294,9 @@ A rating fails closed when the model cannot perceive media in the rated action
 perceive, and the hidden reasoning it names, in the action before any redaction. A redaction that
 puts text in an image's place therefore leaves the failure as it was, and never makes a monitor more
 permissive about content it cannot see. When the action holds nothing the model cannot perceive, an
-opaque part a redaction put in the media's place fails the rating closed, whatever the model
-perceives. `model` reads text only, and the image is replaced by its placeholder:
+opaque part a redaction put in the place of media in its parts or tool calls fails the rating
+closed, whatever the model perceives. `model` reads text only, and the image is replaced by its
+placeholder:
 
 ```python
 score = LLMMonitor(
