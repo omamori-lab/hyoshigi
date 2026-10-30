@@ -684,6 +684,29 @@ def test_a_rating_of_media_the_model_cannot_perceive_fails_closed_whatever_the_r
     assert score == UNPERCEIVABLE_SCORE
 
 
+@pytest.mark.xfail(strict=True)
+def test_a_rating_of_the_latest_step_fails_closed_on_media_a_redaction_removed_by_default(
+    rate_latest_step: RateLatestStep,
+) -> None:
+    trajectory = Trajectory(redaction=Redaction(text=str))
+    trajectory.observe(
+        Observation(
+            author=Author.USER,
+            parts=(TextPart(text="Call Ana."),),
+        ),
+    )
+    trajectory.act(SHOWING)
+    script = Script(perceives=IMAGES)
+
+    score = rate_latest_step(
+        script,
+        trajectory=trajectory,
+        view=View(),
+    )
+
+    assert score == UNPERCEIVABLE_SCORE
+
+
 def test_the_hidden_reasoning_names_media_in_the_thought_a_redaction_turned_into_text(
     rate: Rate,
 ) -> None:
