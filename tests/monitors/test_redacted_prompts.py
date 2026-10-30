@@ -684,6 +684,49 @@ def test_a_rating_of_media_the_model_cannot_perceive_fails_closed_whatever_the_r
     assert score == UNPERCEIVABLE_SCORE
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("build", "action", "view"),
+    [
+        (
+            build_task,
+            SHOWING,
+            View(redaction=Redaction(text=str)),
+        ),
+        (
+            partial(
+                build_task,
+                Redaction(text=str),
+            ),
+            SHOWING,
+            View(),
+        ),
+        (
+            build_task,
+            UPLOADING,
+            View(redaction=Redaction(text=str)),
+        ),
+    ],
+    ids=["media-under-the-views", "media-under-the-trajectorys", "lifted-media-under-the-views"],
+)
+def test_a_rating_of_media_a_redaction_removed_fails_closed_whatever_the_model_perceives(
+    rate: Rate,
+    build: Callable[[], Trajectory],
+    action: Action,
+    view: View,
+) -> None:
+    script = Script(perceives=IMAGES)
+
+    score = rate(
+        script,
+        action=action,
+        trajectory=build(),
+        view=view,
+    )
+
+    assert score == UNPERCEIVABLE_SCORE
+
+
 def test_a_rating_of_the_latest_step_fails_closed_on_media_a_redaction_removed_by_default(
     rate_latest_step: RateLatestStep,
 ) -> None:
