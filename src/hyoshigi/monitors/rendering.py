@@ -59,7 +59,8 @@ class Rendering:
     `hidden_reasoning` names the kinds of the rated thought's opaque parts and the media
     types of its media not shown, or shown only as the agent's own description, and is empty
     when the view does not show the thought. `unperceivable` names the same of the action's
-    parts and tool calls. Both are found in the action before any redaction.
+    parts and tool calls. Both are found in the action before any redaction, and
+    `unperceivable`, when that holds none, in the action as redacted.
     """
 
     trajectory: tuple[PromptPart, ...]
@@ -159,6 +160,10 @@ def render(
         ),
         unperceivable=_collect_unseen(
             unredacted,
+            channels=Channel.AGENT_PARTS | Channel.TOOL_CALLS,
+        )
+        or _collect_unseen(
+            proposed,
             channels=Channel.AGENT_PARTS | Channel.TOOL_CALLS,
         ),
     )

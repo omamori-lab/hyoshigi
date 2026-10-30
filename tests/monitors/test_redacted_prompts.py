@@ -684,7 +684,6 @@ def test_a_rating_of_media_the_model_cannot_perceive_fails_closed_whatever_the_r
     assert score == UNPERCEIVABLE_SCORE
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "action", "view"),
     [
