@@ -11,7 +11,8 @@ name: Release
 #      the recorded digests, then publishes exactly those files through PyPI
 #      trusted publishing, so no token is stored;
 #   5. checks the files against the digests again, creates the GitHub Release
-#      and attaches the built distributions to it.
+#      and attaches the built distributions to it, and deploys the tagged
+#      commit's documentation.
 # After a failure past the upload, re-run the failed jobs only. A full re-run
 # builds new files, which PyPI refuses because it holds the release already.
 # These checks guard against mistakes. Someone with write access could tag a
@@ -300,3 +301,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${TAG}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"
+
+  docs:
+    name: Docs
+    needs: publish
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
