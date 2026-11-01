@@ -38,8 +38,10 @@ It scans for secrets with gitleaks and `.gitleaks.toml`, then runs ruff, the
 spread check, ty (type checking), the test suite and the lanorme standards
 (naming, complexity, docstrings, prose), builds the docs site with
 `--strict`, builds the package and imports the built wheel in a fresh
-environment. CI runs the same script on Python 3.12, 3.13 and 3.14, and
-scans the whole history for secrets.
+environment. CI runs the same script on Python 3.12, 3.13 and 3.14, runs
+the test suite, without the docs site tests, with each direct dependency at
+the lowest version its bound in `pyproject.toml` allows, and scans the whole
+history for secrets.
 
 The domain is mutation-tested: run `uv run --group dev mutmut run`, then
 `uv run --group dev mutmut results`, and explain every surviving mutant in
