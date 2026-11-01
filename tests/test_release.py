@@ -125,21 +125,19 @@ def test_a_tag_other_than_the_package_version_is_refused(tree: Path) -> None:
             ("0.8.0",),
             "CHANGELOG.md has no '## [0.8.0] - YYYY-MM-DD' section.",
         ),
-        pytest.param(
+        (
             "CHANGELOG.md",
             "- A rating fails closed on an image a redaction removed.\n\n",
             "",
             ("0.8.0",),
             "the CHANGELOG.md section for 0.8.0 is empty.",
-            marks=pytest.mark.xfail(strict=True),
         ),
-        pytest.param(
+        (
             "CHANGELOG.md",
             "[0.8.0]: https://github.com/omamori-lab/hyoshigi/compare/v0.7.0...v0.8.0",
             "[0.8.0]: https://",
             ("0.8.0",),
             "CHANGELOG.md has no '[0.8.0]: https://...' link reference.",
-            marks=pytest.mark.xfail(strict=True),
         ),
         (
             "CITATION.cff",
@@ -148,13 +146,12 @@ def test_a_tag_other_than_the_package_version_is_refused(tree: Path) -> None:
             ("0.8.0",),
             "CITATION.cff has version '0.7.0', not 0.8.0.",
         ),
-        pytest.param(
+        (
             "CITATION.cff",
             'version: "0.8.0"',
             'version: "0.8.0',
             ("0.8.0",),
             "CITATION.cff has version '', not 0.8.0.",
-            marks=pytest.mark.xfail(strict=True),
         ),
         (
             "CITATION.cff",
