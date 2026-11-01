@@ -5,8 +5,7 @@ one, and what happens after you report it.
 
 ## Supported versions
 
-Nothing is released yet. Once releases begin, security fixes go into the
-latest release only.
+hyoshigi is at 0.x. Security fixes go into the latest release only.
 
 ## Reporting a vulnerability
 
@@ -34,7 +33,8 @@ the main thing to report. In scope:
   content the monitor cannot perceive that yields a score below 1.0;
 - a payload that a builder misattributes, so that an observation authorises
   what its author could not;
-- trajectory content reaching a log or an error message.
+- trajectory content reaching a log or an error message;
+- a weakness in the release process or the published package.
 
 Out of scope: a monitor model that scores a harmful action too low while the
 library renders its view and reads its reply correctly. Monitors are models
@@ -44,6 +44,6 @@ do better.
 ## What to expect
 
 We reply in the private advisory, confirm the problem with you, and agree on a
-fix and a date to disclose it. The published advisory credits you unless you
-prefer otherwise. Please do not disclose the problem publicly until the fix is
-released.
+fix and a date to disclose it. The fix ships in a new release, and the
+published advisory credits you unless you prefer otherwise. Please do not
+disclose the problem publicly until the fix is released.
