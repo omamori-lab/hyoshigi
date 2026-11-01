@@ -3,6 +3,7 @@
 # Action.from_anthropic names Action in its own signature.
 from __future__ import annotations
 
+import json
 import re
 from base64 import b64decode
 from dataclasses import dataclass, field
@@ -16,14 +17,36 @@ from hyoshigi.trajectory.parts import MEDIA_TYPE, Author, MediaPart, Part, TextP
 # more US-ASCII characters except SPACE, controls and the tspecials ( ) < > @ , ; : \ " / [ ] ? =
 _PARAMETER_CHARACTER = r"[!#$%&'*+.^_`{|}~0-9A-Za-z-]"
 _PARAMETER = f";{_PARAMETER_CHARACTER}+={_PARAMETER_CHARACTER}+"
-# A JSON string that is a whole data URL of base64 data (RFC 2397, section 3): a media
-# type, parameters, then ;base64. The scheme is case-insensitive (RFC 3986, section 3.1),
-# as are the parameter names (RFC 2045, section 5.1), and so ;base64. The URL is matched
-# in the raw arguments, so arguments that are not valid JSON are read too.
+# A JSON string (RFC 8259, section 7): quotation marks around characters and escapes. It is
+# matched in the raw arguments, so arguments that are not valid JSON are read too.
+_STRING = re.compile(r'"(?:[^"\\]|\\.)*"')
+# A whole data URL of base64 data (RFC 2397, section 3): a media type, parameters, then
+# ;base64. The scheme is case-insensitive (RFC 3986, section 3.1), as are the parameter names
+# (RFC 2045, section 5.1), and so ;base64.
 _DATA_URL = re.compile(
-    f'"data:(?P<media_type>{MEDIA_TYPE.pattern})(?:{_PARAMETER})*;base64,(?P<data>[^"]*)"',
-    re.ASCII | re.IGNORECASE,
+    f"data:(?P<media_type>{MEDIA_TYPE.pattern})(?:{_PARAMETER})*;base64,(?P<data>.*)",
+    re.ASCII | re.IGNORECASE | re.DOTALL,
 )
+
+
+def _read_data_url(string: str) -> MediaPart | None:
+    """Return the media of a JSON string whose value is a whole data URL of base64 data, or None."""
+    try:
+        match json.loads(string):
+            case str(value) if url := _DATA_URL.fullmatch(value):
+                return MediaPart(
+                    media_type=url["media_type"],
+                    data=b64decode(
+                        url["data"],
+                        validate=True,
+                    ),
+                )
+            case _:
+                return None
+    # JSONDecodeError for a string that is not JSON, binascii.Error for data that is not base64,
+    # ValueError for text that is not ASCII.
+    except ValueError:
+        return None
 
 
 def _create_action_id() -> str:
@@ -39,7 +62,8 @@ class ToolCall:
     """A tool the agent asks to run, with its arguments as the JSON text the model emitted and
     the media lifted from them.
 
-    Each JSON string in the arguments that is a whole data URL of base64 data is lifted into
+    Each JSON string in the arguments whose value is a whole data URL of base64 data, escapes
+    read, is lifted into
     `media` and replaced by "[media n]", n counting on from the media given. The id, the name
     and the arguments are str and the media a tuple of parts; anything else raises
     ConfigurationError.
@@ -75,26 +99,16 @@ class ToolCall:
         media = list(self.media)
 
         def lift(found: re.Match[str]) -> str:
-            try:
-                data = b64decode(
-                    found["data"],
-                    validate=True,
-                )
-            # binascii.Error for data that is not base64, ValueError for text that is not ASCII.
-            except ValueError:
+            part = _read_data_url(found[0])
+            if part is None:
                 return found[0]
-            media.append(
-                MediaPart(
-                    media_type=found["media_type"],
-                    data=data,
-                ),
-            )
+            media.append(part)
             return f'"[media {len(media)}]"'
 
         object.__setattr__(
             self,
             "arguments",
-            _DATA_URL.sub(
+            _STRING.sub(
                 lift,
                 self.arguments,
             ),

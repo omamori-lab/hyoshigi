@@ -44,7 +44,6 @@ def test_a_tool_call_puts_a_numbered_placeholder_in_place_of_each_data_url_strin
 
 
 # JSON allows any character of a string to be written as an escape (RFC 8259, section 7).
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "arguments",
     [
