@@ -1057,6 +1057,26 @@ def test_a_format_error_names_a_subagent_by_its_call_id_escaped_as_in_a_normaliz
     assert raised.value.path == path
 
 
+def test_a_format_error_for_a_tool_call_says_what_was_expected() -> None:
+    payload: dict[str, JSON] = {
+        **ENVELOPE,
+        "history": [
+            {
+                **ACTION,
+                "tool_calls": [{"id": "c1"}],
+            },
+        ],
+    }
+
+    with pytest.raises(FormatError) as raised:
+        Trajectory.load(payload)
+
+    assert str(raised.value) == (
+        "$.history[0].tool_calls[0]: expected a tool call with an id, a name, arguments as text "
+        "and media"
+    )
+
+
 def test_a_format_error_names_its_path_in_its_message() -> None:
     with pytest.raises(FormatError) as raised:
         Trajectory.load(
