@@ -500,6 +500,43 @@ MEDIA: dict[str, JSON] = {
     "description": None,
 }
 AUDIO: dict[str, JSON] = {"kind": "audio"}
+# An action that uploads the eight bytes every PNG file starts with (RFC 2083, section 3.1), in
+# base64 iVBORw0KGgo=, as a data URL in its arguments.
+UPLOADING = Action(
+    id="a1",
+    tool_calls=(
+        ToolCall(
+            id="call_1",
+            name="upload",
+            arguments='{"image": "data:image/png;base64,iVBORw0KGgo="}',
+        ),
+    ),
+)
+STORED_UPLOADING: dict[str, JSON] = {
+    **ENVELOPE,
+    "version": 4,
+    "history": [
+        {
+            **ACTION,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "name": "upload",
+                    "arguments": '{"image": "[media 1]"}',
+                    "media": [
+                        {
+                            "kind": "media",
+                            "media_type": "image/png",
+                            "url": None,
+                            "data": "iVBORw0KGgo=",
+                            "description": None,
+                        },
+                    ],
+                },
+            ],
+        },
+    ],
+}
 TASK_CALL: dict[str, JSON] = {
     "id": "call_7",
     "name": "task",
@@ -529,6 +566,23 @@ def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None
     stored = trajectory.dump()
 
     assert stored == STORED
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_tool_call_dumps_with_the_media_lifted_from_its_arguments() -> None:
+    trajectory = Trajectory()
+    trajectory.act(UPLOADING)
+
+    stored = trajectory.dump()
+
+    assert stored == STORED_UPLOADING
+
+
+@pytest.mark.xfail(strict=True)
+def test_a_stored_tool_call_loads_back_with_its_media() -> None:
+    loaded = Trajectory.load(STORED_UPLOADING)
+
+    assert loaded.history == (UPLOADING,)
 
 
 def test_loading_the_stored_format_restores_the_history() -> None:
@@ -648,6 +702,24 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 ],
             },
             "$.history[0].tool_calls[0]",
+        ),
+        pytest.param(
+            {
+                **ENVELOPE,
+                "history": [
+                    {
+                        **ACTION,
+                        "tool_calls": [
+                            {
+                                **TASK_CALL,
+                                "media": [AUDIO],
+                            },
+                        ],
+                    },
+                ],
+            },
+            "$.history[0].tool_calls[0].media[0]",
+            marks=pytest.mark.xfail(strict=True),
         ),
         (
             {
@@ -898,6 +970,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         "malformed-thought",
         "malformed-action-part",
         "tool-call-without-arguments",
+        "malformed-tool-call-media",
         "unknown-author",
         "unknown-tool-observation-author",
         "malformed-observation-part",

@@ -79,6 +79,27 @@ TO_TEXT = Redaction(
     ),
     media=lambda part: TextPart(text="image 1"),
 )
+# Each digit masked, a data URL's included; media blurred to new bytes.
+DIGITS_MASKED = Redaction(
+    text=partial(
+        re.sub,
+        "[0-9]",
+        "#",
+    ),
+    media=partial(
+        replace,
+        data=b"blurred",
+    ),
+)
+# Each run of eight or more base64 characters masked, as a scanner for keys does, a data URL's
+# included; media removed, as by default.
+TOKENS_MASKED = Redaction(
+    text=partial(
+        re.sub,
+        "[A-Za-z0-9+/]{8,}",
+        "[SECRET]",
+    ),
+)
 # Text kept as written; media replaced with a text placeholder that holds a phone number.
 PLACEHOLDER = Redaction(
     text=str,
@@ -615,12 +636,53 @@ def test_the_model_reads_the_history_and_the_proposed_action_redacted(
                 ),
             ),
         ),
+        pytest.param(
+            build_task,
+            UPLOADING,
+            View(redaction=DIGITS_MASKED),
+            (
+                TextPart(
+                    text="<user>Call Ana on ###-####.</user>|"
+                    '<tool_call id="call_1" name="upload">{"image": "[media #]"}'
+                    '<media type="image/png" ref="1">',
+                ),
+                MediaPart(
+                    media_type="image/png",
+                    data=b"blurred",
+                ),
+                TextPart(text="</media></tool_call>"),
+            ),
+            marks=pytest.mark.xfail(strict=True),
+        ),
+        pytest.param(
+            partial(
+                build_task,
+                DIGITS_MASKED,
+            ),
+            UPLOADING,
+            View(),
+            (
+                TextPart(
+                    text="<user>Call Ana on ###-####.</user>|"
+                    '<tool_call id="call_1" name="upload">{"image": "[media #]"}'
+                    '<media type="image/png" ref="1">',
+                ),
+                MediaPart(
+                    media_type="image/png",
+                    data=b"blurred",
+                ),
+                TextPart(text="</media></tool_call>"),
+            ),
+            marks=pytest.mark.xfail(strict=True),
+        ),
     ],
     ids=[
         "the-views",
         "the-trajectorys",
         "the-trajectorys-then-the-views",
         "in-the-history-the-trajectorys",
+        "the-views-masking-its-digits",
+        "the-trajectorys-masking-its-digits",
     ],
 )
 def test_media_lifted_from_a_tool_calls_arguments_reaches_the_model_redacted(
@@ -719,6 +781,41 @@ def test_a_rating_of_media_a_redaction_removed_fails_closed_whatever_the_model_p
     score = rate(
         script,
         action=action,
+        trajectory=build(),
+        view=view,
+    )
+
+    assert score == UNPERCEIVABLE_SCORE
+
+
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("build", "view"),
+    [
+        (
+            build_task,
+            View(redaction=TOKENS_MASKED),
+        ),
+        (
+            partial(
+                build_task,
+                TOKENS_MASKED,
+            ),
+            View(),
+        ),
+    ],
+    ids=["the-views", "the-trajectorys"],
+)
+def test_a_rating_fails_closed_on_media_in_tool_call_arguments_whose_text_a_redaction_masks(
+    rate: Rate,
+    build: Callable[[], Trajectory],
+    view: View,
+) -> None:
+    script = Script(perceives=IMAGES)
+
+    score = rate(
+        script,
+        action=UPLOADING,
         trajectory=build(),
         view=view,
     )
