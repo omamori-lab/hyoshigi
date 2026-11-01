@@ -20,5 +20,5 @@ keywords:
   - agent-safety
   - monitoring
   - guardrails
-version: "0.6.0"
-date-released: "2026-10-30"
+version: "0.7.0"
+date-released: "2026-11-01"
