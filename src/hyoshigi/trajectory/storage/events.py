@@ -49,6 +49,7 @@ def dump_tool_call(call: ToolCall) -> JSON:
         "id": call.id,
         "name": call.name,
         "arguments": call.arguments,
+        "media": dump_parts(call.media),
     }
 
 
@@ -180,16 +181,21 @@ def load_tool_call(
             "id": str(call_id),
             "name": str(name),
             "arguments": str(arguments),
+            "media": list(media),
         }:
             return ToolCall(
                 id=call_id,
                 name=name,
                 arguments=arguments,
+                media=load_parts(
+                    media,
+                    path=f"{path}.media",
+                ),
             )
         case _:
             raise FormatError(
                 path=path,
-                expected="a tool call with an id, a name and arguments as text",
+                expected="a tool call with an id, a name, arguments as text and media",
             )
 
 

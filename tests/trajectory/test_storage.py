@@ -292,7 +292,7 @@ CAUSE_IDS = [
 # The stored format, written out by hand: base64 of the bytes 89 50 4E 47 is "iVBORw==".
 STORED: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "history": [
         {
             "kind": "observation",
@@ -329,6 +329,7 @@ STORED: dict[str, JSON] = {
                     "id": "call_1",
                     "name": "read_file",
                     "arguments": '{"path": "q3.csv"}',
+                    "media": [],
                 },
             ],
         },
@@ -370,7 +371,7 @@ STORED: dict[str, JSON] = {
 
 DELEGATING: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "history": [
         {
             "kind": "action",
@@ -382,6 +383,7 @@ DELEGATING: dict[str, JSON] = {
                     "id": "call_7",
                     "name": "task",
                     "arguments": "{}",
+                    "media": [],
                 },
             ],
         },
@@ -413,7 +415,7 @@ DELEGATING: dict[str, JSON] = {
     "subagents": {
         "call_7": {
             "format": "hyoshigi.trajectory",
-            "version": 3,
+            "version": 4,
             "history": [
                 {
                     "kind": "observation",
@@ -456,14 +458,14 @@ DELEGATING: dict[str, JSON] = {
 
 ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "ratings": [],
     "records": [],
     "subagents": {},
 }
 UNRATED_ENVELOPE: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "records": [],
     "subagents": {},
 }
@@ -541,6 +543,7 @@ TASK_CALL: dict[str, JSON] = {
     "id": "call_7",
     "name": "task",
     "arguments": "{}",
+    "media": [],
 }
 
 
@@ -568,7 +571,6 @@ def test_a_trajectory_dumps_to_the_stored_format(trajectory: Trajectory) -> None
     assert stored == STORED
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tool_call_dumps_with_the_media_lifted_from_its_arguments() -> None:
     trajectory = Trajectory()
     trajectory.act(UPLOADING)
@@ -578,7 +580,6 @@ def test_a_tool_call_dumps_with_the_media_lifted_from_its_arguments() -> None:
     assert stored == STORED_UPLOADING
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_stored_tool_call_loads_back_with_its_media() -> None:
     loaded = Trajectory.load(STORED_UPLOADING)
 
@@ -612,7 +613,7 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
         (
             {
                 **ENVELOPE,
-                "version": 4,
+                "version": 5,
                 "history": [],
             },
             "$",
@@ -719,7 +720,6 @@ def test_a_trajectory_with_a_subagent_loads_back_unchanged() -> None:
                 ],
             },
             "$.history[0].tool_calls[0].media[0]",
-            marks=pytest.mark.xfail(strict=True),
         ),
         (
             {
@@ -1997,6 +1997,7 @@ STORED_DELETE_FILE: dict[str, JSON] = {
             "id": "call_2",
             "name": "delete_file",
             "arguments": '{"path": "q3.csv"}',
+            "media": [],
         },
     ],
 }
@@ -2277,7 +2278,7 @@ def build_proposal_payload(**fields: JSON) -> dict[str, JSON]:
         pytest.param(
             {
                 "format": "hyoshigi.trajectory",
-                "version": 3,
+                "version": 4,
                 "history": [],
                 "ratings": [],
                 "subagents": {},
@@ -2996,6 +2997,17 @@ def test_a_format_error_for_a_record_says_what_was_expected(
             },
             id="version-2",
         ),
+        pytest.param(
+            {
+                "format": "hyoshigi.trajectory",
+                "version": 3,
+                "history": [],
+                "ratings": [],
+                "records": [],
+                "subagents": {},
+            },
+            id="version-3",
+        ),
     ],
 )
 def test_a_document_of_another_version_raises_naming_the_version_load_reads(
@@ -3004,7 +3016,7 @@ def test_a_document_of_another_version_raises_naming_the_version_load_reads(
     with pytest.raises(FormatError) as raised:
         Trajectory.load(payload)
 
-    assert str(raised.value) == "$: expected a hyoshigi.trajectory, format version 3"
+    assert str(raised.value) == "$: expected a hyoshigi.trajectory, format version 4"
 
 
 def test_a_proposals_score_nested_32_levels_deep_loads_back_unchanged() -> None:

@@ -134,7 +134,9 @@ class Redactor:
         self,
         action: Action,
     ) -> Action:
-        """Return the action with its thought, parts and tool calls' arguments redacted."""
+        """Return the action with its thought, its parts, and its tool calls' arguments and media
+        redacted.
+        """
         if not self._redactions:
             return action
         if action not in self._actions:
@@ -146,6 +148,7 @@ class Redactor:
                     replace(
                         call,
                         arguments=self.redact_text(call.arguments),
+                        media=self.redact_parts(call.media),
                     )
                     for call in action.tool_calls
                 ),

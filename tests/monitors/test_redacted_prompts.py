@@ -652,7 +652,6 @@ def test_the_model_reads_the_history_and_the_proposed_action_redacted(
                 ),
                 TextPart(text="</media></tool_call>"),
             ),
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             partial(
@@ -673,7 +672,6 @@ def test_the_model_reads_the_history_and_the_proposed_action_redacted(
                 ),
                 TextPart(text="</media></tool_call>"),
             ),
-            marks=pytest.mark.xfail(strict=True),
         ),
     ],
     ids=[
@@ -788,7 +786,6 @@ def test_a_rating_of_media_a_redaction_removed_fails_closed_whatever_the_model_p
     assert score == UNPERCEIVABLE_SCORE
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("build", "view"),
     [

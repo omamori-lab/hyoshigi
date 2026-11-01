@@ -446,7 +446,7 @@ unknown_action = json.loads(text)
 unknown_action["ratings"][0]["action_id"] = "missing"
 wrong_version = {
     **data,
-    "version": 4,
+    "version": 5,
 }
 for tampered in (
     wrong_version,
@@ -459,7 +459,7 @@ for tampered in (
 ```
 
 ```text
-$: expected a hyoshigi.trajectory, format version 3
+$: expected a hyoshigi.trajectory, format version 4
 $.ratings[0].action_id: expected the id of an action in the history
 ```
 
