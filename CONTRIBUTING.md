@@ -60,10 +60,13 @@ limits did when every call of two or more items was spread one per line.
 
 ## Documentation
 
-The site is built with MkDocs from `docs/` and deployed to GitHub Pages from
-`main` by the Docs workflow, which needs the repository's Pages source set to
-GitHub Actions. Its citations are formatted by Pandoc 2.11 or newer, which the
-docs build needs on your `PATH`, for example from `brew install pandoc`.
+The site is built with MkDocs from `docs/` and deployed to GitHub Pages by the
+Docs workflow, which the Release workflow calls once a release is on PyPI, so
+the site shows the released version. The deploy needs the repository's Pages
+source set to GitHub Actions, and the `github-pages` environment to allow
+`main` and the tag pattern `v*`, since it runs from the release tag. The
+site's citations are formatted by Pandoc 2.11 or newer, which the docs build
+needs on your `PATH`, for example from `brew install pandoc`.
 
 A docs page cites a source as `[@key, sec. 3.2]`: the key of its entry in
 `docs/references.bib`, then the locator, inside the same brackets and on one
