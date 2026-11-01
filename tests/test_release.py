@@ -71,7 +71,6 @@ def check_release(
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     "arguments",
     [
@@ -99,7 +98,6 @@ def test_a_tree_that_agrees_with_the_version_passes(
     ) == (0, "", "")
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tag_other_than_the_package_version_is_refused(tree: Path) -> None:
     process = check_release(
         tree,
@@ -110,7 +108,6 @@ def test_a_tag_other_than_the_package_version_is_refused(tree: Path) -> None:
     assert "__version__ is '0.8.0', not 0.9.0." in process.stderr
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("path", "old", "new", "arguments", "problem"),
     [

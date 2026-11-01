@@ -2,7 +2,8 @@ name: Release
 
 # Publishes a release to PyPI when a version tag is pushed. The workflow:
 #   1. checks that the pypi environment has a required reviewer, that the tag
-#      is vX.Y.Z and names a commit on main, and that it agrees with __version__;
+#      is vX.Y.Z and names a commit on main, and that it agrees with __version__,
+#      CHANGELOG.md and CITATION.cff (scripts/check-release.sh);
 #   2. runs the whole CI workflow on the tagged commit;
 #   3. builds the sdist and the wheel once, records their SHA-256 digests,
 #      checks them with twine, and installs the wheel into fresh
@@ -92,15 +93,10 @@ jobs:
             exit 1
           fi
 
-      - name: Check that the tag matches the package version
+      - name: Check the tag against the version, CHANGELOG.md and CITATION.cff
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          package_version="$(sed -n -E 's/^__version__ = "([^"]*)"$/\1/p' src/hyoshigi/__init__.py)"
-          if [[ "${package_version}" != "${VERSION}" ]]; then
-            echo "::error::__version__ is '${package_version}', not ${VERSION}."
-            exit 1
-          fi
+        run: scripts/check-release.sh "${VERSION}"
 
   ci:
     name: CI
