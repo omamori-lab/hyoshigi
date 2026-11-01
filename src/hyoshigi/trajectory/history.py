@@ -3,12 +3,27 @@
 # Action.from_anthropic names Action in its own signature.
 from __future__ import annotations
 
+import re
+from base64 import b64decode
 from dataclasses import dataclass, field
 from uuid import uuid4
 
 from hyoshigi.options import check_instance
 from hyoshigi.trajectory.json_data import JSON
-from hyoshigi.trajectory.parts import Author, Part, TextPart, check_parts
+from hyoshigi.trajectory.parts import MEDIA_TYPE, Author, MediaPart, Part, TextPart, check_parts
+
+# RFC 2045, section 5.1: a parameter is an attribute and a value joined by =, each one or
+# more US-ASCII characters except SPACE, controls and the tspecials ( ) < > @ , ; : \ " / [ ] ? =
+_PARAMETER_CHARACTER = r"[!#$%&'*+.^_`{|}~0-9A-Za-z-]"
+_PARAMETER = f";{_PARAMETER_CHARACTER}+={_PARAMETER_CHARACTER}+"
+# A JSON string that is a whole data URL of base64 data (RFC 2397, section 3): a media
+# type, parameters, then ;base64. The scheme is case-insensitive (RFC 3986, section 3.1),
+# as are the parameter names (RFC 2045, section 5.1), and so ;base64. The URL is matched
+# in the raw arguments, so arguments that are not valid JSON are read too.
+_DATA_URL = re.compile(
+    f'"data:(?P<media_type>{MEDIA_TYPE.pattern})(?:{_PARAMETER})*;base64,(?P<data>[^"]*)"',
+    re.ASCII | re.IGNORECASE,
+)
 
 
 def _create_action_id() -> str:
@@ -21,14 +36,21 @@ def _create_action_id() -> str:
     kw_only=True,
 )
 class ToolCall:
-    """A tool the agent asks to run, with its arguments as the JSON text the model emitted.
+    """A tool the agent asks to run, with its arguments as the JSON text the model emitted and
+    the media lifted from them.
 
-    The id, the name and the arguments are str; anything else raises ConfigurationError.
+    Each JSON string in the arguments that is a whole data URL of base64 data is lifted into
+    `media` and replaced by "[media n]", n counting on from the media given. The id, the name
+    and the arguments are str and the media a tuple of parts; anything else raises
+    ConfigurationError.
+
+    <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
     """
 
     id: str
     name: str
     arguments: str
+    media: tuple[Part, ...] = ()
 
     def __post_init__(self) -> None:
         check_instance(
@@ -45,6 +67,42 @@ class ToolCall:
             self.arguments,
             expected=str,
             name="arguments",
+        )
+        check_parts(
+            self.media,
+            name="media",
+        )
+        media = list(self.media)
+
+        def lift(found: re.Match[str]) -> str:
+            try:
+                data = b64decode(
+                    found["data"],
+                    validate=True,
+                )
+            # binascii.Error for data that is not base64, ValueError for text that is not ASCII.
+            except ValueError:
+                return found[0]
+            media.append(
+                MediaPart(
+                    media_type=found["media_type"],
+                    data=data,
+                ),
+            )
+            return f'"[media {len(media)}]"'
+
+        object.__setattr__(
+            self,
+            "arguments",
+            _DATA_URL.sub(
+                lift,
+                self.arguments,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "media",
+            tuple(media),
         )
 
 

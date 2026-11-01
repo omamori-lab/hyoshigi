@@ -1,5 +1,7 @@
 """Rendering: entries and their tags, parts by perception, selection and the rated action."""
 
+from dataclasses import replace
+
 import pytest
 
 from hyoshigi import (
@@ -675,10 +677,9 @@ def test_lifted_media_is_numbered_from_one_in_each_tool_call() -> None:
         Action(
             tool_calls=(
                 UPLOAD,
-                ToolCall(
+                replace(
+                    UPLOAD,
                     id="c3",
-                    name="upload",
-                    arguments=UPLOAD.arguments,
                 ),
             ),
         ),

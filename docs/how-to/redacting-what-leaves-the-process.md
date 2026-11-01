@@ -122,6 +122,11 @@ of a function, and the rating of an action whose parts or tool calls hold media 
 function that is not callable raises `ConfigurationError` when the `Redaction` is built, and one
 that returns another type raises it where the redaction is applied.
 
+A tool call's images are media too. A `ToolCall` lifts each JSON string in its arguments that is a
+whole base64 data URL into its `media` when it is built, and leaves `"[media n]"` in its place, so
+`text` reads the arguments without the image's data and `media` reads the image. An image that is
+not a whole data URL string, such as bare base64, cannot be told from text and is `text`'s alone.
+
 A redaction reaches every piece of content: text parts, thoughts, tool-call arguments, observations
 and their `source`, media, their descriptions and the text of text media, a score's explanation,
 the reply text that a score's cause holds (a cut-off reply's text, a refusal's explanation), the
@@ -177,7 +182,7 @@ for event in kept.history:
 
 ```text
 Observation(author=<Author.USER: 'user'>, parts=(TextPart(text='Call Ana back on ###-####.'),), source='voicemail from ###-####')
-Action(id='dial-555-0100', thought=(TextPart(text='Ana is on ###-####.'),), parts=(), tool_calls=(ToolCall(id='call-555-0100', name='dial', arguments='{"number": "###-####"}'),))
+Action(id='dial-555-0100', thought=(TextPart(text='Ana is on ###-####.'),), parts=(), tool_calls=(ToolCall(id='call-555-0100', name='dial', arguments='{"number": "###-####"}', media=()),))
 ToolObservation(author=<Author.TOOL: 'tool'>, parts=(TextPart(text='[image/png removed]'),), source=None, call_id='call-555-0100', is_error=False)
 ```
 
@@ -244,9 +249,8 @@ print(read_prompt())
 ## A view redacts what the monitor's model reads
 
 `View(redaction=...)` redacts the history and the rated action that the monitor's model reads,
-after the trajectory's own redaction, and leaves the trajectory as it is. A tool call's arguments
-can hold an image as a data URL, which the rendering lifts out after the arguments. The lifted
-media passes through the trajectory's media function, then the view's:
+after the trajectory's own redaction, and leaves the trajectory as it is. A tool call's media
+follows its arguments, through the trajectory's media function, then the view's:
 
 ```python
 unredacted = Trajectory()
@@ -283,9 +287,6 @@ print(unredacted.history[0].parts)
 <tool_call id="call-2" name="send">{"to": "###-####", "image": "[media 1]"}<media ref="1">[image/png removed]</media></tool_call>
 (TextPart(text="Send Ana's card to 555-0100."),)
 ```
-
-Stored tool-call arguments are text, so only the text function sees them, data URLs included. A
-text function that rewrites a data URL leaves nothing for the rendering to lift.
 
 ## Media the model cannot perceive still fails the rating closed
 
@@ -324,9 +325,8 @@ FailedClosed(model='scripted', cause=Unperceivable(content=('image/png',)))
 
 `rate_latest_step` takes the rated action from the trajectory's history. On a trajectory redacted
 at entry, that action is the redacted copy, so the trajectory's redaction is not applied to it
-again: the view's applies once, and media lifted from its arguments passes through the
-trajectory's media function and then the view's, as a history entry's does. Each piece of content
-passes through each redaction once. An image replaced by text at entry is rated as that text.
+again: the view's applies once, as to a history entry. Each piece of content passes through each
+redaction once. An image replaced by text at entry is rated as that text.
 
 ## A monitor cannot judge what a redaction removed
 
@@ -358,7 +358,7 @@ print(loaded.redaction is masking)
 ```
 
 ```text
-3
+4
 [{'kind': 'text', 'text': "Send Ana's card to ###-####."}]
 (TextPart(text="Send Ana's card to 555-0100."),)
 (TextPart(text="Send Ana's card to ###-####."),)

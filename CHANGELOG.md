@@ -13,6 +13,27 @@ minor version.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `ToolCall` has `media`, a tuple of parts. Each JSON string
+  in a tool call's arguments that is a whole base64 data URL is lifted into
+  `media` when the `ToolCall` is built, and `"[media n]"` takes its place, so
+  `arguments` no longer holds the image. A redaction passes the arguments
+  through `text` and the media through `media`: a redaction without `media`
+  removes an image in a tool call's arguments from what the trajectory keeps,
+  and a `text` function never reads the image's data.
+- **Breaking:** the stored trajectory format is version 4, in which each tool
+  call holds its `media`. `Trajectory.load` reads only version 4; a version-3
+  file raises `FormatError`.
+
+### Fixed
+
+- A rating fails closed on an image in a tool call's arguments that a
+  redaction removed, whatever its `text` function does to the arguments. A
+  `text` function that changed the image's characters, such as one that masks
+  digits or long tokens, left no data URL to lift, so the monitor rated the
+  string and the trajectory kept most of the image.
+
 ## [0.6.0] - 2026-10-30
 
 ### Changed

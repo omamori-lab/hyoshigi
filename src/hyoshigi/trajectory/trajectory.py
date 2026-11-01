@@ -34,7 +34,7 @@ from hyoshigi.trajectory.storage.records import dump_record
 from hyoshigi.trajectory.storage.scores import NESTING_LIMIT, dump_score
 
 FORMAT = "hyoshigi.trajectory"
-VERSION = 3
+VERSION = 4
 
 
 class BlackBoxRun(NamedTuple):

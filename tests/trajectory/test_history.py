@@ -32,7 +32,6 @@ def test_a_tool_observation_is_authored_by_the_tool() -> None:
     assert observation.author is Author.TOOL
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tool_call_puts_a_numbered_placeholder_in_place_of_each_data_url_string() -> None:
     call = ToolCall(
         id="call_1",
@@ -44,28 +43,26 @@ def test_a_tool_call_puts_a_numbered_placeholder_in_place_of_each_data_url_strin
     assert call.arguments == '["[media 1]", "q3.png", "[media 2]"]'
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tool_call_numbers_its_placeholders_after_the_media_given() -> None:
     call = ToolCall(
         id="call_1",
         name="upload",
         arguments='{"image": "data:image/png;base64,iVBORw0KGgo="}',
-        media=(TASK,),  # ty: ignore[unknown-argument]
+        media=(TASK,),
     )
 
     assert call.arguments == '{"image": "[media 2]"}'
 
 
-@pytest.mark.xfail(strict=True)
 def test_a_tool_call_keeps_the_media_of_each_data_url_string_after_the_media_given() -> None:
     call = ToolCall(
         id="call_1",
         name="upload",
         arguments='["data:image/png;base64,iVBORw0KGgo=", "data:image/gif;base64,R0lGODlh"]',
-        media=(TASK,),  # ty: ignore[unknown-argument]
+        media=(TASK,),
     )
 
-    assert call.media == (  # ty: ignore[unresolved-attribute]
+    assert call.media == (
         TASK,
         MediaPart(
             media_type="image/png",
@@ -162,7 +159,6 @@ def test_actions_built_without_an_id_get_distinct_ids() -> None:
             },
             "media must be a tuple, got an instance of list",
             id="media-a-list",
-            marks=pytest.mark.xfail(strict=True),
         ),
         pytest.param(
             Observation,

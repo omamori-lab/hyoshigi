@@ -212,7 +212,7 @@ STORED_SCORE_FIELDS: dict[str, JSON] = {
 }
 STORED_SUBAGENT_FIELDS: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "ratings": [],
     "records": [],
     "subagents": {},
@@ -220,7 +220,7 @@ STORED_SUBAGENT_FIELDS: dict[str, JSON] = {
 # The trajectory build_stored_trajectory keeps, as dump writes it.
 STORED: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "history": [
         {
             "kind": "observation",
@@ -246,6 +246,7 @@ STORED: dict[str, JSON] = {
                     "id": "call_2",
                     "name": "task",
                     "arguments": '{"prompt": "Find who owns 555-0100."}',
+                    "media": [],
                 },
             ],
         },
@@ -278,6 +279,7 @@ STORED: dict[str, JSON] = {
                                 "id": "call_2",
                                 "name": "task",
                                 "arguments": '{"prompt": "Find who owns 555-0100."}',
+                                "media": [],
                             },
                         ],
                     },
@@ -314,7 +316,7 @@ STORED: dict[str, JSON] = {
 # The same trajectory with each digit of its content masked.
 MASKED_STORED: dict[str, JSON] = {
     "format": "hyoshigi.trajectory",
-    "version": 3,
+    "version": 4,
     "history": [
         {
             "kind": "observation",
@@ -340,6 +342,7 @@ MASKED_STORED: dict[str, JSON] = {
                     "id": "call_2",
                     "name": "task",
                     "arguments": '{"prompt": "Find who owns ###-####."}',
+                    "media": [],
                 },
             ],
         },
@@ -372,6 +375,7 @@ MASKED_STORED: dict[str, JSON] = {
                                 "id": "call_2",
                                 "name": "task",
                                 "arguments": '{"prompt": "Find who owns ###-####."}',
+                                "media": [],
                             },
                         ],
                     },
@@ -596,7 +600,6 @@ def test_a_redaction_with_no_media_function_keeps_an_opaque_part_of_the_media_ty
     )
 
 
-@pytest.mark.xfail(strict=True)
 @pytest.mark.parametrize(
     ("text", "arguments"),
     [

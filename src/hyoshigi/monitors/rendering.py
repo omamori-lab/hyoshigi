@@ -5,16 +5,13 @@ its tool calls. Text inside an element is HTML-escaped, so a tool result cannot 
 tag and pose as another entry. Text media is its escaped text, and other media the model
 perceives sits in place among the text; the rest is its description, tagged with who wrote
 it, or a placeholder. The view's redaction applies to the history, which the trajectory keeps
-through its own; the trajectory's redaction, then the view's, applies to the rated action and to
-media lifted from a tool call's arguments. An action split off the trajectory, which kept it
-redacted, is redacted by the view's alone, and its lifted media by both.
+through its own; the trajectory's redaction, then the view's, applies to the rated action. An
+action split off the trajectory, which kept it redacted, is redacted by the view's alone.
 
 <https://omamori-lab.github.io/hyoshigi/how-to/redacting-what-leaves-the-process/>
 """
 
 import html
-import re
-from base64 import b64decode
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, replace
 from typing import assert_never
@@ -23,7 +20,6 @@ from hyoshigi.models.model import MediaTypes, PromptPart
 from hyoshigi.monitors.view import Channel, View
 from hyoshigi.trajectory.history import Action, Observation, ToolCall, ToolObservation
 from hyoshigi.trajectory.parts import (
-    MEDIA_TYPE,
     Author,
     MediaPart,
     OpaquePart,
@@ -33,19 +29,6 @@ from hyoshigi.trajectory.parts import (
 )
 from hyoshigi.trajectory.redaction import Redactor
 from hyoshigi.trajectory.trajectory import Trajectory, is_split_off
-
-# RFC 2045, section 5.1: a parameter is an attribute and a value joined by =, each one or
-# more US-ASCII characters except SPACE, controls and the tspecials ( ) < > @ , ; : \ " / [ ] ? =
-_PARAMETER_CHARACTER = r"[!#$%&'*+.^_`{|}~0-9A-Za-z-]"
-_PARAMETER = f";{_PARAMETER_CHARACTER}+={_PARAMETER_CHARACTER}+"
-# A JSON string that is a whole data URL of base64 data (RFC 2397, section 3): a media
-# type, parameters, then ;base64. The scheme is case-insensitive (RFC 3986, section 3.1),
-# as are the parameter names (RFC 2045, section 5.1), and so ;base64. The URL is matched
-# in the raw arguments, so arguments that are not valid JSON are read too.
-_DATA_URL = re.compile(
-    f'"data:(?P<media_type>{MEDIA_TYPE.pattern})(?:{_PARAMETER})*;base64,(?P<data>[^"]*)"',
-    re.ASCII | re.IGNORECASE,
-)
 
 
 @dataclass(
@@ -105,17 +88,12 @@ def render(
     The action's parts and tool calls are shown whatever the view, and its thought when
     the view shows thoughts; `most_recent` limits only the history.
     """
-    redactor = Redactor(
-        trajectory.redaction,
-        view.redaction,
-    )
     history = _select(
         list(
             _render_history(
                 trajectory,
                 view=view,
                 perceives=perceives,
-                redactor=redactor,
             ),
         ),
         view=view,
@@ -138,7 +116,6 @@ def render(
                 view.redaction,
             ).redact_action(action),
             perceives=perceives,
-            redactor=redactor,
         )
         if entry.channel in shown
     ]
@@ -147,7 +124,6 @@ def render(
         for entry in _render_action(
             action,
             perceives=perceives,
-            redactor=Redactor(),
         )
         if entry.channel in shown
     ]
@@ -236,10 +212,9 @@ def _render_history(
     *,
     view: View,
     perceives: MediaTypes,
-    redactor: Redactor,
 ) -> Iterator[_Entry]:
     """Yield the entries of the trajectory's history, through the view's redaction, in order;
-    its subagents' are not. `redactor` redacts the media lifted from tool calls.
+    its subagents' are not.
     """
     delegations = set(trajectory.subagents)
     view_redactor = Redactor(view.redaction)
@@ -255,7 +230,6 @@ def _render_history(
                 yield from _render_action(
                     event,
                     perceives=perceives,
-                    redactor=redactor,
                 )
             case Observation():
                 yield _render_observation(
@@ -272,12 +246,8 @@ def _render_action(
     action: Action,
     *,
     perceives: MediaTypes,
-    redactor: Redactor,
 ) -> Iterator[_Entry]:
-    """Yield an action's thought, its parts, then each tool call; nothing for what is empty.
-
-    `redactor` redacts the media lifted from the tool calls' arguments.
-    """
+    """Yield an action's thought, its parts, then each tool call; nothing for what is empty."""
     if action.thought:
         yield _render_entry(
             action.thought,
@@ -298,7 +268,6 @@ def _render_action(
             content=_render_tool_call(
                 call,
                 perceives=perceives,
-                redactor=redactor,
             ),
         )
 
@@ -455,7 +424,7 @@ def _render_media(
     perceives it; otherwise media is its description or a mark.
 
     Text media is never passed on, so text by URL or in bytes that are not UTF-8 falls to its
-    description or a mark. `ref` numbers media lifted from a tool call's arguments.
+    description or a mark. `ref` numbers a tool call's media.
     """
     if part.media_type.lower().startswith("text/"):
         text = read_text(part)
@@ -491,8 +460,7 @@ def _describe_media(
     """Render media the model is not given as its description, or else as a mark.
 
     The agent's own description is its claim about the media, so the media stays unseen.
-    Media lifted from a tool call's arguments has a description only when a redaction gave it
-    one, and keeps its ref either way.
+    A tool call's media keeps its ref either way.
     """
     if part.description is not None:
         description = _escape(part.description.text)
@@ -520,55 +488,24 @@ def _render_tool_call(
     call: ToolCall,
     *,
     perceives: MediaTypes,
-    redactor: Redactor,
 ) -> _Content:
-    """Render a tool call, each data URL string in its arguments lifted out after them.
-
-    The n-th lifted string is replaced by "[media n]", and its media, through `redactor`,
-    carries ref="n".
-    """
-    lifted: list[MediaPart] = []
-
-    def lift(found: re.Match[str]) -> str:
-        try:
-            data = b64decode(
-                found["data"],
-                validate=True,
-            )
-        # binascii.Error for data that is not base64, ValueError for text that is not ASCII.
-        except ValueError:
-            return found[0]
-        lifted.append(
-            MediaPart(
-                media_type=found["media_type"],
-                data=data,
-            ),
-        )
-        return f'"[media {len(lifted)}]"'
-
-    arguments = _escape(
-        _DATA_URL.sub(
-            lift,
-            call.arguments,
-        ),
-    )
-    media = [
-        _render_lifted(
-            redactor.redact_part(part),
-            perceives=perceives,
-            ref=str(number),
-        )
-        for number, part in enumerate(
-            lifted,
-            start=1,
-        )
-    ]
+    """Render a tool call: its arguments, then the n-th part of its media with ref="n"."""
     return _wrap(
         "tool_call",
         content=_concatenate(
             [
-                arguments,
-                *media,
+                _escape(call.arguments),
+                *(
+                    _render_tool_call_part(
+                        part,
+                        perceives=perceives,
+                        ref=str(number),
+                    )
+                    for number, part in enumerate(
+                        call.media,
+                        start=1,
+                    )
+                ),
             ],
         ),
         id=call.id,
@@ -576,15 +513,13 @@ def _render_tool_call(
     )
 
 
-def _render_lifted(
+def _render_tool_call_part(
     part: Part,
     *,
     perceives: MediaTypes,
     ref: str,
 ) -> _Content:
-    """Render media lifted from a tool call's arguments, or the part a redaction put in its
-    place, in an element that carries its ref.
-    """
+    """Render a part of a tool call's media in an element that carries its ref."""
     if isinstance(
         part,
         MediaPart,
