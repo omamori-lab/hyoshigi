@@ -1,8 +1,8 @@
 name: CI
 
 # Runs scripts/check.sh, the one gate script, on every pull request and on pushes
-# to main, across the supported Python versions, and scans the whole history for
-# secrets.
+# to main, across the supported Python versions, runs the test suite at the
+# lowest versions pyproject.toml allows, and scans the whole history for secrets.
 
 on:
   pull_request:
@@ -51,6 +51,33 @@ jobs:
 
       - name: Run every gate
         run: scripts/check.sh
+
+  lowest-versions:
+    # The lock file pins the newest versions, so the gates never see the lower
+    # bounds in pyproject.toml. This job resolves every direct dependency to the
+    # lowest version its bound allows and runs the test suite there, without the
+    # docs site tests, which need the docs group and Pandoc.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UV_RESOLUTION: lowest-direct
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      # The dev group installs hyoshigi with every extra.
+      - name: Install the lowest direct versions
+        run: uv sync --group dev
+
+      - name: Run the test suite
+        run: uv run --no-sync pytest -q --ignore=tests/docs/test_site.py
 
   secrets:
     runs-on: ubuntu-latest
