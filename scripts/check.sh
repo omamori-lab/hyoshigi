@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run every gate: the gitleaks secrets scan, ruff, the spread check, ty, the
-# test suite, the lanorme standards, a strict build of the docs site, a package
-# build, and an import of the built wheel in a fresh environment. Run this
-# before committing or finishing a change. No arguments.
+# Run every gate: the gitleaks secrets scan, the release check, ruff, the spread
+# check, ty, the test suite, the lanorme standards, a strict build of the docs
+# site, a package build, and an import of the built wheel in a fresh
+# environment. Run this before committing or finishing a change. No arguments.
 #
 #   scripts/check.sh
 #
@@ -38,6 +38,9 @@ if command -v gitleaks >/dev/null 2>&1; then
 else
   echo "skipped: gitleaks is not on PATH; CI's secrets job scans the whole history."
 fi
+
+echo "==> release (CHANGELOG.md and CITATION.cff against __version__)"
+scripts/check-release.sh
 
 echo "==> ruff"
 uv run --group dev ruff check .

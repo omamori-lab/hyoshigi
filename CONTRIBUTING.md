@@ -34,7 +34,9 @@ One script runs every gate:
 scripts/check.sh
 ```
 
-It scans for secrets with gitleaks and `.gitleaks.toml`, then runs ruff, the
+It scans for secrets with gitleaks and `.gitleaks.toml`, checks that
+`CHANGELOG.md` and `CITATION.cff` agree with `__version__`
+(`scripts/check-release.sh`), then runs ruff, the
 spread check, ty (type checking), the test suite and the lanorme standards
 (naming, complexity, docstrings, prose), builds the docs site with
 `--strict`, builds the package and imports the built wheel in a fresh
