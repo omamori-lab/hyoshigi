@@ -43,6 +43,35 @@ def test_a_tool_call_puts_a_numbered_placeholder_in_place_of_each_data_url_strin
     assert call.arguments == '["[media 1]", "q3.png", "[media 2]"]'
 
 
+# JSON allows any character of a string to be written as an escape (RFC 8259, section 7).
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        pytest.param(
+            '{"image": "data:image\\/png;base64,iVBORw0KGgo="}',
+            id="solidus-escaped",
+        ),
+        pytest.param(
+            '{"image": "\\u0064ata:image/png;base64,iVBORw0KGgo="}',
+            id="letter-escaped",
+        ),
+        pytest.param(
+            '{"image": "data:image/png;base64,iVBORw0KGgo\\u003d"}',
+            id="padding-escaped",
+        ),
+    ],
+)
+def test_a_tool_call_lifts_a_data_url_string_written_with_escapes(arguments: str) -> None:
+    call = ToolCall(
+        id="call_1",
+        name="upload",
+        arguments=arguments,
+    )
+
+    assert call.arguments == '{"image": "[media 1]"}'
+
+
 def test_a_tool_call_numbers_its_placeholders_after_the_media_given() -> None:
     call = ToolCall(
         id="call_1",
