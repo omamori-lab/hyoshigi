@@ -45,27 +45,28 @@ release_date="$(sed -n -E "s/^## \[${escaped_version}\] - ([0-9]{4}-[0-9]{2}-[0-
 if [[ -z "${release_date}" ]]; then
   report "CHANGELOG.md has no '## [${version}] - YYYY-MM-DD' section."
 else
-  # The section runs to the next "## [" heading; its lines that are not blank
-  # are counted.
+  # The section runs to the next "## [" heading; its lines that are neither
+  # blank nor headings are counted.
   entries="$(awk -v heading="## [${version}] - " '
     index($0, heading) == 1 { grab = 1; next }
     grab && /^## \[/ { exit }
-    grab && /[^ \t]/ { count++ }
+    grab && /[^ \t]/ && !/^#/ { count++ }
     END { print count + 0 }
   ' CHANGELOG.md)"
   if [[ "${entries}" -eq 0 ]]; then
     report "the CHANGELOG.md section for ${version} is empty."
   fi
 fi
-if ! grep -q -E "^\[${escaped_version}\]: https://" CHANGELOG.md; then
+if ! grep -q -E "^\[${escaped_version}\]: https://[^[:space:]]" CHANGELOG.md; then
   report "CHANGELOG.md has no '[${version}]: https://...' link reference."
 fi
 
-citation_version="$(sed -n -E 's/^version: "?([^"]*)"?$/\1/p' CITATION.cff)"
+# A value is read in double quotes or bare; one with a lone quote reads as none.
+citation_version="$(sed -n -E 's/^version: ("([^"]*)"|([^"]*))$/\2\3/p' CITATION.cff)"
 if [[ "${citation_version}" != "${version}" ]]; then
   report "CITATION.cff has version '${citation_version}', not ${version}."
 fi
-citation_date="$(sed -n -E 's/^date-released: "?([^"]*)"?$/\1/p' CITATION.cff)"
+citation_date="$(sed -n -E 's/^date-released: ("([^"]*)"|([^"]*))$/\2\3/p' CITATION.cff)"
 if [[ -n "${release_date}" && "${citation_date}" != "${release_date}" ]]; then
   report "CITATION.cff has date-released '${citation_date}', not ${release_date} as in CHANGELOG.md."
 fi
