@@ -596,6 +596,77 @@ def test_a_redaction_with_no_media_function_keeps_an_opaque_part_of_the_media_ty
     )
 
 
+@pytest.mark.xfail(strict=True)
+@pytest.mark.parametrize(
+    ("text", "arguments"),
+    [
+        pytest.param(
+            str,
+            '{"image": "[media 1]"}',
+            id="text-kept",
+        ),
+        pytest.param(
+            partial(
+                re.sub,
+                "[0-9]",
+                "#",
+            ),
+            '{"image": "[media #]"}',
+            id="digits-masked",
+        ),
+        pytest.param(
+            partial(
+                re.sub,
+                "[A-Za-z0-9+/]{8,}",
+                "[SECRET]",
+            ),
+            '{"image": "[media 1]"}',
+            id="long-tokens-masked",
+        ),
+    ],
+)
+def test_media_in_tool_call_arguments_is_kept_through_the_media_function_whatever_the_text(
+    text: Callable[[str], str],
+    arguments: str,
+) -> None:
+    trajectory = Trajectory(redaction=Redaction(text=text))
+
+    trajectory.act(
+        Action(
+            id="a1",
+            tool_calls=(
+                ToolCall(
+                    id="call_1",
+                    name="upload",
+                    arguments='{"image": "data:image/png;base64,iVBORw0KGgo="}',
+                ),
+            ),
+        ),
+    )
+
+    assert trajectory.dump()["history"] == [
+        {
+            "kind": "action",
+            "id": "a1",
+            "thought": [],
+            "parts": [],
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "name": "upload",
+                    "arguments": arguments,
+                    "media": [
+                        {
+                            "kind": "opaque",
+                            "opaque_kind": "image/png",
+                        },
+                    ],
+                },
+            ],
+        },
+    ]
+
+
 def test_media_a_redaction_turns_into_text_is_kept_with_that_text_redacted() -> None:
     trajectory = Trajectory(redaction=TO_TEXT)
 
